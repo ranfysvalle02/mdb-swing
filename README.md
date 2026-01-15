@@ -11,6 +11,42 @@ In this guide, we are going to build **The Sentinel**, a Python-based agent that
 3. **Executes a "Shadow Trade"** (Paper Trade) to track performance.
 4. **Pings your phone** so you can decide if you want to mirror the trade with real money.
 
+## Executive Summary
+
+**The Sentinel** is a hybrid AI trading agent designed to mitigate the risks of fully autonomous trading while leveraging the speed of algorithmic analysis. It solves the "black box" problem by acting as a high-speed analyst rather than a reckless trader—automating the research, but leaving the final financial decision to a human.
+
+* **Goal:** Automate the 99% of trading that is boring (scanning, math, news reading) to focus on the 1% that matters (decision making).
+* **Mechanism:** It scans for technical dips in uptrending stocks, uses an LLM (GPT-4) to verify the move against real-time news sentiment, and executes a "paper trade" to track hypothetical performance.
+* **Stack:** Python, Docker, MongoDB (Storage), OpenAI (Sentiment Analysis), Alpaca (Market Data & Paper Execution).
+* **Outcome:** A push notification on your phone containing a pre-validated, high-probability trade setup with entry, stop-loss, and take-profit targets calculated for you.
+
+---
+
+## The Strategy: Explained Simply
+
+Think of **The Sentinel** like a professional house flipper looking for a deal in a nice neighborhood. It uses three specific checks before it calls you:
+
+### 1. The "Good Neighborhood" Check (Trend)
+
+* **Technical Term:** 50-Day Moving Average (SMA).
+* **The Analogy:** We only want to buy houses in neighborhoods where property values are generally going *up* over time. If the whole neighborhood is crashing (Price < SMA), we don't care how cheap the house is—we aren't interested.
+
+### 2. The "Ugly Paint" Check (Discount)
+
+* **Technical Term:** RSI (Relative Strength Index) < 35.
+* **The Analogy:** We found a great neighborhood, but we don't want to pay full price. We look for the one house that looks a little ugly right now—maybe the paint is peeling or the lawn is overgrown (Oversold). It’s a good asset temporarily looking bad.
+
+### 3. The "Foundation" Check (AI Analysis)
+
+* **Technical Term:** LLM Sentiment Analysis.
+* **The Analogy:** This is the most critical step. Before we buy that ugly house, we hire an inspector ( The AI) to check *why* it's cheap.
+* **Good Cheap:** The lawn is overgrown because the owner was lazy. (Market overreaction to minor news). **Result: BUY.**
+* **Bad Cheap:** The foundation is cracked and the house is sinking. (CEO fraud, bankruptcy, major lawsuit). **Result: WALK AWAY.**
+
+
+
+Only when a stock passes all three checks—it's in a good trend, it's currently cheap, and the news confirms the "foundation" is solid—does the bot ping your phone.
+
 ---
 
 ## The Architecture
