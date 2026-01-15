@@ -147,6 +147,7 @@ This is the core logic. It implements the "Three-Green-Lights" strategy: **Trend
 ```python
 import time
 import os
+import math
 import requests
 import pandas as pd
 import alpaca_trade_api as tradeapi
@@ -162,14 +163,24 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.pydantic_v1 import BaseModel, Field
 
 # --- LOGGING SETUP ---
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger("Sentinel")
 
 # --- CONFIGURATION ---
-SYMBOL = os.getenv("TARGET_SYMBOL", "NVDA")
-TP_PCT = float(os.getenv("TAKE_PROFIT_PCT", 1.08))
-SL_PCT = float(os.getenv("STOP_LOSS_PCT", 0.96))
+# Load symbols as a comma-separated string (e.g. "NVDA,AMD,MSFT,TSLA")
+SYMBOLS_ENV = os.getenv("TARGET_SYMBOLS", "NVDA,AMD,MSFT,GOOGL,AMZN")
+SYMBOLS = [s.strip() for s in SYMBOLS_ENV.split(',')]
 
+# Risk Management
+RISK_PER_TRADE_PCT = 0.01  # Risk 1% of total equity per trade
+MAX_POS_SIZE_PCT = 0.20    # Never put more than 20% of account in one trade
+TP_PCT = float(os.getenv("TAKE_PROFIT_PCT", 1.08)) # Target: +8%
+SL_PCT = float(os.getenv("STOP_LOSS_PCT", 0.96))   # Stop: -4%
+
+# Infrastructure
 NTFY_TOPIC = os.getenv("NTFY_TOPIC", "sentinel_dev")
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
 PUBLIC_URL = os.getenv("PUBLIC_URL", "http://localhost:5000")
@@ -197,7 +208,6 @@ class TradeSignal(BaseModel):
 
 class SentinelAgent:
     def __init__(self):
-        # Ensure you have OPENAI_API_KEY in your env
         self.llm = ChatOpenAI(model="gpt-4-turbo", temperature=0.5) 
         self.chain = self._build_chain()
     
@@ -222,15 +232,15 @@ agent = SentinelAgent()
 # --- 2. DATA METHODS ---
 def get_clean_data(symbol):
     try:
-        # Fetch 100 days to ensure robust SMA calculation
+        # Fetch 100 days for SMA calculation
         bars = api.get_bars(symbol, TimeFrame.Day, limit=100).df
         if bars.empty: return None
-        
-        # Reset index to handle MultiIndex issues cleanly
-        bars = bars.reset_index()
+        # Clean MultiIndex if present
+        if isinstance(bars.index, pd.MultiIndex):
+            bars = bars.reset_index()
         return bars
     except Exception as e:
-        logger.error(f"Alpaca Data Error: {e}")
+        logger.error(f"Data Error {symbol}: {e}")
         return None
 
 def get_market_news(symbol):
@@ -238,64 +248,91 @@ def get_market_news(symbol):
         news_list = api.get_news(symbol=symbol, limit=3)
         return [n.headline for n in news_list]
     except Exception as e:
-        logger.error(f"News Error: {e}")
+        logger.warning(f"News Error {symbol}: {e}")
         return []
 
-# --- 3. MATH & STRATEGY (UPDATED WITH FIX) ---
+# --- 3. MATH & RISK MANAGEMENT ---
 def calculate_technicals(data):
-    """
-    Calculates RSI (14) and SMA (50).
-    SAFEGUARD: Returns neutral values if data is insufficient.
-    """
-    # 1. Safety Check: Need at least 50 days for SMA
     if len(data) < 50:
-        logger.warning("⚠️ Insufficient data for SMA50. Skipping calculation.")
-        # Return RSI=50 (neutral) and SMA=Infinite (fails price > sma check)
-        return 50.0, float('inf')
+        return 50.0, float('inf') # Not enough data
 
-    # Ensure we use 'close' column (Alpaca sometimes returns lowercase)
     data.columns = [c.lower() for c in data.columns]
     
-    # RSI Calculation
+    # RSI (14)
     delta = data['close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-    loss = loss.replace(0, 0.001) # Avoid div by zero
+    loss = loss.replace(0, 0.001)
     rs = gain / loss
     rsi = 100 - (100 / (1 + rs)).iloc[-1]
     
-    # SMA 50
+    # SMA (50)
     sma = data['close'].rolling(window=50).mean().iloc[-1]
     
-    # Handle NaN result from rolling window
-    if pd.isna(sma) or pd.isna(rsi):
-        return 50.0, float('inf')
-
     return rsi, sma
 
-# --- 4. EXECUTION (BRACKET ORDERS) ---
-def execute_bracket_trade(symbol, price, side, reason, score):
+def calculate_position_size(price):
     """
-    Submits a Buy Order with attached Take-Profit and Stop-Loss.
+    Calculates dynamic share quantity based on account equity and risk.
     """
     try:
-        # 1. Check if we already own it
+        account = api.get_account()
+        equity = float(account.equity)
+        buying_power = float(account.buying_power)
+        
+        # 1. Calculate Risk Amount (e.g., 1% of $100k = $1,000 risk)
+        risk_amt = equity * RISK_PER_TRADE_PCT
+        
+        # 2. Calculate Stop Loss distance per share
+        # If Price is $100 and SL_PCT is 0.96, Stop is at $96. Distance = $4.
+        sl_price = price * SL_PCT
+        loss_per_share = price - sl_price
+        
+        if loss_per_share <= 0: return 0 # Avoid division by zero
+        
+        # 3. Calculate Ideal Qty based on Risk
+        # Shares = $1000 Risk / $4 loss per share = 250 shares
+        qty_risk = risk_amt / loss_per_share
+        
+        # 4. Calculate Max Qty based on Total Allocation Cap
+        # e.g., Max 20% of account = $20,000. $20,000 / $100 price = 200 shares.
+        max_alloc = equity * MAX_POS_SIZE_PCT
+        qty_cap = max_alloc / price
+        
+        # 5. Take the smaller of the two (Risk vs Cap)
+        final_qty = math.floor(min(qty_risk, qty_cap))
+        
+        # 6. Final check against Buying Power
+        if (final_qty * price) > buying_power:
+            final_qty = math.floor(buying_power / price)
+            
+        return max(1, final_qty) # Ensure at least 1 share if affordable
+        
+    except Exception as e:
+        logger.error(f"Risk Calc Error: {e}")
+        return 1 # Fallback to 1 share
+
+# --- 4. EXECUTION ---
+def execute_bracket_trade(symbol, price, side, reason, score):
+    try:
+        # Check existing position
         try:
             pos = api.get_position(symbol)
             if float(pos.qty) > 0:
                 logger.info(f"✋ Existing position in {symbol}. Skipping.")
-                return None, 0, 0
+                return None, 0, 0, 0
         except:
-            pass # No position exists, proceed.
+            pass 
 
-        # 2. Calculate Exits
+        # Calculate Quantity
+        qty = calculate_position_size(price)
+        
         take_profit = round(price * TP_PCT, 2)
         stop_loss = round(price * SL_PCT, 2)
 
-        # 3. Submit Bracket Order
         order = api.submit_order(
             symbol=symbol,
-            qty=1,
+            qty=qty,
             side=side,
             type='market',
             time_in_force='gtc',
@@ -304,12 +341,13 @@ def execute_bracket_trade(symbol, price, side, reason, score):
             stop_loss={'stop_price': stop_loss}
         )
         
-        logger.info(f"✅ BRACKET ORDER: Buy {symbol} @ ~{price} | TP: {take_profit} | SL: {stop_loss}")
+        logger.info(f"✅ EXECUTION: Buy {qty} {symbol} @ ~{price}")
         
-        # 4. Save to DB
+        # Save to DB
         history_col.insert_one({
             "action": side,
             "symbol": symbol,
+            "qty": qty,
             "entry_price": price,
             "tp": take_profit,
             "sl": stop_loss,
@@ -318,56 +356,70 @@ def execute_bracket_trade(symbol, price, side, reason, score):
             "order_id": order.id,
             "timestamp": time.time()
         })
-        return order, take_profit, stop_loss
+        return order, tp, sl, qty
 
     except Exception as e:
-        logger.error(f"Execution Error: {e}")
-        return None, 0, 0
+        logger.error(f"Execution Error {symbol}: {e}")
+        return None, 0, 0, 0
 
 # --- 5. THE MAIN LOOP ---
 def scan_market():
-    logger.info(f"🕵️ Scanning {SYMBOL}...")
-    
+    # --- 1. MARKET HOURS CHECK ---
     try:
-        # A. Technical Check
-        df = get_clean_data(SYMBOL)
-        if df is None: return
-
-        price = df['close'].iloc[-1].item()
-        rsi, sma = calculate_technicals(df)
-        
-        logger.info(f"📉 {SYMBOL} | Price: ${price:.2f} | RSI: {rsi:.1f} | SMA50: ${sma:.2f}")
-
-        # STRATEGY: Uptrend (Price > SMA) + Oversold (RSI < 35)
-        # Note: If calculate_technicals returned inf/50 due to low data, this fails safely.
-        is_uptrend = price > sma
-        is_oversold = rsi < 35
-
-        if not (is_uptrend and is_oversold):
-            logger.info("💤 No technical setup.")
+        clock = api.get_clock()
+        if not clock.is_open:
+            logger.info("🌙 Market is closed. Sleeping...")
             return
-
-        # B. AI Vibe Check
-        logger.info("🚦 Technicals Green. Asking AI...")
-        headlines = get_market_news(SYMBOL)
-        ai = agent.analyze(SYMBOL, headlines)
-        logger.info(f"🧠 AI Score: {ai.score}/10 | {ai.reason}")
-
-        # C. Trigger
-        if ai.score >= 7:
-            order, tp, sl = execute_bracket_trade(SYMBOL, price, "buy", ai.reason, ai.score)
-            if order:
-                notify_user(price, rsi, ai, tp, sl, order.id)
-        else:
-            logger.info("❌ AI rejected the trade (Score too low).")
-
     except Exception as e:
-        logger.error(f"CRITICAL LOOP ERROR: {e}")
+        logger.error(f"Clock check failed: {e}")
+        return
 
-def notify_user(price, rsi, ai, tp, sl, order_id):
-    rh_link = f"https://robinhood.com/stocks/{SYMBOL}"
+    logger.info("☀️ Market is OPEN. Starting Scan...")
+
+    # --- 2. MULTI-SYMBOL LOOP ---
+    for symbol in SYMBOLS:
+        try:
+            logger.info(f"🔎 Scanning {symbol}...")
+            
+            # A. Technical Check
+            df = get_clean_data(symbol)
+            if df is None: continue
+
+            price = df['close'].iloc[-1].item()
+            rsi, sma = calculate_technicals(df)
+
+            is_uptrend = price > sma
+            is_oversold = rsi < 35
+            
+            # Skip if technicals don't align
+            if not (is_uptrend and is_oversold):
+                continue
+                
+            logger.info(f"⚡ SETUP FOUND: {symbol} | RSI: {rsi:.1f} | Price > SMA")
+
+            # B. AI Analysis
+            headlines = get_market_news(symbol)
+            ai = agent.analyze(symbol, headlines)
+            
+            logger.info(f"🧠 {symbol} AI Score: {ai.score}/10 | {ai.reason}")
+
+            # C. Trigger
+            if ai.score >= 7:
+                order, tp, sl, qty = execute_bracket_trade(symbol, price, "buy", ai.reason, ai.score)
+                if order:
+                    notify_user(symbol, price, qty, rsi, ai, tp, sl, order.id)
+            else:
+                logger.info(f"❌ {symbol}: Good Technicals, Bad Sentiment.")
+
+        except Exception as e:
+            logger.error(f"Error scanning {symbol}: {e}")
+            continue
+
+def notify_user(symbol, price, qty, rsi, ai, tp, sl, order_id):
+    rh_link = f"https://robinhood.com/stocks/{symbol}"
     msg = (
-        f"🚀 Enter: {SYMBOL} @ ${price}\n"
+        f"🚀 BUY: {symbol} ({qty} shares)\n"
+        f"💰 Entry: ${price}\n"
         f"🎯 Target: ${tp}\n"
         f"🛑 Stop: ${sl}\n"
         f"🧠 AI: {ai.score}/10 ({ai.reason})"
@@ -377,7 +429,7 @@ def notify_user(price, rsi, ai, tp, sl, order_id):
         requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", 
             data=msg,
             headers={
-                "Title": f"Opener: {SYMBOL}",
+                "Title": f"Sentinel: {symbol} Trade",
                 "Priority": "high",
                 "Tags": "money_with_wings",
                 "Actions": f"view, 📱 Broker, {rh_link}; view, 🔍 Logic, {PUBLIC_URL}/browse?id={order_id}"
@@ -399,22 +451,22 @@ def browse():
         <p><b>AI Score:</b> {record['ai_score']}/10</p>
         <p><b>Reasoning:</b> {record['reason']}</p>
         <hr>
+        <p><b>Quantity:</b> {record['qty']}</p>
         <p><b>Entry:</b> ${record['entry_price']}</p>
-        <p><b>Take Profit:</b> ${record['tp']}</p>
-        <p><b>Stop Loss:</b> ${record['sl']}</p>
+        <p><b>Risk/Reward:</b> 1:{round((record['tp']-record['entry_price'])/(record['entry_price']-record['sl']), 1)}</p>
         """
     except Exception as e:
         return f"Error loading trade: {e}"
 
 if __name__ == '__main__':
-    # Initial scan on startup
+    # Initial scan
     scan_market()
     
     scheduler = BackgroundScheduler()
+    # Runs every hour only during weekdays ideally, but the clock check handles the rest
     scheduler.add_job(scan_market, 'interval', minutes=60)
     scheduler.start()
     
-    # Run Flask
     app.run(host='0.0.0.0', port=5000)
 ```
 
