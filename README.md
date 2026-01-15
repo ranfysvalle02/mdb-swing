@@ -1,11 +1,15 @@
+
 # mdb-swing
 
 ----
+
 # Building "The Sentinel": A Headless AI Swing Trading Bot with Human Authorization
 
-> **The Problem:** Automated trading bots are terrifying. If you leave them alone, they can drain your account in minutes due to a bug.
+> **The Problem:** Automated trading bots are terrifying. If you leave them alone, they can drain your account in minutes due to a single bug or a market crash.
 >
 > **The Solution:** An "Iron Man" system. The bot does the heavy lifting (scanning, math, AI analysis), but it requires **you** to press the big red button to execute the trade.
+
+
 
 In this guide, we are going to build a **Hybrid Swing Trading System** that:
 1.  **Scans the market** every hour for technical setups (RSI, Trends).
@@ -17,90 +21,33 @@ In this guide, we are going to build a **Hybrid Swing Trading System** that:
 
 ## The Architecture
 
-We are ditching complex cloud architectures for a simple, robust **All-In-One** Python script.
+We are ditching complex cloud architectures for a simple, robust **All-In-One** Python script running in Docker.
+
+
 
 * **The Brain:** Python (Logic & Math).
 * **The Heart:** `APScheduler` runs a background loop every 60 minutes.
 * **The Nervous System:** `Ntfy.sh` (Free) sends push notifications with action buttons to your phone.
+* **The Memory:** `MongoDB Atlas` (Local or Cloud) stores trade history.
 * **The Hands:** `Flask` listens for your approval click to execute the trade.
 
 ---
 
 ## The Strategy: "Three-Green-Lights"
 
-Before bothering you, the bot filters stocks through a rigorous checklist:
+Before bothering you, the bot filters stocks through a rigorous checklist. Note that this is a **Mean Reversion** strategy, designed to catch stocks that have dipped but are fundamentally strong.
 
 1.  **The Trend:** Is the stock in an uptrend? (SMA 50 Check).
-2.  **The Discount:** Is the stock oversold? (RSI < 40).
+2.  **The Discount:** Is the stock oversold? (RSI < 35).
 3.  **The Vibe Check:** Does the news look good? (AI Sentiment Analysis).
 
-Only if **all** conditions are met does your phone buzz.
-
-## The Result
-
-1. **You go about your day.**
-2. Suddenly, your phone buzzes.
-3. **"🚀 Signal: NVDA ($120.50)"**
-4. You see the RSI is low and the AI says "Bullish."
-5. You tap **[ Buy Now ]**.
-6. The browser opens, displays "✅ Order Placed," and the trade is logged.
-
-You are now a cyborg trader.
-
-> **Disclaimer:** *Trading stocks involves risk. This code is for educational purposes only. Always paper trade (simulate) for weeks before using real money. I am an AI, not a financial advisor.*
-
-In this guide, we are building a professional Swing Trading System that features:
-
-1. **Agentic AI:** Uses **LangChain** and **Pydantic** to force the AI to act as a disciplined analyst (no hallucinations).
-2. **Semantic Memory:** Uses **MongoDB Atlas Local** to fuzzy-search past market signals offline without cloud fees.
-3. **Enterprise Compatibility:** Supports both **OpenAI (GPT-4o)** and **Azure OpenAI** out of the box.
-4. **Human-in-the-Loop:** Pings your phone via **Ntfy** with a "Mission Report" and waits for your authorization.
+> **Warning:** Strategies relying on RSI < 35 can be dangerous in a market crash (catching a falling knife). That is why the **AI Sentiment Check** is crucial—it ensures we aren't buying a stock that is crashing due to a scandal or earnings miss.
 
 ---
 
-## Trust
+## Part 1: The Code
 
-**Trust is earned, not hard-coded.**
-
-Most algorithmic trading tutorials ask you to hand over your API keys and pray. They promise that if `RSI < 30`, the bot will make you rich. In reality, it usually just buys a falling knife and drains your account while you sleep.
-
-We are going to build something smarter. We are building **The Sentinel**.
-
-It is a "Shadow Trading" system. It runs 24/7 on your machine, watching the market, reading the news, and **executing trades with monopoly money** (Alpaca Paper Trading).
-
-It doesn't ask for permission to practice. It trades automatically in a sandbox. Then, it pings your phone: *"I just bought NVDA on Paper at $120. Here is my thesis."*
-
-Crucially, it provides a **Deep Link to Robinhood**. If you agree with the bot's shadow trade, you can tap one button to open the app and place the trade with real money yourself.
-
----
-
-## The Economics: Cost of Business
-
-While the code in this repository is free, intelligence is not.
-
-This bot uses OpenAI's **GPT-4o** to analyze news sentiment.
-* **Token Usage:** ~1,000 tokens per analysis (News Headlines + System Prompt).
-* **Frequency:** Once per hour (24 times/day).
-* **Estimated Cost:** ~$0.20 - $0.30 per day.
-
-You are effectively hiring a Junior Analyst to watch the charts 24/7 for the price of a gumball. If you want to cut costs, you can switch the model to `gpt-4o-mini` in the code, which drops the cost to pennies per month.
-
----
-
-## The Architecture: The "Shadow" Loop
-
-We are using a **Microservices** approach running in Docker.
-
-1. **The Analyst (LangChain + OpenAI):** Reads news headlines and forms an opinion (Bullish/Bearish).
-2. **The Quant (Pandas):** Calculates hard math (RSI, SMA) to find entry points.
-3. **The Historian (MongoDB Atlas):** Stores every "Shadow Trade" and the *exact* news context that triggered it.
-4. **The Executioner (Alpaca Paper API):** Automatically places the simulation trade.
-
----
-
-## Part 1: The Code (`demo.py`)
-
-Here is the complete, updated script. It is configured for **Automatic Paper Trading** + **Human Ready Mode**.
+Here is the complete script. It is configured for **Automatic Paper Trading** + **Human Ready Mode**.
 
 ### 1. `requirements.txt`
 
@@ -109,7 +56,7 @@ flask
 apscheduler
 yfinance
 requests
-pymongo
+pymongo[srv]
 langchain
 langchain-openai
 alpaca-trade-api
@@ -132,8 +79,6 @@ CMD ["python", "demo.py"]
 
 ### 3. `docker-compose.yml`
 
-*Don't forget to add your Keys!*
-
 ```yaml
 version: '3.8'
 services:
@@ -147,7 +92,6 @@ services:
       - "27017:27017"
     volumes:
       - atlas-data:/data/db
-      - atlas-search-index:/var/lib/mongodb/mongot
 
   bot:
     build: .
@@ -156,13 +100,12 @@ services:
       - "5000:5000"
     environment:
       MONGO_URI: mongodb://admin:password123@atlas:27017/?directConnection=true
-      # Your public URL for viewing memory
+      # Your public URL (ngrok) for viewing memory
       PUBLIC_URL: https://YOUR_NGROK_URL.ngrok-free.app
       NTFY_TOPIC: my_shadow_bot_007
       
       # AI
       OPENAI_API_KEY: sk-proj-YOUR-KEY
-      # PERSONALITY: Standard, Gekko, or Yoda?
       BOT_PERSONALITY: "Standard" 
       
       # ALPACA PAPER TRADING (REQUIRED)
@@ -175,11 +118,12 @@ services:
         condition: service_healthy
 volumes:
   atlas-data:
-  atlas-search-index:
 
 ```
 
-### 4. `demo.py` (The Shadow Trader)
+### 4. `demo.py` (The Sentinel)
+
+This updated script includes **Robust Data Handling**. Financial APIs like `yfinance` often change their data structure (MultiIndex vs Single Index) or return empty frames. This script anticipates those errors.
 
 ```python
 import time
@@ -217,7 +161,7 @@ signals_col = db['history']
 # --- 1. PERSONALITIES (LLM MAGIC) ---
 PROMPTS = {
     "Standard": "You are a Senior Hedge Fund Analyst. Be professional, skeptical, and concise.",
-    "Gekko": "You are a ruthless Wall Street corporate raider from the 80s. Greed is good. Use aggressive metaphors.",
+    "Gekko": "You are a ruthless Wall Street corporate raider. Greed is good. Use aggressive metaphors.",
     "Yoda": "A wise Jedi Master you are. The market flow you sense. Speak in riddles you must."
 }
 
@@ -228,13 +172,14 @@ class TradeSignal(BaseModel):
 
 class SentinelAgent:
     def __init__(self):
-        self.llm = ChatOpenAI(model="gpt-4o", temperature=0.7) # Slightly creative for personality
+        self.llm = ChatOpenAI(model="gpt-4o", temperature=0.7) 
         self.chain = self._build_chain()
     
     def _build_chain(self):
         base_persona = PROMPTS.get(PERSONALITY, PROMPTS["Standard"])
         system_prompt = f"""{base_persona}
-        Analyze the news headlines. If news is old/irrelevant, score 5.
+        Analyze the news headlines. 
+        If news is old/irrelevant, score 5.
         Output valid JSON."""
         
         prompt = ChatPromptTemplate.from_messages([
@@ -249,23 +194,41 @@ class SentinelAgent:
 
 agent = SentinelAgent()
 
-# --- 3. MATH & EXECUTION ---
+# --- 3. DATA & MATH (ROBUST) ---
+def get_clean_data(ticker):
+    """
+    Safely fetches and cleans data, handling yfinance MultiIndex issues.
+    """
+    try:
+        df = yf.download(ticker, period="1mo", interval="1d", progress=False)
+        
+        if df.empty or len(df) < 14:
+            print(f"⚠️ Data insufficient for {ticker}.")
+            return None
+
+        # Fix: Handle yfinance MultiIndex (flatten columns if needed)
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+            
+        return df
+    except Exception as e:
+        print(f"❌ Data Fetch Error: {e}")
+        return None
+
 def calculate_rsi(data, window=14):
-    """Calculates Relative Strength Index (RSI)."""
     delta = data['Close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
-    
-    # Avoid division by zero
-    loss = loss.replace(0, 0.001) 
+    loss = loss.replace(0, 0.001) # Zero division safeguard
     rs = gain / loss
     return 100 - (100 / (1 + rs)).iloc[-1]
 
 def execute_shadow_trade(symbol, side, reason, score):
-    """Places a PAPER trade automatically and logs it."""
+    """Places a PAPER trade automatically."""
     try:
         api = tradeapi.REST(ALPACA_KEY, ALPACA_SECRET, ALPACA_URL)
-        # Check if we already have a position to avoid stacking
+        
+        # Check existing position to prevent "Stacking" trades
         try:
             pos = api.get_position(symbol)
             if side == 'buy' and float(pos.qty) > 0:
@@ -274,15 +237,13 @@ def execute_shadow_trade(symbol, side, reason, score):
         except:
             pass # No position exists
 
-        # Submit Paper Order
         order = api.submit_order(symbol=symbol, qty=1, side=side, type='market', time_in_force='gtc')
         print(f"✅ SHADOW TRADE EXECUTED: {side.upper()} {symbol}")
         
-        # Log to MongoDB Atlas
+        # Log to Mongo
         signals_col.insert_one({
             "action": side,
             "symbol": symbol,
-            "price": "Market", # We could fetch fill price later
             "reason": reason,
             "ai_score": score,
             "order_id": order.id,
@@ -296,96 +257,64 @@ def execute_shadow_trade(symbol, side, reason, score):
 # --- 4. THE LOOP ---
 def scan_market():
     print(f"\n🕵️ Scanning {SYMBOL}...")
-    try:
-        # Fetch Data
-        df = yf.download(SYMBOL, period="1mo", interval="1d", progress=False)
-        
-        # --- SAFEGUARD: Handle Empty/Bad Data ---
-        if df.empty or len(df) < 14:
-            print(f"⚠️ Data insufficient or empty for {SYMBOL}. Skipping scan.")
-            return
+    
+    # 1. Technical Check
+    df = get_clean_data(SYMBOL)
+    if df is None: return
 
-        rsi = calculate_rsi(df)
-        price = df['Close'].iloc[-1].item()
-        print(f"📉 {SYMBOL} | Price: ${price:.2f} | RSI: {rsi:.1f}")
-        
-        # LOGIC:
-        # If RSI < 35: Potentially Oversold -> Check for BUY
-        # If RSI > 70: Potentially Overbought -> Check for SELL (Optional)
-        
-        action = None
-        if rsi < 35: action = "buy"
-        
-        if not action:
-            print("💤 Market Neutral.")
-            return
+    rsi = calculate_rsi(df)
+    price = df['Close'].iloc[-1].item()
+    print(f"📉 {SYMBOL} | Price: ${price:.2f} | RSI: {rsi:.1f}")
+    
+    action = None
+    # Strategy: Buy Dips, but not Crashes
+    if rsi < 35: action = "buy"
+    
+    if not action:
+        print("💤 Market Neutral.")
+        return
 
-        # AI CHECK
-        stock = yf.Ticker(SYMBOL)
-        # Safety check for news
-        news_data = stock.news if stock.news else []
-        news = [n['title'] for n in news_data[:3]]
-        
-        ai = agent.analyze(SYMBOL, news)
-        
-        print(f"🧠 AI Score: {ai.score} | {ai.reason}")
+    # 2. AI Sentiment Check
+    stock = yf.Ticker(SYMBOL)
+    news_data = stock.news if stock.news else []
+    news = [n['title'] for n in news_data[:3]]
+    
+    ai = agent.analyze(SYMBOL, news)
+    print(f"🧠 AI Score: {ai.score} | {ai.reason}")
 
-        # EXECUTION TRIGGER
-        # Buy if RSI is low AND AI is Bullish (>7)
-        if action == "buy" and ai.score >= 7:
-            order = execute_shadow_trade(SYMBOL, "buy", ai.reason, ai.score)
-            if order:
-                notify_user(price, rsi, ai, order.id)
-
-    except Exception as e:
-        print(f"⚠️ Scan Error: {e}")
+    # 3. Execution Trigger
+    # Rule: Only buy the dip if the AI is Bullish (>7)
+    if action == "buy" and ai.score >= 7:
+        order = execute_shadow_trade(SYMBOL, "buy", ai.reason, ai.score)
+        if order:
+            notify_user(price, rsi, ai, order.id)
 
 def notify_user(price, rsi, ai, order_id):
-    # DEEP LINK: Opens Robinhood App directly to the stock
     rh_link = f"[https://robinhood.com/stocks/](https://robinhood.com/stocks/){SYMBOL}"
     
     try:
         requests.post(f"[https://ntfy.sh/](https://ntfy.sh/){NTFY_TOPIC}", 
-            data=f"🤖 I just paper-traded {SYMBOL}!\nScore: {ai.score}/10\nReason: {ai.reason}",
+            data=f"🤖 Paper Trade: {SYMBOL}\nScore: {ai.score}/10\nReason: {ai.reason}",
             headers={
                 "Title": f"👻 Shadow Buy: {SYMBOL} (${price:.2f})",
-                "Priority": "default",
+                "Priority": "high",
                 "Tags": "ghost,chart_with_upwards_trend",
                 "Actions": f"view, 📱 Open Robinhood, {rh_link}; view, 🔍 Inspect Logic, {PUBLIC_URL}/browse?id={order_id}"
             },
-            timeout=10 # Prevent hanging if ntfy is down
+            timeout=10
         )
     except Exception as e:
         print(f"⚠️ Notification Failed: {e}")
 
-# --- 5. SERVER & MEMORY ---
+# --- 5. SERVER ---
 @app.route('/browse')
 def browse():
-    # Retrieve the specific trade logic from Mongo
     oid = request.args.get('id')
-    if not oid: return "<h1>Create your own luck.</h1>" # Gekko reference
-    
     record = signals_col.find_one({"order_id": oid})
     if not record: return "Trade not found in memory."
-    
-    return f"""
-    <html>
-        <body style="font-family: sans-serif; padding: 20px;">
-            <h1>🧠 Logic Inspector</h1>
-            <p><b>Action:</b> {record['action'].upper()} {record['symbol']}</p>
-            <p><b>AI Score:</b> {record['ai_score']}/10</p>
-            <div style="background: #f0f0f0; padding: 15px; border-radius: 5px;">
-                <h3>The Thesis:</h3>
-                <p>"{record['reason']}"</p>
-            </div>
-            <br>
-            <p><i>Stored permanently in MongoDB Atlas.</i></p>
-        </body>
-    </html>
-    """
+    return f"<h1>AI Reason:</h1><p>{record['reason']}</p>"
 
 if __name__ == '__main__':
-    # Initialize Atlas Search Index logic here if needed (omitted for brevity)
     scheduler = BackgroundScheduler()
     scheduler.add_job(scan_market, 'interval', minutes=60)
     scheduler.start()
@@ -396,39 +325,28 @@ if __name__ == '__main__':
 
 ---
 
-## Part 2: Cloud Scaling (MongoDB Atlas)
+## Part 2: Upgrading to Enterprise (Vector Search)
 
-When you are ready to take this from "Laptop Experiment" to "Permanent Hedge Fund," you need the cloud. We specifically used the `mongodb-atlas-local` image so that this transition is seamless.
+The code above stores your trade history in a standard database. But to make the AI truly smart, you should upgrade to **Atlas Vector Search**.
 
-**Why Atlas?**
-As your bot runs for months, you will accumulate thousands of data points (Shadow Trades). You don't just want to store them; you want to **learn** from them.
+**Why?**
+Right now, the AI treats every day as a new day. It has no memory. By using Vector Search, the AI can recall the past.
 
-* *Query:* "Show me all trades where RSI was < 30 but we *lost* money."
-* *Query:* "Did 'Gordon Gekko' mode perform better than 'Standard' mode?"
+1. **Embeddings:** When news comes in, turn the text into numbers (vectors) using OpenAI.
+2. **Storage:** Store these vectors in MongoDB Atlas.
+3. **Retrieval (RAG):** Before making a trade, the bot performs a vector search:
+* *"Find me the last 3 times news headlines looked similar to today's headlines."*
+* *"Did we lose money on those trades?"*
 
-**The Steps to Scale:**
 
-1. **Create a Free Cluster:** Go to [MongoDB.com](https://www.mongodb.com/atlas) and spin up an M0 Sandbox cluster.
-2. **Get the Connection String:** It will look like `mongodb+srv://...`.
-3. **Swap the Variable:** In your `docker-compose.yml`, replace the `MONGO_URI` with the cloud version.
-4. **Visualize:** Connect **MongoDB Charts** to your collection. You can drag-and-drop a dashboard showing your "Shadow P&L" over time without writing a single line of frontend code.
 
----
+If the historical search returns 3 losses for similar news events, the bot can **Veto** the trade, saving you money where a standard algorithm would have failed.
 
-## Part 3: "LLM Magic" (Personalization)
+## Summary
 
-The `PERSONALITY` variable in `docker-compose.yml` is where the magic happens.
+You have now built a system that is:
 
-By tweaking the System Prompt in the `SentinelAgent` class, you change *how* the bot perceives the market.
-
-**1. The "Gordon Gekko" Mode**
-
-* *Prompt:* "You are a ruthless corporate raider. You only care about asymmetric upside. If a stock is weak, crush it. If it's strong, ride it. Use quotes from the movie Wall Street."
-* *Result:* Instead of "Market is bearish," the bot logs: *"The bulls are sleeping. It's time to slaughter the sheep. Shorting TSLA."*
-
-**2. The "Warren Buffett" Mode**
-
-* *Prompt:* "You are a conservative value investor. You hate hype. You love cash flow. Only buy if the company has a 'moat'."
-* *Result:* The bot will ignore high-flying tech stocks (RSI > 70) and only alert you on boring, profitable dips.
-
-This isn't just for fun—it allows you to **A/B Test psychology.** You can run two containers: one "Aggressive" and one "Conservative," and see which personality makes more (paper) money over a month.
+1. **Safe:** It trades on paper first.
+2. **Psychologically aligned:** It asks for your permission for real money.
+3. **Robust:** It handles dirty financial data gracefully.
+4. **Extensible:** It is ready for Vector Search and RAG implementation.
