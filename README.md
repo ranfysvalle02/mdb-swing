@@ -1,62 +1,41 @@
+# Building "The Sentinel": A Hybrid AI Swing Trading Bot
 
-# mdb-swing
+**The Problem:** Automated trading bots are terrifying. If you leave them alone, they can drain your account in minutes due to a single bug or a market crash.
 
-----
+**The Solution:** A "Hybrid" system. The bot does the heavy lifting (scanning, math, AI analysis), but it keeps a human in the loop.
 
-# Building "The Sentinel": A Headless AI Swing Trading Bot with Human Authorization
+In this guide, we are going to build **The Sentinel**, a Python-based agent that:
 
-> **The Problem:** Automated trading bots are terrifying. If you leave them alone, they can drain your account in minutes due to a single bug or a market crash.
->
-> **The Solution:** An "Iron Man" system. The bot does the heavy lifting (scanning, math, AI analysis), but it requires **you** to press the big red button to execute the trade.
-
-
-
-In this guide, we are going to build a **Hybrid Swing Trading System** that:
-1.  **Scans the market** every hour for technical setups (RSI, Trends).
-2.  **Reads the news** using AI to determine sentiment.
-3.  **Pings your phone** with a "Mission Report" if it finds a trade.
-4.  **Waits for your click** to execute the trade on Robinhood (or Paper Trade).
+1. **Scans the market** every hour for technical setups (Trend + RSI).
+2. **Reads the news** using an LLM to validate the move.
+3. **Executes a "Shadow Trade"** (Paper Trade) to track performance.
+4. **Pings your phone** so you can decide if you want to mirror the trade with real money.
 
 ---
 
 ## The Architecture
 
-We are ditching complex cloud architectures for a simple, robust **All-In-One** Python script running in Docker.
+We are ditching complex cloud architectures for a robust **All-In-One** Python script running in Docker.
 
-
-
-* **The Brain:** Python (Logic & Math).
-* **The Heart:** `APScheduler` runs a background loop every 60 minutes.
-* **The Nervous System:** `Ntfy.sh` (Free) sends push notifications with action buttons to your phone.
-* **The Memory:** `MongoDB Atlas` (Local or Cloud) stores trade history.
-* **The Hands:** `Flask` listens for your approval click to execute the trade.
+* **The Brain:** Python (Logic) + OpenAI (Sentiment).
+* **The Hands:** Alpaca API (Paper Trading Execution).
+* **The Eyes:** Alpaca Data API (Price History & News).
+* **The Memory:** MongoDB (Trade History).
+* **The Nervous System:** `ntfy.sh` (Push Notifications).
 
 ---
 
-## The Strategy: "Three-Green-Lights"
-
-Before bothering you, the bot filters stocks through a rigorous checklist. Note that this is a **Mean Reversion** strategy, designed to catch stocks that have dipped but are fundamentally strong.
-
-1.  **The Trend:** Is the stock in an uptrend? (SMA 50 Check).
-2.  **The Discount:** Is the stock oversold? (RSI < 35).
-3.  **The Vibe Check:** Does the news look good? (AI Sentiment Analysis).
-
-> **Warning:** Strategies relying on RSI < 35 can be dangerous in a market crash (catching a falling knife). That is why the **AI Sentiment Check** is crucial—it ensures we aren't buying a stock that is crashing due to a scandal or earnings miss.
-
----
-
-## Part 1: The Code
-
-Here is the complete script. It is configured for **Automatic Paper Trading** + **Human Ready Mode**.
+## Part 1: The Setup
 
 ### 1. `requirements.txt`
+
+We need a lightweight environment. We use `alpaca-trade-api` for both data and execution to keep things consistent.
 
 ```text
 flask
 apscheduler
-yfinance
 requests
-pymongo[srv]
+pymongo
 langchain
 langchain-openai
 alpaca-trade-api
@@ -67,71 +46,75 @@ numpy
 
 ### 2. `Dockerfile`
 
+This ensures our bot runs identically on your laptop or a cheap cloud VPS.
+
 ```dockerfile
 FROM python:3.9-slim
+
+# Keep Python from buffering stdout so logs show up immediately
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY demo.py .
-CMD ["python", "demo.py"]
+
+COPY main.py .
+CMD ["python", "main.py"]
 
 ```
 
 ### 3. `docker-compose.yml`
 
+We spin up a local MongoDB instance alongside our bot.
+
 ```yaml
 version: '3.8'
 services:
-  atlas:
-    image: mongodb/mongodb-atlas-local:latest
-    container_name: atlas_local
-    environment:
-      - MONGODB_INITDB_ROOT_USERNAME=admin
-      - MONGODB_INITDB_ROOT_PASSWORD=password123
+  mongo:
+    image: mongo:latest
+    container_name: sentinel_mongo
+    restart: always
     ports:
       - "27017:27017"
     volumes:
-      - atlas-data:/data/db
+      - mongo_data:/data/db
 
-  bot:
+  sentinel:
     build: .
     restart: on-failure
-    ports:
-      - "5000:5000"
-    environment:
-      MONGO_URI: mongodb://admin:password123@atlas:27017/?directConnection=true
-      # Your public URL (ngrok) for viewing memory
-      PUBLIC_URL: https://YOUR_NGROK_URL.ngrok-free.app
-      NTFY_TOPIC: my_shadow_bot_007
-      
-      # AI
-      OPENAI_API_KEY: sk-proj-YOUR-KEY
-      BOT_PERSONALITY: "Standard" 
-      
-      # ALPACA PAPER TRADING (REQUIRED)
-      ALPACA_API_KEY: YOUR_PAPER_KEY
-      ALPACA_SECRET_KEY: YOUR_PAPER_SECRET
-      ALPACA_BASE_URL: [https://paper-api.alpaca.markets](https://paper-api.alpaca.markets)
-      
     depends_on:
-      atlas:
-        condition: service_healthy
+      - mongo
+    environment:
+      # SYSTEM CONFIG
+      MONGO_URI: "mongodb://mongo:27017/"
+      NTFY_TOPIC: "my_sentinel_bot"
+      PUBLIC_URL: "http://localhost:5000"
+      
+      # API KEYS (Replace these!)
+      OPENAI_API_KEY: "sk-..."
+      ALPACA_API_KEY: "PK..."
+      ALPACA_SECRET_KEY: "..."
+      # Use Paper URL for safety
+      ALPACA_BASE_URL: "https://paper-api.alpaca.markets" 
+
 volumes:
-  atlas-data:
+  mongo_data:
 
 ```
 
-### 4. `demo.py` (The Sentinel)
+---
 
-This updated script includes **Robust Data Handling**. Financial APIs like `yfinance` often change their data structure (MultiIndex vs Single Index) or return empty frames. This script anticipates those errors.
+## Part 2: The Code (`main.py`)
+
+This is the core logic. It implements the "Three-Green-Lights" strategy: **Trend + Discount + Sentiment**.
 
 ```python
 import time
 import os
 import requests
-import yfinance as yf
 import pandas as pd
 import alpaca_trade_api as tradeapi
+from alpaca_trade_api.rest import TimeFrame
 from flask import Flask, request
 from apscheduler.schedulers.background import BackgroundScheduler
 from pymongo import MongoClient
@@ -148,24 +131,24 @@ NTFY_TOPIC = os.getenv("NTFY_TOPIC", "my_bot")
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
 PERSONALITY = os.getenv("BOT_PERSONALITY", "Standard")
 
-# --- ALPACA CONFIG (PAPER ONLY) ---
+# --- ALPACA CONFIG ---
 ALPACA_KEY = os.getenv("ALPACA_API_KEY")
 ALPACA_SECRET = os.getenv("ALPACA_SECRET_KEY")
-ALPACA_URL = os.getenv("ALPACA_BASE_URL", "[https://paper-api.alpaca.markets](https://paper-api.alpaca.markets)")
+ALPACA_URL = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+
+# Initialize Global Alpaca Client
+api = tradeapi.REST(ALPACA_KEY, ALPACA_SECRET, ALPACA_URL, api_version='v2')
 
 app = Flask(__name__)
 client = MongoClient(MONGO_URI)
 db = client['shadow_trading']
 signals_col = db['history']
 
-# --- 1. PERSONALITIES (LLM MAGIC) ---
+# --- 1. THE AI AGENT ---
 PROMPTS = {
     "Standard": "You are a Senior Hedge Fund Analyst. Be professional, skeptical, and concise.",
-    "Gekko": "You are a ruthless Wall Street corporate raider. Greed is good. Use aggressive metaphors.",
-    "Yoda": "A wise Jedi Master you are. The market flow you sense. Speak in riddles you must."
 }
 
-# --- 2. THE AI AGENT ---
 class TradeSignal(BaseModel):
     score: int = Field(description="Sentiment score 0-10 (10 is Bullish).")
     reason: str = Field(description="A concise justification.")
@@ -176,8 +159,7 @@ class SentinelAgent:
         self.chain = self._build_chain()
     
     def _build_chain(self):
-        base_persona = PROMPTS.get(PERSONALITY, PROMPTS["Standard"])
-        system_prompt = f"""{base_persona}
+        system_prompt = f"""{PROMPTS.get(PERSONALITY)}
         Analyze the news headlines. 
         If news is old/irrelevant, score 5.
         Output valid JSON."""
@@ -189,58 +171,73 @@ class SentinelAgent:
         return prompt | self.llm.with_structured_output(TradeSignal)
 
     def analyze(self, ticker, headlines):
-        if not headlines: return TradeSignal(score=5, reason="No News")
+        if not headlines: return TradeSignal(score=5, reason="No News Found")
         return self.chain.invoke({"ticker": ticker, "headlines": "\n".join(headlines)})
 
 agent = SentinelAgent()
 
-# --- 3. DATA & MATH (ROBUST) ---
-def get_clean_data(ticker):
+# --- 2. DATA METHODS (ALPACA) ---
+def get_clean_data(symbol):
     """
-    Safely fetches and cleans data, handling yfinance MultiIndex issues.
+    Fetches 60 days of daily bars from Alpaca (enough for SMA 50).
     """
     try:
-        df = yf.download(ticker, period="1mo", interval="1d", progress=False)
+        # Fetch 60 days of data to ensure we have enough for SMA 50
+        bars = api.get_bars(symbol, TimeFrame.Day, limit=60).df
         
-        if df.empty or len(df) < 14:
-            print(f"⚠️ Data insufficient for {ticker}.")
+        if bars.empty:
+            print(f"⚠️ No data found for {symbol}")
             return None
-
-        # Fix: Handle yfinance MultiIndex (flatten columns if needed)
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
             
-        return df
+        # Alpaca returns lowercase columns; rename to Title Case
+        bars.rename(columns=lambda x: x.capitalize(), inplace=True)
+        return bars
     except Exception as e:
-        print(f"❌ Data Fetch Error: {e}")
+        print(f"❌ Alpaca Data Error: {e}")
         return None
 
-def calculate_rsi(data, window=14):
+def get_market_news(symbol):
+    try:
+        news_list = api.get_news(symbol=symbol, limit=3)
+        headlines = [n.headline for n in news_list]
+        return headlines
+    except Exception as e:
+        print(f"❌ News Error: {e}")
+        return []
+
+# --- 3. MATH & EXECUTION ---
+def calculate_technicals(data, rsi_window=14, sma_window=50):
+    """Calculates RSI and SMA 50."""
+    # RSI
     delta = data['Close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
-    loss = loss.replace(0, 0.001) # Zero division safeguard
+    gain = (delta.where(delta > 0, 0)).rolling(window=rsi_window).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_window).mean()
+    loss = loss.replace(0, 0.001)
     rs = gain / loss
-    return 100 - (100 / (1 + rs)).iloc[-1]
+    rsi = 100 - (100 / (1 + rs)).iloc[-1]
+    
+    # SMA 50
+    if len(data) >= sma_window:
+        sma = data['Close'].rolling(window=sma_window).mean().iloc[-1]
+    else:
+        sma = 0 # Not enough data
+        
+    return rsi, sma
 
 def execute_shadow_trade(symbol, side, reason, score):
-    """Places a PAPER trade automatically."""
     try:
-        api = tradeapi.REST(ALPACA_KEY, ALPACA_SECRET, ALPACA_URL)
-        
-        # Check existing position to prevent "Stacking" trades
+        # Check existing position to avoid stacking
         try:
             pos = api.get_position(symbol)
             if side == 'buy' and float(pos.qty) > 0:
                 print(f"✋ Already holding {symbol}. Skipping.")
                 return None
         except:
-            pass # No position exists
+            pass 
 
         order = api.submit_order(symbol=symbol, qty=1, side=side, type='market', time_in_force='gtc')
         print(f"✅ SHADOW TRADE EXECUTED: {side.upper()} {symbol}")
         
-        # Log to Mongo
         signals_col.insert_one({
             "action": side,
             "symbol": symbol,
@@ -256,50 +253,54 @@ def execute_shadow_trade(symbol, side, reason, score):
 
 # --- 4. THE LOOP ---
 def scan_market():
-    print(f"\n🕵️ Scanning {SYMBOL}...")
+    print(f"\n🕵️ Scanning {SYMBOL} via Alpaca...")
     
     # 1. Technical Check
     df = get_clean_data(SYMBOL)
     if df is None: return
 
-    rsi = calculate_rsi(df)
     price = df['Close'].iloc[-1].item()
-    print(f"📉 {SYMBOL} | Price: ${price:.2f} | RSI: {rsi:.1f}")
+    rsi, sma = calculate_technicals(df)
+    
+    print(f"📉 {SYMBOL} | Price: ${price:.2f} | RSI: {rsi:.1f} | SMA50: ${sma:.2f}")
     
     action = None
-    # Strategy: Buy Dips, but not Crashes
-    if rsi < 35: action = "buy"
     
-    if not action:
-        print("💤 Market Neutral.")
+    # STRATEGY: 
+    # 1. Trend: Price > SMA 50 (Uptrend)
+    # 2. Discount: RSI < 35 (Oversold)
+    if price > sma and rsi < 35:
+        action = "buy"
+    elif price <= sma:
+        print("❌ Trend is Down (Price < SMA50). Skipping.")
+        return
+    elif rsi >= 35:
+        print("💤 Market Neutral (RSI > 35). Skipping.")
         return
 
-    # 2. AI Sentiment Check
-    stock = yf.Ticker(SYMBOL)
-    news_data = stock.news if stock.news else []
-    news = [n['title'] for n in news_data[:3]]
-    
-    ai = agent.analyze(SYMBOL, news)
+    # 3. AI Sentiment Check (Vibe Check)
+    print("🚦 Technicals Passed. Asking AI...")
+    news_headlines = get_market_news(SYMBOL)
+    ai = agent.analyze(SYMBOL, news_headlines)
     print(f"🧠 AI Score: {ai.score} | {ai.reason}")
 
-    # 3. Execution Trigger
-    # Rule: Only buy the dip if the AI is Bullish (>7)
+    # 4. Execution Trigger
     if action == "buy" and ai.score >= 7:
         order = execute_shadow_trade(SYMBOL, "buy", ai.reason, ai.score)
         if order:
             notify_user(price, rsi, ai, order.id)
 
 def notify_user(price, rsi, ai, order_id):
-    rh_link = f"[https://robinhood.com/stocks/](https://robinhood.com/stocks/){SYMBOL}"
+    # Link to Robinhood for manual execution
+    rh_link = f"https://robinhood.com/stocks/{SYMBOL}"
     
     try:
-        requests.post(f"[https://ntfy.sh/](https://ntfy.sh/){NTFY_TOPIC}", 
-            data=f"🤖 Paper Trade: {SYMBOL}\nScore: {ai.score}/10\nReason: {ai.reason}",
+        requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", 
+            data=f"🤖 Trade Alert: {SYMBOL}\nPrice: ${price}\nRSI: {rsi:.1f}\nScore: {ai.score}/10",
             headers={
-                "Title": f"👻 Shadow Buy: {SYMBOL} (${price:.2f})",
+                "Title": f"Buy Signal: {SYMBOL}",
                 "Priority": "high",
-                "Tags": "ghost,chart_with_upwards_trend",
-                "Actions": f"view, 📱 Open Robinhood, {rh_link}; view, 🔍 Inspect Logic, {PUBLIC_URL}/browse?id={order_id}"
+                "Actions": f"view, 📱 Open App, {rh_link}; view, 🔍 Logic, {PUBLIC_URL}/browse?id={order_id}"
             },
             timeout=10
         )
@@ -311,42 +312,52 @@ def notify_user(price, rsi, ai, order_id):
 def browse():
     oid = request.args.get('id')
     record = signals_col.find_one({"order_id": oid})
-    if not record: return "Trade not found in memory."
-    return f"<h1>AI Reason:</h1><p>{record['reason']}</p>"
+    if not record: return "Trade not found."
+    return f"<h1>Reasoning:</h1><p>{record['reason']}</p>"
 
 if __name__ == '__main__':
     scheduler = BackgroundScheduler()
     scheduler.add_job(scan_market, 'interval', minutes=60)
     scheduler.start()
-    scan_market() # Run once on boot
+    scan_market() 
     app.run(host='0.0.0.0', port=5000)
 
 ```
 
 ---
 
-## Part 2: Upgrading to Enterprise (Vector Search)
+## How It Works
 
-The code above stores your trade history in a standard database. But to make the AI truly smart, you should upgrade to **Atlas Vector Search**.
+### 1. The Trend Filter (SMA 50)
 
-**Why?**
-Right now, the AI treats every day as a new day. It has no memory. By using Vector Search, the AI can recall the past.
+We never trade against the trend. The bot calculates the **50-Day Moving Average**. If the current price is *below* this line, we assume the stock is dying, and we do nothing.
 
-1. **Embeddings:** When news comes in, turn the text into numbers (vectors) using OpenAI.
-2. **Storage:** Store these vectors in MongoDB Atlas.
-3. **Retrieval (RAG):** Before making a trade, the bot performs a vector search:
-* *"Find me the last 3 times news headlines looked similar to today's headlines."*
-* *"Did we lose money on those trades?"*
+### 2. The Discount Filter (RSI)
 
+If the trend is UP, we look for a dip. We use **RSI (Relative Strength Index)**.
 
+* **RSI < 35:** The stock is "Oversold."
+* If RSI > 35, we wait.
 
-If the historical search returns 3 losses for similar news events, the bot can **Veto** the trade, saving you money where a standard algorithm would have failed.
+### 3. The AI Filter (The Vibe Check)
 
-## Summary
+If the math looks good, the AI reads the last 3 news headlines.
 
-You have now built a system that is:
+* **Scenario A:** "CEO resigns in scandal" -> AI Score: 2/10 -> **BLOCK TRADE.**
+* **Scenario B:** "Market dips on inflation fears" -> AI Score: 8/10 -> **EXECUTE.**
 
-1. **Safe:** It trades on paper first.
-2. **Psychologically aligned:** It asks for your permission for real money.
-3. **Robust:** It handles dirty financial data gracefully.
-4. **Extensible:** It is ready for Vector Search and RAG implementation.
+### 4. The Shadow Trade
+
+If all lights are green, the bot executes a **Paper Trade** via Alpaca. This tracks your hypothetical P&L. Simultaneously, it sends a notification to your phone. If you agree with the logic, you open your brokerage app and place the real trade yourself.
+
+---
+
+## Next Steps: Making it Smarter
+
+To take this from a fun project to an enterprise-grade tool, consider implementing **Vector Search**.
+
+Currently, the AI has no memory. By using **MongoDB Atlas Vector Search**, you could embed every news headline you analyze. Before placing a trade, the bot could query its own memory:
+
+> *"Last time I saw headlines about 'CEO Investigation' for this stock, did the price recover?"*
+
+If the answer is "No," the bot can veto the trade based on historical performance, creating a self-improving feedback loop.
