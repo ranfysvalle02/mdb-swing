@@ -1,6 +1,6 @@
 # mdb-swing
 
-===
+----
 
 # Building "The Sentinel": A Headless AI Swing Trading Bot with Human Authorization
 
