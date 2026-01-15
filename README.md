@@ -181,9 +181,14 @@ ALPACA_URL = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
 
 api = tradeapi.REST(ALPACA_KEY, ALPACA_SECRET, ALPACA_URL, api_version='v2')
 app = Flask(__name__)
-client = MongoClient(MONGO_URI)
-db = client['shadow_trading']
-history_col = db['history']
+
+# Safe MongoDB Connection
+try:
+    client = MongoClient(MONGO_URI)
+    db = client['shadow_trading']
+    history_col = db['history']
+except Exception as e:
+    logger.error(f"MongoDB Connection Failed: {e}")
 
 # --- 1. THE AI AGENT ---
 class TradeSignal(BaseModel):
@@ -192,6 +197,7 @@ class TradeSignal(BaseModel):
 
 class SentinelAgent:
     def __init__(self):
+        # Ensure you have OPENAI_API_KEY in your env
         self.llm = ChatOpenAI(model="gpt-4-turbo", temperature=0.5) 
         self.chain = self._build_chain()
     
@@ -235,8 +241,18 @@ def get_market_news(symbol):
         logger.error(f"News Error: {e}")
         return []
 
-# --- 3. MATH & STRATEGY ---
+# --- 3. MATH & STRATEGY (UPDATED WITH FIX) ---
 def calculate_technicals(data):
+    """
+    Calculates RSI (14) and SMA (50).
+    SAFEGUARD: Returns neutral values if data is insufficient.
+    """
+    # 1. Safety Check: Need at least 50 days for SMA
+    if len(data) < 50:
+        logger.warning("⚠️ Insufficient data for SMA50. Skipping calculation.")
+        # Return RSI=50 (neutral) and SMA=Infinite (fails price > sma check)
+        return 50.0, float('inf')
+
     # Ensure we use 'close' column (Alpaca sometimes returns lowercase)
     data.columns = [c.lower() for c in data.columns]
     
@@ -250,13 +266,17 @@ def calculate_technicals(data):
     
     # SMA 50
     sma = data['close'].rolling(window=50).mean().iloc[-1]
+    
+    # Handle NaN result from rolling window
+    if pd.isna(sma) or pd.isna(rsi):
+        return 50.0, float('inf')
+
     return rsi, sma
 
 # --- 4. EXECUTION (BRACKET ORDERS) ---
 def execute_bracket_trade(symbol, price, side, reason, score):
     """
     Submits a Buy Order with attached Take-Profit and Stop-Loss.
-    This creates the "Exit Strategy" automatically.
     """
     try:
         # 1. Check if we already own it
@@ -264,7 +284,7 @@ def execute_bracket_trade(symbol, price, side, reason, score):
             pos = api.get_position(symbol)
             if float(pos.qty) > 0:
                 logger.info(f"✋ Existing position in {symbol}. Skipping.")
-                return None
+                return None, 0, 0
         except:
             pass # No position exists, proceed.
 
@@ -319,6 +339,7 @@ def scan_market():
         logger.info(f"📉 {SYMBOL} | Price: ${price:.2f} | RSI: {rsi:.1f} | SMA50: ${sma:.2f}")
 
         # STRATEGY: Uptrend (Price > SMA) + Oversold (RSI < 35)
+        # Note: If calculate_technicals returned inf/50 due to low data, this fails safely.
         is_uptrend = price > sma
         is_oversold = rsi < 35
 
@@ -370,17 +391,20 @@ def notify_user(price, rsi, ai, tp, sl, order_id):
 @app.route('/browse')
 def browse():
     oid = request.args.get('id')
-    record = history_col.find_one({"order_id": oid})
-    if not record: return "Trade not found."
-    return f"""
-    <h2>Trade Logic for {record['symbol']}</h2>
-    <p><b>AI Score:</b> {record['ai_score']}/10</p>
-    <p><b>Reasoning:</b> {record['reason']}</p>
-    <hr>
-    <p><b>Entry:</b> ${record['entry_price']}</p>
-    <p><b>Take Profit:</b> ${record['tp']}</p>
-    <p><b>Stop Loss:</b> ${record['sl']}</p>
-    """
+    try:
+        record = history_col.find_one({"order_id": oid})
+        if not record: return "Trade not found."
+        return f"""
+        <h2>Trade Logic for {record['symbol']}</h2>
+        <p><b>AI Score:</b> {record['ai_score']}/10</p>
+        <p><b>Reasoning:</b> {record['reason']}</p>
+        <hr>
+        <p><b>Entry:</b> ${record['entry_price']}</p>
+        <p><b>Take Profit:</b> ${record['tp']}</p>
+        <p><b>Stop Loss:</b> ${record['sl']}</p>
+        """
+    except Exception as e:
+        return f"Error loading trade: {e}"
 
 if __name__ == '__main__':
     # Initial scan on startup
