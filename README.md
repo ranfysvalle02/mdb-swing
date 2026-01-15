@@ -118,52 +118,53 @@ from alpaca_trade_api.rest import TimeFrame
 from flask import Flask, request
 from apscheduler.schedulers.background import BackgroundScheduler
 from pymongo import MongoClient
+import logging
 
 # --- LANGCHAIN & PYDANTIC ---
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.pydantic_v1 import BaseModel, Field
 
+# --- LOGGING SETUP ---
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("Sentinel")
+
 # --- CONFIGURATION ---
-SYMBOL = "NVDA"
-PUBLIC_URL = os.getenv("PUBLIC_URL", "http://localhost:5000")
-NTFY_TOPIC = os.getenv("NTFY_TOPIC", "my_bot")
+SYMBOL = os.getenv("TARGET_SYMBOL", "NVDA")
+TP_PCT = float(os.getenv("TAKE_PROFIT_PCT", 1.08))
+SL_PCT = float(os.getenv("STOP_LOSS_PCT", 0.96))
+
+NTFY_TOPIC = os.getenv("NTFY_TOPIC", "sentinel_dev")
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
-PERSONALITY = os.getenv("BOT_PERSONALITY", "Standard")
+PUBLIC_URL = os.getenv("PUBLIC_URL", "http://localhost:5000")
 
 # --- ALPACA CONFIG ---
 ALPACA_KEY = os.getenv("ALPACA_API_KEY")
 ALPACA_SECRET = os.getenv("ALPACA_SECRET_KEY")
 ALPACA_URL = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
 
-# Initialize Global Alpaca Client
 api = tradeapi.REST(ALPACA_KEY, ALPACA_SECRET, ALPACA_URL, api_version='v2')
-
 app = Flask(__name__)
 client = MongoClient(MONGO_URI)
 db = client['shadow_trading']
-signals_col = db['history']
+history_col = db['history']
 
 # --- 1. THE AI AGENT ---
-PROMPTS = {
-    "Standard": "You are a Senior Hedge Fund Analyst. Be professional, skeptical, and concise.",
-}
-
 class TradeSignal(BaseModel):
     score: int = Field(description="Sentiment score 0-10 (10 is Bullish).")
-    reason: str = Field(description="A concise justification.")
+    reason: str = Field(description="A concise justification under 20 words.")
 
 class SentinelAgent:
     def __init__(self):
-        self.llm = ChatOpenAI(model="gpt-4o", temperature=0.7) 
+        self.llm = ChatOpenAI(model="gpt-4-turbo", temperature=0.5) 
         self.chain = self._build_chain()
     
     def _build_chain(self):
-        system_prompt = f"""{PROMPTS.get(PERSONALITY)}
-        Analyze the news headlines. 
-        If news is old/irrelevant, score 5.
-        Output valid JSON."""
-        
+        system_prompt = (
+            "You are a Senior Hedge Fund Analyst. Be skeptical. "
+            "Analyze the headlines for immediate market impact. "
+            "If news is old/irrelevant, score 5. Output JSON."
+        )
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
             ("human", "Ticker: {ticker}\nHeadlines:\n{headlines}")
@@ -176,152 +177,185 @@ class SentinelAgent:
 
 agent = SentinelAgent()
 
-# --- 2. DATA METHODS (ALPACA) ---
+# --- 2. DATA METHODS ---
 def get_clean_data(symbol):
-    """
-    Fetches 60 days of daily bars from Alpaca (enough for SMA 50).
-    """
     try:
-        # Fetch 60 days of data to ensure we have enough for SMA 50
-        bars = api.get_bars(symbol, TimeFrame.Day, limit=60).df
+        # Fetch 100 days to ensure robust SMA calculation
+        bars = api.get_bars(symbol, TimeFrame.Day, limit=100).df
+        if bars.empty: return None
         
-        if bars.empty:
-            print(f"⚠️ No data found for {symbol}")
-            return None
-            
-        # Alpaca returns lowercase columns; rename to Title Case
-        bars.rename(columns=lambda x: x.capitalize(), inplace=True)
+        # Reset index to handle MultiIndex issues cleanly
+        bars = bars.reset_index()
         return bars
     except Exception as e:
-        print(f"❌ Alpaca Data Error: {e}")
+        logger.error(f"Alpaca Data Error: {e}")
         return None
 
 def get_market_news(symbol):
     try:
         news_list = api.get_news(symbol=symbol, limit=3)
-        headlines = [n.headline for n in news_list]
-        return headlines
+        return [n.headline for n in news_list]
     except Exception as e:
-        print(f"❌ News Error: {e}")
+        logger.error(f"News Error: {e}")
         return []
 
-# --- 3. MATH & EXECUTION ---
-def calculate_technicals(data, rsi_window=14, sma_window=50):
-    """Calculates RSI and SMA 50."""
-    # RSI
-    delta = data['Close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=rsi_window).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_window).mean()
-    loss = loss.replace(0, 0.001)
+# --- 3. MATH & STRATEGY ---
+def calculate_technicals(data):
+    # Ensure we use 'close' column (Alpaca sometimes returns lowercase)
+    data.columns = [c.lower() for c in data.columns]
+    
+    # RSI Calculation
+    delta = data['close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    loss = loss.replace(0, 0.001) # Avoid div by zero
     rs = gain / loss
     rsi = 100 - (100 / (1 + rs)).iloc[-1]
     
     # SMA 50
-    if len(data) >= sma_window:
-        sma = data['Close'].rolling(window=sma_window).mean().iloc[-1]
-    else:
-        sma = 0 # Not enough data
-        
+    sma = data['close'].rolling(window=50).mean().iloc[-1]
     return rsi, sma
 
-def execute_shadow_trade(symbol, side, reason, score):
+# --- 4. EXECUTION (BRACKET ORDERS) ---
+def execute_bracket_trade(symbol, price, side, reason, score):
+    """
+    Submits a Buy Order with attached Take-Profit and Stop-Loss.
+    This creates the "Exit Strategy" automatically.
+    """
     try:
-        # Check existing position to avoid stacking
+        # 1. Check if we already own it
         try:
             pos = api.get_position(symbol)
-            if side == 'buy' and float(pos.qty) > 0:
-                print(f"✋ Already holding {symbol}. Skipping.")
+            if float(pos.qty) > 0:
+                logger.info(f"✋ Existing position in {symbol}. Skipping.")
                 return None
         except:
-            pass 
+            pass # No position exists, proceed.
 
-        order = api.submit_order(symbol=symbol, qty=1, side=side, type='market', time_in_force='gtc')
-        print(f"✅ SHADOW TRADE EXECUTED: {side.upper()} {symbol}")
+        # 2. Calculate Exits
+        take_profit = round(price * TP_PCT, 2)
+        stop_loss = round(price * SL_PCT, 2)
+
+        # 3. Submit Bracket Order
+        order = api.submit_order(
+            symbol=symbol,
+            qty=1,
+            side=side,
+            type='market',
+            time_in_force='gtc',
+            order_class='bracket',
+            take_profit={'limit_price': take_profit},
+            stop_loss={'stop_price': stop_loss}
+        )
         
-        signals_col.insert_one({
+        logger.info(f"✅ BRACKET ORDER: Buy {symbol} @ ~{price} | TP: {take_profit} | SL: {stop_loss}")
+        
+        # 4. Save to DB
+        history_col.insert_one({
             "action": side,
             "symbol": symbol,
+            "entry_price": price,
+            "tp": take_profit,
+            "sl": stop_loss,
             "reason": reason,
             "ai_score": score,
             "order_id": order.id,
             "timestamp": time.time()
         })
-        return order
+        return order, take_profit, stop_loss
+
     except Exception as e:
-        print(f"❌ Execution Error: {e}")
-        return None
+        logger.error(f"Execution Error: {e}")
+        return None, 0, 0
 
-# --- 4. THE LOOP ---
+# --- 5. THE MAIN LOOP ---
 def scan_market():
-    print(f"\n🕵️ Scanning {SYMBOL} via Alpaca...")
+    logger.info(f"🕵️ Scanning {SYMBOL}...")
     
-    # 1. Technical Check
-    df = get_clean_data(SYMBOL)
-    if df is None: return
+    try:
+        # A. Technical Check
+        df = get_clean_data(SYMBOL)
+        if df is None: return
 
-    price = df['Close'].iloc[-1].item()
-    rsi, sma = calculate_technicals(df)
-    
-    print(f"📉 {SYMBOL} | Price: ${price:.2f} | RSI: {rsi:.1f} | SMA50: ${sma:.2f}")
-    
-    action = None
-    
-    # STRATEGY: 
-    # 1. Trend: Price > SMA 50 (Uptrend)
-    # 2. Discount: RSI < 35 (Oversold)
-    if price > sma and rsi < 35:
-        action = "buy"
-    elif price <= sma:
-        print("❌ Trend is Down (Price < SMA50). Skipping.")
-        return
-    elif rsi >= 35:
-        print("💤 Market Neutral (RSI > 35). Skipping.")
-        return
+        price = df['close'].iloc[-1].item()
+        rsi, sma = calculate_technicals(df)
+        
+        logger.info(f"📉 {SYMBOL} | Price: ${price:.2f} | RSI: {rsi:.1f} | SMA50: ${sma:.2f}")
 
-    # 3. AI Sentiment Check (Vibe Check)
-    print("🚦 Technicals Passed. Asking AI...")
-    news_headlines = get_market_news(SYMBOL)
-    ai = agent.analyze(SYMBOL, news_headlines)
-    print(f"🧠 AI Score: {ai.score} | {ai.reason}")
+        # STRATEGY: Uptrend (Price > SMA) + Oversold (RSI < 35)
+        is_uptrend = price > sma
+        is_oversold = rsi < 35
 
-    # 4. Execution Trigger
-    if action == "buy" and ai.score >= 7:
-        order = execute_shadow_trade(SYMBOL, "buy", ai.reason, ai.score)
-        if order:
-            notify_user(price, rsi, ai, order.id)
+        if not (is_uptrend and is_oversold):
+            logger.info("💤 No technical setup.")
+            return
 
-def notify_user(price, rsi, ai, order_id):
-    # Link to Robinhood for manual execution
+        # B. AI Vibe Check
+        logger.info("🚦 Technicals Green. Asking AI...")
+        headlines = get_market_news(SYMBOL)
+        ai = agent.analyze(SYMBOL, headlines)
+        logger.info(f"🧠 AI Score: {ai.score}/10 | {ai.reason}")
+
+        # C. Trigger
+        if ai.score >= 7:
+            order, tp, sl = execute_bracket_trade(SYMBOL, price, "buy", ai.reason, ai.score)
+            if order:
+                notify_user(price, rsi, ai, tp, sl, order.id)
+        else:
+            logger.info("❌ AI rejected the trade (Score too low).")
+
+    except Exception as e:
+        logger.error(f"CRITICAL LOOP ERROR: {e}")
+
+def notify_user(price, rsi, ai, tp, sl, order_id):
     rh_link = f"https://robinhood.com/stocks/{SYMBOL}"
+    msg = (
+        f"🚀 Enter: {SYMBOL} @ ${price}\n"
+        f"🎯 Target: ${tp}\n"
+        f"🛑 Stop: ${sl}\n"
+        f"🧠 AI: {ai.score}/10 ({ai.reason})"
+    )
     
     try:
         requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", 
-            data=f"🤖 Trade Alert: {SYMBOL}\nPrice: ${price}\nRSI: {rsi:.1f}\nScore: {ai.score}/10",
+            data=msg,
             headers={
-                "Title": f"Buy Signal: {SYMBOL}",
+                "Title": f"Opener: {SYMBOL}",
                 "Priority": "high",
-                "Actions": f"view, 📱 Open App, {rh_link}; view, 🔍 Logic, {PUBLIC_URL}/browse?id={order_id}"
+                "Tags": "money_with_wings",
+                "Actions": f"view, 📱 Broker, {rh_link}; view, 🔍 Logic, {PUBLIC_URL}/browse?id={order_id}"
             },
-            timeout=10
+            timeout=5
         )
     except Exception as e:
-        print(f"⚠️ Notification Failed: {e}")
+        logger.error(f"Notification Failed: {e}")
 
-# --- 5. SERVER ---
+# --- 6. SERVER ---
 @app.route('/browse')
 def browse():
     oid = request.args.get('id')
-    record = signals_col.find_one({"order_id": oid})
+    record = history_col.find_one({"order_id": oid})
     if not record: return "Trade not found."
-    return f"<h1>Reasoning:</h1><p>{record['reason']}</p>"
+    return f"""
+    <h2>Trade Logic for {record['symbol']}</h2>
+    <p><b>AI Score:</b> {record['ai_score']}/10</p>
+    <p><b>Reasoning:</b> {record['reason']}</p>
+    <hr>
+    <p><b>Entry:</b> ${record['entry_price']}</p>
+    <p><b>Take Profit:</b> ${record['tp']}</p>
+    <p><b>Stop Loss:</b> ${record['sl']}</p>
+    """
 
 if __name__ == '__main__':
+    # Initial scan on startup
+    scan_market()
+    
     scheduler = BackgroundScheduler()
     scheduler.add_job(scan_market, 'interval', minutes=60)
     scheduler.start()
-    scan_market() 
+    
+    # Run Flask
     app.run(host='0.0.0.0', port=5000)
-
 ```
 
 ---
