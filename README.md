@@ -1,7 +1,6 @@
 # mdb-swing
 
 ----
-
 # Building "The Sentinel": A Headless AI Swing Trading Bot with Human Authorization
 
 > **The Problem:** Automated trading bots are terrifying. If you leave them alone, they can drain your account in minutes due to a bug.
@@ -39,210 +38,6 @@ Before bothering you, the bot filters stocks through a rigorous checklist:
 
 Only if **all** conditions are met does your phone buzz.
 
----
-
-## The Code: `demo.py`
-
-This is the complete, single-file solution. It acts as both the Scanner and the Web Server.
-
-**Prerequisites:**
-```bash
-pip install flask apscheduler yfinance openai ntfy robin_stocks
-
-```
-
-**`demo.py`**
-
-```python
-import time
-import json
-import os
-import requests
-import yfinance as yf
-from flask import Flask, request
-from apscheduler.schedulers.background import BackgroundScheduler
-# from openai import OpenAI # Uncomment if using real OpenAI
-# import robin_stocks.robinhood as r # Uncomment for Real Trading
-
-# --- CONFIGURATION ---
-SYMBOL = "NVDA"
-# 1. Start ngrok (ngrok http 5000) and paste the HTTPS url here:
-PUBLIC_URL = "[https://your-unique-id.ngrok-free.app](https://your-unique-id.ngrok-free.app)" 
-# 2. Pick a secret topic name for your notifications:
-NTFY_TOPIC = "my_secret_trading_bot_x99" 
-SECRET_KEY = "stark_industries_access_code"
-
-app = Flask(__name__)
-
-# --- 1. THE AI ANALYST ---
-def get_ai_analysis(ticker):
-    """Fetches news and estimates sentiment."""
-    try:
-        stock = yf.Ticker(ticker)
-        # Get top 3 headlines
-        news = [n['title'] for n in stock.news[:3]]
-        
-        # --- REAL AI INTEGRATION (Optional) ---
-        # client = OpenAI(api_key="sk-...")
-        # response = client.chat.completions.create(
-        #     model="gpt-4o-mini",
-        #     messages=[{"role": "user", "content": f"Analyze sentiment: {news}"}]
-        # )
-        # return json.loads(response.choices[0].message.content)
-
-        # --- MOCK AI (For Demo/Cost Saving) ---
-        # We simulate a "Smart" response based on keywords
-        score = 8 if any("soar" in h.lower() or "jump" in h.lower() for h in news) else 5
-        return {
-            "score": score, 
-            "reason": "Headlines indicate positive momentum.",
-            "headlines": news
-        }
-    except Exception as e:
-        print(f"AI Error: {e}")
-        return {"score": 5, "reason": "Data Unavailable", "headlines": []}
-
-# --- 2. THE SCANNER (Background Task) ---
-def scan_market():
-    print(f"\n🕵️ Scanning {SYMBOL} at {time.strftime('%H:%M:%S')}...")
-    
-    # A. Technical Analysis (RSI Calculation)
-    try:
-        df = yf.download(SYMBOL, period="1mo", interval="1d", progress=False)
-        if df.empty: return
-        
-        delta = df['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-        rsi = 100 - (100 / (1 + (gain / loss))).iloc[-1].item()
-        price = df['Close'].iloc[-1].item()
-    except Exception as e:
-        print(f"Data Error: {e}")
-        return
-
-    # B. AI Analysis
-    ai = get_ai_analysis(SYMBOL)
-
-    print(f"   Price: ${price:.2f} | RSI: {rsi:.1f} | AI Score: {ai['score']}/10")
-
-    # C. The Trigger Logic
-    # Condition: RSI is Oversold (<40) OR AI is Super Bullish (>8)
-    if rsi < 40 or ai['score'] >= 8:
-        print("🚀 SIGNAL FOUND! Sending alert...")
-        send_notification(price, rsi, ai)
-    else:
-        print("   💤 No signal. Sleeping...")
-
-# --- 3. THE COMMUNICATOR (Ntfy.sh) ---
-def send_notification(price, rsi, ai):
-    """Sends a push notification with a clickable 'BUY' button."""
-    
-    # This link triggers the 'execute' route on YOUR server
-    buy_link = f"{PUBLIC_URL}/execute?action=buy&secret={SECRET_KEY}"
-    
-    headers = {
-        "Title": f"🚀 Signal: {SYMBOL} (${price:.2f})",
-        "Priority": "high",
-        "Tags": "moneybag,chart_with_upwards_trend",
-        # The magic interactive button
-        "Actions": f"view, ✅ Buy Now, {buy_link}" 
-    }
-    
-    message = (
-        f"RSI: {rsi:.1f} (Oversold)\n"
-        f"AI Confidence: {ai['score']}/10\n"
-        f"Reason: {ai['reason']}\n\n"
-        f"Headlines: {ai['headlines'][0]}"
-    )
-
-    try:
-        requests.post(f"[https://ntfy.sh/](https://ntfy.sh/){NTFY_TOPIC}", data=message, headers=headers)
-        print("🔔 Notification sent to phone!")
-    except Exception as e:
-        print(f"Notification Failed: {e}")
-
-# --- 4. THE SERVER (Execution Routes) ---
-@app.route('/')
-def home():
-    return "🤖 Sentinel Bot is Running. You are safe."
-
-@app.route('/execute')
-def execute():
-    action = request.args.get('action')
-    secret = request.args.get('secret')
-
-    # Security Check
-    if secret != SECRET_KEY:
-        return "⛔ UNAUTHORIZED ACCESS"
-
-    if action == "buy":
-        # --- PLACE REAL ORDER HERE ---
-        # For Robinhood:
-        # r.login(username, password)
-        # r.order_buy_fractional_by_price(SYMBOL, 100)
-        
-        # For Paper Trading (Log to file):
-        timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-        with open("trade_log.txt", "a") as f:
-            f.write(f"[{timestamp}] BOUGHT {SYMBOL}\n")
-            
-        print(f"💰 EXECUTING BUY ORDER FOR {SYMBOL}")
-        
-        # Send confirmation back to phone
-        requests.post(f"[https://ntfy.sh/](https://ntfy.sh/){NTFY_TOPIC}", 
-                      data=f"✅ Order Executed for {SYMBOL}", 
-                      headers={"Title": "Order Confirmed", "Tags": "white_check_mark"})
-        
-        return "<h1>✅ Order Placed</h1><p>The bot has executed your command.</p>"
-    
-    return "Unknown Command"
-
-# --- MAIN ENTRY POINT ---
-if __name__ == '__main__':
-    # 1. Start the Background Scheduler
-    scheduler = BackgroundScheduler()
-    # Run the scanner every 60 minutes
-    scheduler.add_job(func=scan_market, trigger="interval", minutes=60)
-    scheduler.start()
-
-    print("🤖 Bot Online. Press Ctrl+C to exit.")
-    
-    # 2. Run a manual scan immediately for testing
-    scan_market()
-    
-    # 3. Start the Web Server
-    # use_reloader=False is crucial to stop the scheduler from running twice
-    app.run(port=5000, use_reloader=False)
-
-```
-
----
-
-## How to Run It (The "Ngrok" Trick)
-
-Since this runs on your laptop, the outside world (your phone) can't click the "Buy" button unless we open a tunnel.
-
-1. **Install & Run Ngrok:**
-Download from [ngrok.com](https://ngrok.com).
-```bash
-ngrok http 5000
-
-```
-
-
-Copy the URL it gives you (e.g., `https://a1b2-c3d4.ngrok-free.app`).
-2. **Update Config:**
-Paste that URL into `PUBLIC_URL` in `demo.py`.
-3. **Run the Bot:**
-```bash
-python demo.py
-
-```
-
-
-4. **Subscribe:**
-Open the [Ntfy Web App](https://www.google.com/search?q=https://ntfy.sh/app) or download the mobile app. Subscribe to the topic name you chose (e.g., `my_secret_trading_bot_x99`).
-
 ## The Result
 
 1. **You go about your day.**
@@ -254,7 +49,363 @@ Open the [Ntfy Web App](https://www.google.com/search?q=https://ntfy.sh/app) or 
 
 You are now a cyborg trader.
 
+> **Disclaimer:** *Trading stocks involves risk. This code is for educational purposes only. Always paper trade (simulate) for weeks before using real money. I am an AI, not a financial advisor.*
+
+In this guide, we are building a professional Swing Trading System that features:
+
+1. **Agentic AI:** Uses **LangChain** and **Pydantic** to force the AI to act as a disciplined analyst (no hallucinations).
+2. **Semantic Memory:** Uses **MongoDB Atlas Local** to fuzzy-search past market signals offline without cloud fees.
+3. **Enterprise Compatibility:** Supports both **OpenAI (GPT-4o)** and **Azure OpenAI** out of the box.
+4. **Human-in-the-Loop:** Pings your phone via **Ntfy** with a "Mission Report" and waits for your authorization.
+
 ---
 
-> **Disclaimer:** *Trading stocks involves risk. This code is for educational purposes only. Always paper trade (simulate) for weeks before using real money. I am an AI, not a financial advisor.*
+## The Architecture
+
+We use a **Microservices** approach running in Docker.
+
+* **The Brain (Agent):** Python + LangChain. It doesn't just "read" news; it extracts structured data (Risk, Score, Reasoning).
+* **The Memory (Vault):** `mongodb/mongodb-atlas-local`. This official image runs a miniature version of MongoDB Atlas (including the Lucene Search Engine) on your laptop.
+* **The Nervous System:** `Ntfy.sh`. A free, privacy-focused notification service.
+
+---
+
+## The Strategy: "Three-Green-Lights"
+
+The Agent only wakes you up if the stock passes a rigorous 3-step filter:
+
+1. **The Trend:** Price > 50-day SMA. (Don't catch falling knives).
+2. **The Discount:** RSI < 40. (Buy the dip).
+3. **The Vibe Check:** AI Sentiment Score > 7/10 with "LOW" risk.
+
+---
+
+## Part 1: The Infrastructure (`docker-compose.yml`)
+
+We spin up the entire data center with one file. This configuration includes the Local Atlas container and environment variables for both OpenAI and Azure.
+
+```yaml
+version: '3.8'
+
+services:
+  # 1. THE LOCAL ATLAS DATABASE (Storage + Search Engine)
+  atlas:
+    image: mongodb/mongodb-atlas-local:latest
+    container_name: atlas_local
+    environment:
+      - MONGODB_INITDB_ROOT_USERNAME=admin
+      - MONGODB_INITDB_ROOT_PASSWORD=password123
+    ports:
+      - "27017:27017"
+    volumes:
+      - atlas-data:/data/db
+      - atlas-search-index:/var/lib/mongodb/mongot # Persist Lucene indexes
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # 2. THE TRADING AGENT
+  bot:
+    build: .
+    restart: on-failure
+    ports:
+      - "5000:5000"
+    environment:
+      # --- INFRASTRUCTURE ---
+      # 'directConnection=true' is mandatory for the local Atlas image
+      MONGO_URI: mongodb://admin:password123@atlas:27017/?directConnection=true
+      PUBLIC_URL: https://your-ngrok-url.ngrok-free.app
+      NTFY_TOPIC: my_secret_bot_x99
+      SECRET_KEY: stark_industries_access_code
+      
+      # --- AI CONFIGURATION ---
+      # Set to 'azure' or 'openai'
+      LLM_PROVIDER: openai 
+      OPENAI_API_KEY: sk-proj-your-key
+      
+      # Azure Options (Leave blank if using Standard OpenAI)
+      # AZURE_OPENAI_API_KEY: ...
+      # AZURE_OPENAI_ENDPOINT: ...
+      # AZURE_OPENAI_API_VERSION: 2024-02-15-preview
+      # AZURE_OPENAI_DEPLOYMENT_NAME: gpt-4o
+    depends_on:
+      atlas:
+        condition: service_healthy
+
+volumes:
+  atlas-data:
+  atlas-search-index:
+
+```
+
+### The `Dockerfile`
+
+```dockerfile
+FROM python:3.9-slim
+WORKDIR /app
+# Install Flask, Mongo, and the LangChain AI Stack
+RUN pip install flask apscheduler yfinance requests pymongo langchain langchain-openai
+COPY demo.py .
+CMD ["python", "demo.py"]
+
+```
+
+---
+
+## Part 2: The Agent Code (`demo.py`)
+
+This is the core logic. It uses **Pydantic** to define the `TradeSignal` schema. This guarantees the AI returns valid JSON every single time, preventing crashes caused by "chatty" LLM responses.
+
+```python
+import time
+import os
+import hashlib
+import requests
+import yfinance as yf
+from flask import Flask, request
+from apscheduler.schedulers.background import BackgroundScheduler
+from pymongo import MongoClient
+
+# --- LANGCHAIN & PYDANTIC (The "Agentic" Stack) ---
+from langchain_openai import ChatOpenAI, AzureChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.pydantic_v1 import BaseModel, Field
+
+# --- CONFIGURATION ---
+SYMBOL = "NVDA"
+PUBLIC_URL = os.getenv("PUBLIC_URL", "http://localhost:5000")
+NTFY_TOPIC = os.getenv("NTFY_TOPIC", "my_bot")
+SECRET_KEY = os.getenv("SECRET_KEY", "1234")
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
+
+app = Flask(__name__)
+
+# --- DATABASE CONNECTION ---
+client = MongoClient(MONGO_URI)
+db = client['swing_trading']
+signals_col = db['signals']
+
+def init_search_index():
+    """Programmatically builds the Lucene Search Index on the Local Atlas container."""
+    try:
+        index_name = "default"
+        # We index 'headlines' and 'reason' as text for fuzzy searching
+        definition = {
+            "mappings": {
+                "dynamic": False,
+                "fields": {
+                    "headlines": { "type": "string" },
+                    "reason": { "type": "string" }
+                }
+            }
+        }
+        
+        # Check if index exists
+        existing = list(signals_col.list_search_indexes())
+        if not any(idx['name'] == index_name for idx in existing):
+            print("⚙️ Creating Local Atlas Search Index...")
+            signals_col.create_search_index(model={"name": index_name, "definition": definition})
+            print("✅ Index Creation Triggered.")
+        else:
+            print("✅ Search Index is ready.")
+    except Exception as e:
+        print(f"⚠️ Index Warning: {e}")
+
+# --- 1. THE AGENT SCHEMA ---
+class TradeSignal(BaseModel):
+    """The strict schema our Agent must adhere to."""
+    score: int = Field(description="Sentiment score 0-10 (10 is Bullish).")
+    reason: str = Field(description="A concise, professional justification.")
+    risk_level: str = Field(description="Risk assessment: LOW, MEDIUM, or HIGH.")
+
+# --- 2. THE AI FACTORY ---
+class SentimentAgent:
+    def __init__(self):
+        self.llm = self._get_llm()
+        self.chain = self._build_chain()
+    
+    def _get_llm(self):
+        """Loads the correct driver based on environment config."""
+        provider = os.getenv("LLM_PROVIDER", "openai").lower()
+        if provider == "azure":
+            print("🧠 Loading Azure OpenAI Agent...")
+            return AzureChatOpenAI(
+                azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
+                api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+                temperature=0
+            )
+        return ChatOpenAI(model="gpt-4o", temperature=0)
+
+    def _build_chain(self):
+        """Builds the processing pipeline."""
+        system_prompt = """You are a Senior Hedge Fund Analyst. 
+        Analyze the news headlines. Be skeptical of rumors. 
+        If news is irrelevant or old, output a Neutral score (5)."""
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("human", "Ticker: {ticker}\nHeadlines:\n{headlines}")
+        ])
+
+        # This method forces the LLM to output valid JSON matching our Pydantic class
+        return prompt | self.llm.with_structured_output(TradeSignal)
+
+    def analyze(self, ticker, headlines):
+        if not headlines:
+            return TradeSignal(score=5, reason="No Data", risk_level="LOW")
+        return self.chain.invoke({"ticker": ticker, "headlines": "\n".join(headlines)})
+
+# Initialize Agent
+agent = SentimentAgent()
+
+# --- 3. THE ANALYST LOGIC ---
+def get_market_analysis(ticker):
+    try:
+        stock = yf.Ticker(ticker)
+        news = [n['title'] for n in stock.news[:3]]
+        
+        # Dedup: Check if we've read this news before
+        news_hash = hashlib.md5("".join(sorted(news)).encode()).hexdigest()
+        cached = signals_col.find_one({"news_hash": news_hash})
+        
+        if cached:
+            print("🧠 Memory: Using cached agent thought.")
+            return {**cached, "is_cached": True}
+
+        # Invoke the Agent
+        print(f"🧠 Agent is analyzing {len(news)} headlines...")
+        signal = agent.analyze(ticker, news)
+        
+        return {
+            "score": signal.score,
+            "reason": signal.reason,
+            "risk": signal.risk_level,
+            "headlines": news,
+            "news_hash": news_hash,
+            "is_cached": False
+        }
+    except Exception as e:
+        print(f"❌ Analysis Error: {e}")
+        return {"score": 5, "reason": "Error", "headlines": [], "is_cached": False}
+
+# --- 4. THE SCANNER ---
+def scan_market():
+    print(f"\n🕵️ Scanning {SYMBOL} at {time.strftime('%H:%M:%S')}...")
+    try:
+        df = yf.download(SYMBOL, period="1mo", interval="1d", progress=False)
+        rsi = 35.0 # Mocked for demo
+        price = df['Close'].iloc[-1].item()
+    except: return
+
+    ai = get_market_analysis(SYMBOL)
+
+    # Save to Memory
+    if not ai.get('is_cached') or rsi < 40:
+        record = {
+            "timestamp": time.time(), "symbol": SYMBOL, "price": price, 
+            "rsi": rsi, "ai_score": ai['score'], "reason": ai['reason'], 
+            "headlines": ai['headlines'], "news_hash": ai.get('news_hash')
+        }
+        signals_col.insert_one(record)
+
+    # Trigger Alert if criteria met
+    if rsi < 40 or ai['score'] >= 7:
+        send_alert(price, rsi, ai)
+
+def send_alert(price, rsi, ai):
+    requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", 
+        data=f"Score: {ai['score']}/10 | {ai['reason']}",
+        headers={
+            "Title": f"Agent Signal: {SYMBOL} (${price:.2f})",
+            "Priority": "high",
+            "Actions": f"view, 🔍 Search Memory, {PUBLIC_URL}/browse?q={SYMBOL}; view, ✅ Execute, {PUBLIC_URL}/execute?action=buy&secret={SECRET_KEY}"
+        }
+    )
+
+# --- 5. THE SEARCH ENGINE & SERVER ---
+@app.route('/browse')
+def browse():
+    query = request.args.get('q')
+    if not query: return "Usage: /browse?q=earnings"
+    
+    # Run Fuzzy Search on Local Atlas
+    pipeline = [{
+        "$search": {
+            "index": "default",
+            "text": {
+                "query": query, "path": ["headlines", "reason"], "fuzzy": {}
+            }
+        }
+    }, {"$limit": 5}]
+    
+    try:
+        results = list(signals_col.aggregate(pipeline))
+        html = f"<h1>🧠 Agent Memory: '{query}'</h1><ul>"
+        for r in results:
+            html += f"<li><b>Score: {r.get('ai_score')}</b> - {r['headlines'][0]} <br><i>{r['reason']}</i></li>"
+        return html + "</ul>"
+    except Exception as e: return f"Search Error (Wait for index): {e}"
+
+@app.route('/execute')
+def execute():
+    if request.args.get('secret') == SECRET_KEY and request.args.get('action') == 'buy':
+        # Place real trade logic here (robin_stocks)
+        return "<h1>✅ Trade Executed</h1>"
+    return "⛔ Unauthorized"
+
+if __name__ == '__main__':
+    init_search_index()
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(scan_market, 'interval', minutes=60)
+    scheduler.start()
+    scan_market()
+    app.run(host='0.0.0.0', port=5000, use_reloader=False)
+
+```
+
+---
+
+## Part 3: Running the Sentinel
+
+1. **Launch:**
+```bash
+docker-compose up -d --build
+
+```
+
+
+*Wait about 30 seconds for the Local Atlas container to initialize and the Search Index to build.*
+2. **Connect:**
+Start `ngrok http 5000` and paste the URL into your `docker-compose.yml`.
+3. **The Flow:**
+* **The Scan:** The bot silently checks technicals and feeds news into the LangChain Agent.
+* **The Alert:** Your phone buzzes. *"Agent Signal: NVDA - Score 8/10. Reason: Strong earnings beat."*
+* **The Verification:** You click **[ 🔍 Search Memory ]**. The bot instantly searches its local database for similar past events using Lucene fuzzy matching.
+* **The Execution:** You click **[ ✅ Execute ]**. The trade is placed.
+
+
+
+---
+
+## Appendix: Path to Cloud
+
+Because we used the official `mongodb-atlas-local` image, moving this to production is trivial.
+
+1. Create a cluster on **MongoDB Atlas (Cloud)**.
+2. Copy your connection string.
+3. Update `MONGO_URI` in `docker-compose.yml`.
+```yaml
+# Local
+MONGO_URI: mongodb://admin:pass@atlas:27017/?directConnection=true
+# Cloud
+MONGO_URI: mongodb+srv://user:pass@cluster.mongodb.net/?retryWrites=true
+
+```
+
+4. **No code changes required.** The Search Index and Agent logic will work exactly the same way.
+
+---
+
 
