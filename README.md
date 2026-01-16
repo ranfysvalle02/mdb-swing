@@ -145,11 +145,13 @@ volumes:
 This is the core logic. It implements the "Three-Green-Lights" strategy: **Trend + Discount + Sentiment**.
 
 ```python
+```python
 import time
 import os
 import math
 import requests
 import pandas as pd
+import pandas_ta as ta  # NEW: Robust technical analysis library
 import alpaca_trade_api as tradeapi
 from alpaca_trade_api.rest import TimeFrame
 from flask import Flask, request, jsonify, render_template_string
@@ -269,24 +271,39 @@ def get_market_news(symbol):
     except Exception as e:
         return []
 
-# --- 3. RISK & MATH ---
+# --- 3. RISK & MATH (UPDATED WITH PANDAS-TA) ---
 def calculate_technicals(data):
-    if len(data) < 50: return 50.0, 0.0
+    """
+    Calculates RSI(14) and SMA(50) using pandas-ta for robustness.
+    """
+    # Safety check for minimum data points
+    if len(data) < 50: 
+        return 50.0, 0.0
     
+    # Ensure column names are lowercase for pandas-ta
     data.columns = [c.lower() for c in data.columns]
     
-    # RSI (14)
-    delta = data['close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-    loss = loss.replace(0, 0.001)
-    rs = gain / loss
-    rsi = 100 - (100 / (1 + rs)).iloc[-1]
-    
-    # SMA (50)
-    sma = data['close'].rolling(window=50).mean().iloc[-1]
-    
-    return rsi, sma
+    try:
+        # Calculate indicators using pandas-ta
+        # This handles edge cases, smoothing, and NaN values automatically
+        data['rsi'] = ta.rsi(data['close'], length=14)
+        data['sma_50'] = ta.sma(data['close'], length=50)
+        
+        # Drop NaNs created by the calculation window to avoid errors
+        data = data.dropna()
+
+        if data.empty:
+            return 50.0, 0.0
+
+        # Get the most recent values
+        rsi = data['rsi'].iloc[-1]
+        sma = data['sma_50'].iloc[-1]
+        
+        return rsi, sma
+        
+    except Exception as e:
+        logger.error(f"Math Error: {e}")
+        return 50.0, 0.0
 
 def check_budget_availability(symbol_price, quantity):
     """
@@ -541,6 +558,8 @@ if __name__ == '__main__':
     # Run App
     print(f"🛡️ Sentinel Active on {PUBLIC_URL}")
     app.run(host='0.0.0.0', port=5000)
+
+```
 ```
 
 ---
