@@ -152,7 +152,7 @@ import requests
 import pandas as pd
 import alpaca_trade_api as tradeapi
 from alpaca_trade_api.rest import TimeFrame
-from flask import Flask, request
+from flask import Flask, request, jsonify, render_template_string
 from apscheduler.schedulers.background import BackgroundScheduler
 from pymongo import MongoClient
 import logging
@@ -167,25 +167,30 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger("Sentinel")
+logger = logging.getLogger("Sentinel_Pro")
 
-# --- CONFIGURATION ---
-# Load symbols as a comma-separated string (e.g. "NVDA,AMD,MSFT,TSLA")
-SYMBOLS_ENV = os.getenv("TARGET_SYMBOLS", "NVDA,AMD,MSFT,GOOGL,AMZN")
+# --- CONFIGURATION & SAFETY ---
+# Symbols to trade
+SYMBOLS_ENV = os.getenv("TARGET_SYMBOLS", "NVDA,AMD,MSFT,GOOGL,AMZN,TSLA")
 SYMBOLS = [s.strip() for s in SYMBOLS_ENV.split(',')]
 
-# Risk Management
-RISK_PER_TRADE_PCT = 0.01  # Risk 1% of total equity per trade
-MAX_POS_SIZE_PCT = 0.20    # Never put more than 20% of account in one trade
-TP_PCT = float(os.getenv("TAKE_PROFIT_PCT", 1.08)) # Target: +8%
-SL_PCT = float(os.getenv("STOP_LOSS_PCT", 0.96))   # Stop: -4%
+# 🛡️ BUDGET CAP (Crucial Safety Feature)
+# Max dollars the bot is allowed to have in the market at any time.
+MAX_CAPITAL_DEPLOYED = float(os.getenv("MAX_CAPITAL_DEPLOYED", "2000.00"))
+
+# Risk Parameters
+RISK_PER_TRADE_PCT = 0.015  # Risk 1.5% of equity per trade
+MAX_POS_SIZE_PCT = 0.20     # Max 20% allocation per stock
+TP_PCT = 1.08               # Take Profit +8%
+SL_PCT = 0.96               # Stop Loss -4%
+LIMIT_BUFFER = 1.002        # Pay up to 0.2% above current price to ensure fill (Slippage protection)
 
 # Infrastructure
-NTFY_TOPIC = os.getenv("NTFY_TOPIC", "sentinel_dev")
+NTFY_TOPIC = os.getenv("NTFY_TOPIC", "sentinel_alerts")
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
 PUBLIC_URL = os.getenv("PUBLIC_URL", "http://localhost:5000")
 
-# --- ALPACA CONFIG ---
+# --- ALPACA CONNECTION ---
 ALPACA_KEY = os.getenv("ALPACA_API_KEY")
 ALPACA_SECRET = os.getenv("ALPACA_SECRET_KEY")
 ALPACA_URL = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
@@ -193,49 +198,63 @@ ALPACA_URL = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
 api = tradeapi.REST(ALPACA_KEY, ALPACA_SECRET, ALPACA_URL, api_version='v2')
 app = Flask(__name__)
 
-# Safe MongoDB Connection
+# --- MONGO CONNECTION ---
 try:
     client = MongoClient(MONGO_URI)
     db = client['shadow_trading']
     history_col = db['history']
 except Exception as e:
-    logger.error(f"MongoDB Connection Failed: {e}")
+    logger.critical(f"MongoDB Failed: {e}")
+    exit(1)
 
-# --- 1. THE AI AGENT ---
+# --- 1. ENHANCED AI AGENT ---
 class TradeSignal(BaseModel):
-    score: int = Field(description="Sentiment score 0-10 (10 is Bullish).")
-    reason: str = Field(description="A concise justification under 20 words.")
+    score: int = Field(description="Sentiment score 0-10 (10 is Bullish/Buy).")
+    reason: str = Field(description="A strategic justification under 25 words.")
 
 class SentinelAgent:
     def __init__(self):
-        self.llm = ChatOpenAI(model="gpt-4-turbo", temperature=0.5) 
+        self.llm = ChatOpenAI(model="gpt-4-turbo", temperature=0.3) 
         self.chain = self._build_chain()
     
     def _build_chain(self):
         system_prompt = (
-            "You are a Senior Hedge Fund Analyst. Be skeptical. "
-            "Analyze the headlines for immediate market impact. "
-            "If news is old/irrelevant, score 5. Output JSON."
+            "You are a Risk Manager at a Hedge Fund. "
+            "We have a Technical BUY Signal (Oversold). "
+            "Your job is to VETO the trade if there is catastrophic news (bankruptcy, fraud, lawsuits). "
+            "If news is quiet or generic market noise, confirm the trade with a high score (8-10). "
+            "If news is actively bad, score low (0-3). Output JSON."
         )
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
-            ("human", "Ticker: {ticker}\nHeadlines:\n{headlines}")
+            ("human", (
+                "Ticker: {ticker}\n"
+                "Current Price: ${price}\n"
+                "Technical Context: RSI is {rsi} (Oversold), Price is above SMA.\n"
+                "Recent Headlines:\n{headlines}"
+            ))
         ])
         return prompt | self.llm.with_structured_output(TradeSignal)
 
-    def analyze(self, ticker, headlines):
-        if not headlines: return TradeSignal(score=5, reason="No News Found")
-        return self.chain.invoke({"ticker": ticker, "headlines": "\n".join(headlines)})
+    def analyze(self, ticker, headlines, price, rsi):
+        if not headlines: 
+            return TradeSignal(score=6, reason="No news found; technicals valid.")
+        
+        return self.chain.invoke({
+            "ticker": ticker, 
+            "headlines": "\n".join(headlines),
+            "price": price,
+            "rsi": round(rsi, 2)
+        })
 
 agent = SentinelAgent()
 
 # --- 2. DATA METHODS ---
 def get_clean_data(symbol):
     try:
-        # Fetch 100 days for SMA calculation
-        bars = api.get_bars(symbol, TimeFrame.Day, limit=100).df
+        # Get 200 days to be safe for SMA calc
+        bars = api.get_bars(symbol, TimeFrame.Day, limit=200).df
         if bars.empty: return None
-        # Clean MultiIndex if present
         if isinstance(bars.index, pd.MultiIndex):
             bars = bars.reset_index()
         return bars
@@ -245,17 +264,15 @@ def get_clean_data(symbol):
 
 def get_market_news(symbol):
     try:
-        news_list = api.get_news(symbol=symbol, limit=3)
-        return [n.headline for n in news_list]
+        news_list = api.get_news(symbol=symbol, limit=4)
+        return [f"- {n.headline} ({n.created_at.strftime('%Y-%m-%d')})" for n in news_list]
     except Exception as e:
-        logger.warning(f"News Error {symbol}: {e}")
         return []
 
-# --- 3. MATH & RISK MANAGEMENT ---
+# --- 3. RISK & MATH ---
 def calculate_technicals(data):
-    if len(data) < 50:
-        return 50.0, float('inf') # Not enough data
-
+    if len(data) < 50: return 50.0, 0.0
+    
     data.columns = [c.lower() for c in data.columns]
     
     # RSI (14)
@@ -271,202 +288,258 @@ def calculate_technicals(data):
     
     return rsi, sma
 
-def calculate_position_size(price):
+def check_budget_availability(symbol_price, quantity):
     """
-    Calculates dynamic share quantity based on account equity and risk.
+    🛡️ SAFETY CHECK: Ensures we do not exceed MAX_CAPITAL_DEPLOYED.
     """
+    try:
+        positions = api.list_positions()
+        current_exposure = sum([float(p.market_value) for p in positions])
+        
+        trade_cost = symbol_price * quantity
+        
+        if (current_exposure + trade_cost) > MAX_CAPITAL_DEPLOYED:
+            logger.warning(f"🚫 BUDGET CAP HIT: Exposure ${current_exposure:.2f} + Trade ${trade_cost:.2f} > ${MAX_CAPITAL_DEPLOYED}")
+            return False
+        return True
+    except Exception as e:
+        logger.error(f"Budget check failed: {e}")
+        return False
+
+def calculate_smart_size(price):
     try:
         account = api.get_account()
         equity = float(account.equity)
         buying_power = float(account.buying_power)
         
-        # 1. Calculate Risk Amount (e.g., 1% of $100k = $1,000 risk)
+        # Risk Math
         risk_amt = equity * RISK_PER_TRADE_PCT
+        stop_dist = price * (1 - SL_PCT)
+        if stop_dist <= 0: return 0
         
-        # 2. Calculate Stop Loss distance per share
-        # If Price is $100 and SL_PCT is 0.96, Stop is at $96. Distance = $4.
-        sl_price = price * SL_PCT
-        loss_per_share = price - sl_price
+        qty_risk = math.floor(risk_amt / stop_dist)
         
-        if loss_per_share <= 0: return 0 # Avoid division by zero
-        
-        # 3. Calculate Ideal Qty based on Risk
-        # Shares = $1000 Risk / $4 loss per share = 250 shares
-        qty_risk = risk_amt / loss_per_share
-        
-        # 4. Calculate Max Qty based on Total Allocation Cap
-        # e.g., Max 20% of account = $20,000. $20,000 / $100 price = 200 shares.
+        # Max Allocation Math
         max_alloc = equity * MAX_POS_SIZE_PCT
-        qty_cap = max_alloc / price
+        qty_cap = math.floor(max_alloc / price)
         
-        # 5. Take the smaller of the two (Risk vs Cap)
-        final_qty = math.floor(min(qty_risk, qty_cap))
+        final_qty = min(qty_risk, qty_cap)
         
-        # 6. Final check against Buying Power
         if (final_qty * price) > buying_power:
             final_qty = math.floor(buying_power / price)
             
-        return max(1, final_qty) # Ensure at least 1 share if affordable
-        
+        return max(0, final_qty)
     except Exception as e:
-        logger.error(f"Risk Calc Error: {e}")
-        return 1 # Fallback to 1 share
+        logger.error(f"Size Calc Error: {e}")
+        return 0
 
-# --- 4. EXECUTION ---
-def execute_bracket_trade(symbol, price, side, reason, score):
+# --- 4. EXECUTION ENGINE (Limit Orders) ---
+def execute_smart_trade(symbol, price, side, reason, score, rsi):
+    qty = calculate_smart_size(price)
+    if qty < 1: 
+        logger.info(f"⚠️ {symbol}: Qty calculated to 0 (Risk or Funds issue).")
+        return None
+
+    if not check_budget_availability(price, qty):
+        return None
+
+    # Limit Price Logic: Bid slightly higher to get filled, but cap slippage
+    limit_price = round(price * LIMIT_BUFFER, 2)
+    take_profit = round(price * TP_PCT, 2)
+    stop_loss = round(price * SL_PCT, 2)
+
     try:
-        # Check existing position
-        try:
-            pos = api.get_position(symbol)
-            if float(pos.qty) > 0:
-                logger.info(f"✋ Existing position in {symbol}. Skipping.")
-                return None, 0, 0, 0
-        except:
-            pass 
-
-        # Calculate Quantity
-        qty = calculate_position_size(price)
-        
-        take_profit = round(price * TP_PCT, 2)
-        stop_loss = round(price * SL_PCT, 2)
-
+        # Submit Bracket Order with LIMIT entry
         order = api.submit_order(
             symbol=symbol,
             qty=qty,
             side=side,
-            type='market',
+            type='limit',          # Changed from market
+            limit_price=limit_price, 
             time_in_force='gtc',
             order_class='bracket',
             take_profit={'limit_price': take_profit},
             stop_loss={'stop_price': stop_loss}
         )
         
-        logger.info(f"✅ EXECUTION: Buy {qty} {symbol} @ ~{price}")
+        logger.info(f"✅ ORDER SENT: {symbol} | {qty} shares | Limit: ${limit_price}")
         
-        # Save to DB
+        # Log to Mongo
         history_col.insert_one({
             "action": side,
             "symbol": symbol,
             "qty": qty,
             "entry_price": price,
+            "limit_price": limit_price,
             "tp": take_profit,
             "sl": stop_loss,
             "reason": reason,
             "ai_score": score,
+            "rsi": rsi,
             "order_id": order.id,
-            "timestamp": time.time()
+            "timestamp": time.time(),
+            "status": "filled" # Assumption for simple log
         })
-        return order, tp, sl, qty
-
+        
+        notify_user(symbol, price, qty, score, reason)
+        return order
+        
     except Exception as e:
-        logger.error(f"Execution Error {symbol}: {e}")
-        return None, 0, 0, 0
+        logger.error(f"Execution Failed {symbol}: {e}")
+        return None
 
-# --- 5. THE MAIN LOOP ---
+def notify_user(symbol, price, qty, score, reason):
+    try:
+        requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", 
+            data=f"🚀 {symbol} BUY | {qty} sh @ ${price} | AI: {score}/10 | {reason}",
+            headers={"Title": f"Sentinel: Bought {symbol}", "Tags": "moneybag"}
+        )
+    except: pass
+
+# --- 5. MAIN LOGIC ---
 def scan_market():
-    # --- 1. MARKET HOURS CHECK ---
+    # 1. Market Hours Check
     try:
         clock = api.get_clock()
         if not clock.is_open:
-            logger.info("🌙 Market is closed. Sleeping...")
+            logger.info("🌙 Market Closed.")
             return
-    except Exception as e:
-        logger.error(f"Clock check failed: {e}")
-        return
+    except: pass
 
-    logger.info("☀️ Market is OPEN. Starting Scan...")
-
-    # --- 2. MULTI-SYMBOL LOOP ---
+    logger.info("🔎 Scanning Market...")
+    
     for symbol in SYMBOLS:
         try:
-            logger.info(f"🔎 Scanning {symbol}...")
-            
-            # A. Technical Check
+            # Check existing position first
+            try:
+                pos = api.get_position(symbol)
+                if float(pos.qty) > 0: continue # Skip if we hold it
+            except: pass 
+
+            # Technicals
             df = get_clean_data(symbol)
             if df is None: continue
-
+            
             price = df['close'].iloc[-1].item()
             rsi, sma = calculate_technicals(df)
-
+            
+            # Strategy: Simple Dip Buy (Uptrend + Oversold)
             is_uptrend = price > sma
-            is_oversold = rsi < 35
+            is_oversold = rsi < 35  # Aggressive dip buying
             
-            # Skip if technicals don't align
-            if not (is_uptrend and is_oversold):
-                continue
+            if is_uptrend and is_oversold:
+                logger.info(f"⚡ MATCH: {symbol} (RSI {rsi:.1f})")
                 
-            logger.info(f"⚡ SETUP FOUND: {symbol} | RSI: {rsi:.1f} | Price > SMA")
-
-            # B. AI Analysis
-            headlines = get_market_news(symbol)
-            ai = agent.analyze(symbol, headlines)
-            
-            logger.info(f"🧠 {symbol} AI Score: {ai.score}/10 | {ai.reason}")
-
-            # C. Trigger
-            if ai.score >= 7:
-                order, tp, sl, qty = execute_bracket_trade(symbol, price, "buy", ai.reason, ai.score)
-                if order:
-                    notify_user(symbol, price, qty, rsi, ai, tp, sl, order.id)
-            else:
-                logger.info(f"❌ {symbol}: Good Technicals, Bad Sentiment.")
-
+                # AI Analysis
+                headlines = get_market_news(symbol)
+                decision = agent.analyze(symbol, headlines, price, rsi)
+                
+                if decision.score >= 7:
+                    execute_smart_trade(symbol, price, "buy", decision.reason, decision.score, rsi)
+                else:
+                    logger.info(f"🛑 AI VETO: {symbol} | Score {decision.score} | {decision.reason}")
+                    
         except Exception as e:
-            logger.error(f"Error scanning {symbol}: {e}")
-            continue
+            logger.error(f"Scan error {symbol}: {e}")
 
-def notify_user(symbol, price, qty, rsi, ai, tp, sl, order_id):
-    rh_link = f"https://robinhood.com/stocks/{symbol}"
-    msg = (
-        f"🚀 BUY: {symbol} ({qty} shares)\n"
-        f"💰 Entry: ${price}\n"
-        f"🎯 Target: ${tp}\n"
-        f"🛑 Stop: ${sl}\n"
-        f"🧠 AI: {ai.score}/10 ({ai.reason})"
-    )
+# --- 6. FLASK SERVER & DASHBOARD ---
+
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sentinel Dashboard</title>
+    <meta http-equiv="refresh" content="30">
+    <style>
+        body { font-family: sans-serif; background: #111; color: #eee; padding: 20px; }
+        .card { background: #222; padding: 15px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #333; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #444; }
+        th { color: #888; }
+        .buy { color: #4caf50; font-weight: bold; }
+        .panic { background: #d32f2f; color: white; border: none; padding: 15px; width: 100%; font-size: 1.2em; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🛡️ Sentinel Control Deck</h1>
     
+    <div class="card">
+        <h3>💰 Portfolio Status</h3>
+        <p><b>Equity:</b> ${{ equity }} | <b>Buying Power:</b> ${{ bp }}</p>
+        <p><b>Budget Used:</b> ${{ exposure }} / ${{ max_budget }}</p>
+    </div>
+
+    <div class="card">
+        <h3>🚨 Emergency Controls</h3>
+        <form action="/panic" method="post" onsubmit="return confirm('ARE YOU SURE? THIS SELLS EVERYTHING.');">
+            <button type="submit" class="panic">☢️ PANIC BUTTON: SELL ALL POSITIONS ☢️</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h3>📜 Recent Trade Log</h3>
+        <table>
+            <tr><th>Time</th><th>Symbol</th><th>Action</th><th>Price</th><th>AI Score</th><th>Reason</th></tr>
+            {% for t in trades %}
+            <tr>
+                <td>{{ t.timestamp }}</td>
+                <td class="buy">{{ t.symbol }}</td>
+                <td>{{ t.action }}</td>
+                <td>${{ t.entry_price }}</td>
+                <td>{{ t.ai_score }}</td>
+                <td>{{ t.reason }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</body>
+</html>
+"""
+
+@app.route('/')
+def dashboard():
     try:
-        requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", 
-            data=msg,
-            headers={
-                "Title": f"Sentinel: {symbol} Trade",
-                "Priority": "high",
-                "Tags": "money_with_wings",
-                "Actions": f"view, 📱 Broker, {rh_link}; view, 🔍 Logic, {PUBLIC_URL}/browse?id={order_id}"
-            },
-            timeout=5
+        # Get Account Info
+        acct = api.get_account()
+        positions = api.list_positions()
+        exposure = sum([float(p.market_value) for p in positions])
+        
+        # Get DB History
+        trades = list(history_col.find().sort("timestamp", -1).limit(10))
+        for t in trades:
+            t['timestamp'] = time.strftime('%H:%M:%S', time.localtime(t['timestamp']))
+        
+        return render_template_string(HTML_TEMPLATE, 
+            equity=acct.equity, 
+            bp=acct.buying_power,
+            exposure=round(exposure, 2),
+            max_budget=MAX_CAPITAL_DEPLOYED,
+            trades=trades
         )
     except Exception as e:
-        logger.error(f"Notification Failed: {e}")
+        return f"Dashboard Error: {e}"
 
-# --- 6. SERVER ---
-@app.route('/browse')
-def browse():
-    oid = request.args.get('id')
+@app.route('/panic', methods=['POST'])
+def panic():
+    """
+    🚨 KILL SWITCH: Cancels all orders and Liquidates all positions.
+    """
     try:
-        record = history_col.find_one({"order_id": oid})
-        if not record: return "Trade not found."
-        return f"""
-        <h2>Trade Logic for {record['symbol']}</h2>
-        <p><b>AI Score:</b> {record['ai_score']}/10</p>
-        <p><b>Reasoning:</b> {record['reason']}</p>
-        <hr>
-        <p><b>Quantity:</b> {record['qty']}</p>
-        <p><b>Entry:</b> ${record['entry_price']}</p>
-        <p><b>Risk/Reward:</b> 1:{round((record['tp']-record['entry_price'])/(record['entry_price']-record['sl']), 1)}</p>
-        """
+        api.cancel_all_orders()
+        api.close_all_positions()
+        logger.critical("☢️ PANIC TRIGGERED: SELLING EVERYTHING ☢️")
+        return "<h1>🚨 LIQUIDATION INITIATED. CHECK BROKER.</h1>"
     except Exception as e:
-        return f"Error loading trade: {e}"
+        return f"Panic Failed: {e}"
 
 if __name__ == '__main__':
-    # Initial scan
-    scan_market()
-    
+    # Initialize Scheduler
     scheduler = BackgroundScheduler()
-    # Runs every hour only during weekdays ideally, but the clock check handles the rest
-    scheduler.add_job(scan_market, 'interval', minutes=60)
+    scheduler.add_job(scan_market, 'interval', minutes=15) # Check every 15 mins
     scheduler.start()
     
+    # Run App
+    print(f"🛡️ Sentinel Active on {PUBLIC_URL}")
     app.run(host='0.0.0.0', port=5000)
 ```
 
