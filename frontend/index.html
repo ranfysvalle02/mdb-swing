@@ -1,0 +1,2675 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sauron's Eye - Market Watcher</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+        ::-webkit-scrollbar-thumb { background: rgba(239, 68, 68, 0.5); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(239, 68, 68, 0.7); }
+        
+        .htmx-indicator{display:none} 
+        .htmx-request .htmx-indicator{display:inline} 
+        .htmx-request.htmx-indicator{display:inline}
+        
+        /* Glassmorphism */
+        .glass {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        
+        .glass-strong {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(239, 68, 68, 0.1);
+        }
+        
+        /* Gradient text */
+        .gradient-text {
+            background: linear-gradient(135deg, #ef4444 0%, #f97316 50%, #eab308 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        /* Glow effects */
+        .glow-red {
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+        }
+        
+        .glow-green {
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
+        }
+        
+        /* Animations */
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.5); }
+            50% { box-shadow: 0 0 30px rgba(239, 68, 68, 0.8); }
+        }
+        
+        .pulse-glow {
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        /* Tooltip */
+        .tooltip {
+            position: relative;
+            cursor: help;
+        }
+        
+        .tooltip-text {
+            visibility: hidden;
+            opacity: 0;
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.98);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 12px;
+            line-height: 1.6;
+            white-space: normal;
+            max-width: 300px;
+            min-width: 200px;
+            z-index: 1000;
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+            font-weight: 400;
+            pointer-events: none;
+        }
+        
+        .tooltip-text::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: rgba(15, 23, 42, 0.98);
+        }
+        
+        .group:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        /* Enhanced tooltip for metrics */
+        .tooltip.group:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        /* Card hover effects */
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Badge styles */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .badge-success {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+        
+        .badge-warning {
+            background: rgba(234, 179, 8, 0.2);
+            color: #eab308;
+            border: 1px solid rgba(234, 179, 8, 0.3);
+        }
+        
+        .badge-danger {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        
+        .badge-info {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+        
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+        }
+        
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 1rem;
+            padding: 2rem;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        
+        .close-modal {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close-modal:hover {
+            color: #fff;
+        }
+        
+        /* Progress bar animation */
+        @keyframes progress-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        #progress-bar {
+            transition: width 0.3s ease-out;
+            animation: progress-pulse 2s ease-in-out infinite;
+        }
+        
+        /* Stock card fade-in */
+        @keyframes cardFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .stock-card-new {
+            animation: cardFadeIn 0.4s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        /* Line clamp utility */
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        /* Hide scrollbar but keep functionality */
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        
+        /* Smooth scrolling */
+        .smooth-scroll {
+            scroll-behavior: smooth;
+        }
+        
+        /* Stock card fixed width for slider */
+        .stock-card-slider {
+            min-width: 280px;
+            max-width: 280px;
+            flex-shrink: 0;
+            height: 260px;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+        
+        .stock-card-slider:hover {
+            transform: translateY(-2px);
+        }
+        
+        /* Responsive transitions */
+        #trending-stocks-slider {
+            transition: opacity 0.3s ease;
+        }
+        
+        /* Button responsiveness */
+        button {
+            transition: all 0.2s ease;
+        }
+        
+        button:active {
+            transform: scale(0.95);
+        }
+        
+        /* Slider container hover effect */
+        #trending-stocks-slider:hover ~ #slider-prev,
+        #trending-stocks-slider:hover ~ #slider-next,
+        #trending-stocks-slider:hover + #slider-prev,
+        #trending-stocks-slider:hover + #slider-next {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+        
+        /* Show arrows when hovering over slider container */
+        .relative:hover #slider-prev,
+        .relative:hover #slider-next {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-gray-100 min-h-screen p-6" onload="checkFirstLoad()">
+    
+    <!-- Header -->
+    <div class="glass-strong rounded-2xl p-6 mb-8 border border-red-500/20">
+        <div class="flex justify-between items-center">
+            <div>
+                <div class="flex items-center gap-3 mb-2">
+                    <h1 class="text-4xl font-bold gradient-text">👁️ SAURON'S EYE</h1>
+                    <button onclick="openModal('strategy-modal')" class="badge badge-info cursor-pointer hover:bg-blue-500/30 transition">
+                        <i class="fas fa-cog mr-1"></i>Strategy
+                    </button>
+                    <button onclick="openModal('how-it-works-modal')" class="badge badge-info cursor-pointer hover:bg-blue-500/30 transition">
+                        <i class="fas fa-question-circle mr-1"></i>How It Works
+                    </button>
+                    <button onclick="openModal('learn-modal')" class="badge badge-success cursor-pointer hover:bg-green-500/30 transition">
+                        <i class="fas fa-graduation-cap mr-1"></i>Learn
+                    </button>
+                </div>
+                <p class="text-sm text-gray-400 flex items-center gap-2">
+                    <i class="fas fa-server text-red-500"></i>
+                    Local Trading System - Direct Market Execution
+                </p>
+            </div>
+            <div class="text-right">
+                <div class="text-xs text-gray-500 mb-1 uppercase tracking-wider">Account Balance</div>
+                <div id="account-info" hx-get="/api/balance" hx-trigger="load, every 10s" hx-swap="innerHTML" class="text-3xl font-bold">
+                    <span class="animate-pulse text-gray-500">Connecting...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- What's New - Trending Stocks Discovery -->
+    <div id="whats-new-section" class="glass rounded-xl p-4 mb-4 border border-blue-500/20 hidden">
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                    <i class="fas fa-sparkles text-blue-500 text-sm"></i>
+                </div>
+                <div>
+                    <h2 class="text-lg font-bold text-white">What's New</h2>
+                    <p class="text-xs text-gray-400">Live market opportunities</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="refreshTrendingStocks()" class="badge badge-info cursor-pointer hover:bg-blue-500/30 active:scale-95 transition-all text-xs px-2 py-1 tooltip relative group">
+                    <i class="fas fa-sync-alt text-xs mr-1"></i>Refresh
+                    <div class="tooltip-text">Reload trending stocks analysis</div>
+                </button>
+                <button onclick="closeWhatsNew()" class="text-gray-500 hover:text-white active:scale-95 transition-all tooltip relative group">
+                    <i class="fas fa-times"></i>
+                    <div class="tooltip-text">Hide this section</div>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Progress Bar -->
+        <div id="progress-container" class="mb-4 hidden">
+            <div class="flex items-center justify-between mb-2">
+                <span id="progress-message" class="text-sm text-gray-400">Starting analysis...</span>
+                <span id="progress-percentage" class="text-sm font-bold text-blue-400">0%</span>
+            </div>
+            <div class="w-full bg-gray-700/50 rounded-full h-2.5 overflow-hidden">
+                <div id="progress-bar" class="bg-gradient-to-r from-blue-500 to-purple-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <div id="progress-details" class="mt-2 text-xs text-gray-500"></div>
+        </div>
+        
+        <!-- Horizontal Slider Container -->
+        <div class="relative">
+            <!-- Scrollable Container -->
+            <div id="trending-stocks-slider" class="flex gap-3 overflow-x-auto overflow-y-hidden pb-2 scrollbar-hide" style="scroll-behavior: smooth; height: 280px;">
+                <div class="text-center py-8 text-gray-500 min-w-full flex items-center justify-center">
+                    <div>
+                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                        <p class="text-sm">Discovering trending stocks...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Navigation Arrows -->
+            <button id="slider-prev" onclick="scrollSlider(-1)" class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 w-10 h-10 rounded-full glass-strong border border-blue-500/30 flex items-center justify-center text-white hover:bg-blue-500/30 hover:scale-110 transition-all opacity-0 pointer-events-none z-10 shadow-lg">
+                <i class="fas fa-chevron-left text-sm"></i>
+            </button>
+            <button id="slider-next" onclick="scrollSlider(1)" class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 w-10 h-10 rounded-full glass-strong border border-blue-500/30 flex items-center justify-center text-white hover:bg-blue-500/30 hover:scale-110 transition-all opacity-0 pointer-events-none z-10 shadow-lg">
+                <i class="fas fa-chevron-right text-sm"></i>
+            </button>
+            
+            <!-- Loading More Indicator -->
+            <div id="loading-more-indicator" class="absolute bottom-0 left-1/2 -translate-x-1/2 hidden transition-opacity duration-300">
+                <div class="glass rounded-lg px-4 py-2 flex items-center gap-2 text-sm text-gray-400 shadow-lg">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>Loading more stocks...</span>
+                </div>
+            </div>
+            
+            <!-- Warning Banner -->
+            <div id="warning-banner" class="hidden mt-3 animate-fade-in">
+                <div class="glass rounded-lg px-4 py-3 border-l-4 border-yellow-500/50 bg-yellow-500/10 flex items-start gap-3 shadow-lg">
+                    <i class="fas fa-exclamation-triangle text-yellow-400 mt-0.5 flex-shrink-0"></i>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-semibold text-yellow-300 mb-1">Limited Data Available</div>
+                        <div id="warning-message" class="text-xs text-gray-300 break-words"></div>
+                    </div>
+                    <button onclick="document.getElementById('warning-banner').classList.add('hidden')" class="text-gray-400 hover:text-white transition flex-shrink-0 ml-2">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-12 gap-6">
+        
+        <!-- Left Sidebar -->
+        <div class="col-span-12 lg:col-span-4 space-y-6">
+            
+            <!-- Stock Discovery & Watchlist -->
+            <div class="glass rounded-2xl p-6 card-hover border border-green-500/20">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
+                            <i class="fas fa-compass text-green-500"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-white">Watchlist</h2>
+                            <p class="text-sm text-gray-400">Monitored symbols</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="openModal('watchlist-info-modal')" class="text-gray-500 hover:text-white transition cursor-pointer tooltip relative group" title="Learn how the watchlist works">
+                            <i class="fas fa-info-circle"></i>
+                            <div class="tooltip-text">Learn about watchlists</div>
+                        </button>
+                        <button onclick="openModal('discovery-modal')" class="badge badge-success cursor-pointer hover:bg-green-500/30 transition">
+                            <i class="fas fa-plus mr-1"></i>Add Stocks
+                        </button>
+                    </div>
+                </div>
+                <div id="watchlist-display" hx-get="/api/watchlist" hx-trigger="load, every 10s" hx-swap="innerHTML" class="space-y-2 min-h-[60px]">
+                    <div class="text-center py-4 text-gray-500">
+                        <i class="fas fa-spinner fa-spin mb-2"></i>
+                        <p class="text-xs">Loading watchlist...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Market Scanner -->
+            <div class="glass rounded-2xl p-6 card-hover">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
+                            <i class="fas fa-search text-red-500"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-white">Scanner</h2>
+                            <p class="text-sm text-gray-400">Analyze any symbol</p>
+                        </div>
+                    </div>
+                    <button onclick="openModal('scanner-info-modal')" class="text-gray-500 hover:text-white transition">
+                        <i class="fas fa-info-circle"></i>
+                    </button>
+                </div>
+                <form hx-post="/api/analyze" hx-target="#ai-result" hx-indicator="#loading" class="space-y-3">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2 uppercase tracking-wider">
+                            <i class="fas fa-tag mr-1"></i>Stock Symbol
+                        </label>
+                        <div class="flex gap-2">
+                            <input type="text" name="ticker" placeholder="e.g. AAPL, NVDA" 
+                                   class="w-full glass rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 uppercase">
+                            <button type="submit" class="glass-strong px-6 py-3 rounded-lg font-bold text-white hover:bg-red-600/20 transition-all glow-red tooltip">
+                                <i class="fas fa-search"></i>
+                                <span class="tooltip-text">Analyze this stock</span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                <div id="loading" class="htmx-indicator mt-4 text-center">
+                    <div class="inline-flex items-center gap-2 text-gray-400 text-sm">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span>Analyzing stock data...</span>
+                    </div>
+                </div>
+                <div id="ai-result" class="mt-4 fade-in"></div>
+            </div>
+
+            <!-- Backtest -->
+            <div class="glass rounded-2xl p-6 card-hover">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-pink-500/20 flex items-center justify-center">
+                            <i class="fas fa-clock-rotate-left text-pink-500"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-white">Backtest</h2>
+                            <p class="text-sm text-gray-400">Historical simulation</p>
+                        </div>
+                    </div>
+                    <button onclick="openModal('backtest-info-modal')" class="text-gray-500 hover:text-white transition">
+                        <i class="fas fa-info-circle"></i>
+                    </button>
+                </div>
+                <form hx-post="/api/backtest" hx-target="#backtest-results" hx-indicator="#bt-loading" class="space-y-3">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2 uppercase tracking-wider">
+                            <i class="fas fa-chart-bar mr-1"></i>Stock to Test
+                        </label>
+                        <div class="flex gap-2">
+                            <input type="text" name="ticker" placeholder="e.g. NVDA" 
+                                   class="w-full glass rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-pink-500/50 uppercase">
+                            <button type="submit" class="glass-strong px-6 py-3 rounded-lg font-bold text-white hover:bg-pink-600/20 transition-all tooltip">
+                                <i class="fas fa-play"></i>
+                                <span class="tooltip-text">Run backtest</span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                <div id="bt-loading" class="htmx-indicator mt-4 text-center">
+                    <div class="inline-flex items-center gap-2 text-gray-400 text-sm">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span>Simulating past year...</span>
+                    </div>
+                </div>
+                <div id="backtest-results" class="mt-4 fade-in"></div>
+            </div>
+
+            <!-- Manual Trade -->
+            <div class="glass rounded-2xl p-6 card-hover">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+                        <i class="fas fa-hand-pointer text-yellow-500"></i>
+                    </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-white">Manual Trade</h2>
+                            <p class="text-sm text-gray-400">Direct execution</p>
+                        </div>
+                </div>
+                <form hx-post="/api/trade" hx-target="#trade-status" class="space-y-3">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2 uppercase tracking-wider">
+                                <i class="fas fa-tag mr-1"></i>Stock Symbol
+                            </label>
+                            <input type="text" name="ticker" placeholder="SYMBOL" 
+                                   class="w-full glass rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500/50 uppercase text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2 uppercase tracking-wider">
+                                <i class="fas fa-arrow-up-down mr-1"></i>Action
+                            </label>
+                            <select name="action" class="w-full glass rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 text-sm">
+                                <option value="buy">BUY</option>
+                                <option value="sell">SELL</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full glass-strong py-3 rounded-lg font-bold text-white hover:bg-green-600/20 transition-all glow-green">
+                        <i class="fas fa-rocket mr-2"></i>EXECUTE
+                    </button>
+                </form>
+                <div id="trade-status" class="mt-3 text-sm"></div>
+            </div>
+
+            <!-- Positions -->
+            <div class="glass rounded-2xl p-6 card-hover">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                            <i class="fas fa-briefcase text-purple-500"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-white">Positions</h2>
+                            <p class="text-sm text-gray-400">Active holdings</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="openModal('positions-info-modal')" class="text-gray-500 hover:text-white transition cursor-pointer tooltip relative group" title="Learn about positions">
+                            <i class="fas fa-info-circle"></i>
+                            <div class="tooltip-text">Learn about positions</div>
+                        </button>
+                        <button onclick="cancelAllOrders()" class="badge badge-danger cursor-pointer hover:bg-red-600/30 transition text-xs">
+                            <i class="fas fa-ban mr-1"></i>Cancel Orders
+                        </button>
+                    </div>
+                </div>
+                <div id="positions-list" hx-get="/api/positions" hx-trigger="load, every 5s" hx-swap="innerHTML"></div>
+            </div>
+
+            <!-- Strategy Config Display -->
+            <div id="strategy-display" hx-get="/api/strategy-config" hx-trigger="load" hx-swap="innerHTML" class="mb-4"></div>
+
+            <!-- Pending Trades -->
+            <div class="glass-strong rounded-2xl p-6 card-hover border border-orange-500/20">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center pulse-glow">
+                            <i class="fas fa-hourglass-half text-orange-500"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-white">Pending Orders</h2>
+                            <p class="text-sm text-gray-400">Awaiting execution</p>
+                        </div>
+                    </div>
+                    <span class="badge badge-warning">
+                        <i class="fas fa-clock mr-1"></i>Auto
+                    </span>
+                </div>
+                <div id="pending-trades" hx-get="/api/pending-trades" hx-trigger="load, every 3s" hx-swap="innerHTML" class="max-h-96 overflow-y-auto"></div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-span-12 lg:col-span-8 space-y-6">
+            
+            <!-- Chart -->
+            <div class="glass rounded-2xl p-4 h-96 relative overflow-hidden">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-chart-candlestick text-red-500"></i>
+                        <span class="text-sm text-gray-400 uppercase">Live Chart</span>
+                    </div>
+                    <span class="badge badge-info">
+                        <i class="fas fa-sync-alt mr-1"></i>TradingView
+                    </span>
+                </div>
+                <div class="tradingview-widget-container" style="height:calc(100% - 40px);width:100%">
+                  <div id="tradingview_12345" style="height:100%;width:100%"></div>
+                  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+                  <script type="text/javascript">
+                  new TradingView.widget({
+                    "autosize": true, "symbol": "NASDAQ:NVDA",
+                    "interval": "D", "timezone": "Etc/UTC", "theme": "dark",
+                    "style": "1", "locale": "en", "toolbar_bg": "#1e293b",
+                    "enable_publishing": false, "container_id": "tradingview_12345"
+                  });
+                  </script>
+                </div>
+            </div>
+
+            <!-- Trade Ledger -->
+            <div class="glass rounded-2xl p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                            <i class="fas fa-book text-blue-500"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-white">History</h2>
+                            <p class="text-sm text-gray-400">Trade log</p>
+                        </div>
+                    </div>
+                    <button class="badge badge-danger hover:bg-red-600/30 transition-all cursor-pointer" 
+                            hx-post="/api/panic" 
+                            onclick="return confirm('⚠️ WARNING: This will sell ALL your stocks and cancel ALL pending orders. Are you sure?')">
+                        <i class="fas fa-exclamation-triangle mr-1"></i>EMERGENCY SELL ALL
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-sm text-gray-400 uppercase tracking-wider border-b border-gray-700/50">
+                                <th class="px-4 py-3 text-left">
+                                    <i class="fas fa-clock mr-1"></i>When
+                                </th>
+                                <th class="px-4 py-3 text-left">
+                                    <i class="fas fa-tag mr-1"></i>Stock
+                                </th>
+                                <th class="px-4 py-3 text-left">
+                                    <i class="fas fa-arrow-up-down mr-1"></i>Buy/Sell
+                                </th>
+                                <th class="px-4 py-3 text-left">
+                                    <i class="fas fa-dollar-sign mr-1"></i>Price
+                                </th>
+                                <th class="px-4 py-3 text-left">
+                                    <i class="fas fa-lightbulb mr-1"></i>Why
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody hx-get="/api/logs" hx-trigger="load, every 5s" hx-swap="innerHTML" class="text-gray-300"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+            <!-- Footer Info -->
+    <div class="glass rounded-2xl p-4 mt-6">
+        <div class="flex items-center justify-center gap-6 flex-wrap">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-server text-red-500"></i>
+                <span class="text-sm text-gray-400">Local System</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <i class="fas fa-bolt text-green-500"></i>
+                <span class="text-sm text-gray-400">Direct Execution</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <i class="fas fa-chart-line text-blue-500"></i>
+                <span class="text-sm text-gray-400">Live Market Data</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <i class="fas fa-sync-alt text-yellow-500"></i>
+                <span class="text-sm text-gray-400">Auto-scans 15min</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy Configuration Modal -->
+    <div id="strategy-modal" class="modal">
+        <div class="modal-content fade-in" style="max-width: 700px;">
+            <span class="close-modal" onclick="closeModal('strategy-modal')">&times;</span>
+            <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                <i class="fas fa-cog text-red-500"></i>
+                Choose Your Risk Level
+            </h2>
+            
+            <div class="space-y-4">
+                <p class="text-gray-300 text-sm mb-4">Pick a strategy that matches your comfort level with risk. Don't worry - you can always change this later!</p>
+                
+                <div>
+                    <label class="block text-sm text-gray-400 mb-3 uppercase tracking-wider">Strategy Options</label>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="glass rounded-lg p-4 border border-blue-500/30 cursor-pointer hover:border-blue-500/50 transition hover:bg-blue-500/10" onclick="selectPreset('conservative')">
+                            <div class="font-bold text-white mb-1 flex items-center gap-2">
+                                <i class="fas fa-shield-alt text-blue-400"></i>
+                                Conservative
+                            </div>
+                            <div class="text-xs text-gray-400 mb-2">Safest option</div>
+                            <div class="text-xs text-gray-500 space-y-1">
+                                <div>• RSI &lt; 30 (very "on sale")</div>
+                                <div>• AI Score ≥ 9 (almost perfect)</div>
+                                <div>• Risk: $25/trade</div>
+                                <div>• Max: $2,500</div>
+                            </div>
+                            <div class="text-xs text-blue-400 mt-2">Best for: Beginners, risk-averse</div>
+                        </div>
+                        <div class="glass rounded-lg p-4 border border-yellow-500/30 cursor-pointer hover:border-yellow-500/50 transition hover:bg-yellow-500/10" onclick="selectPreset('moderate')">
+                            <div class="font-bold text-white mb-1 flex items-center gap-2">
+                                <i class="fas fa-balance-scale text-yellow-400"></i>
+                                Moderate
+                            </div>
+                            <div class="text-xs text-gray-400 mb-2">Balanced (recommended)</div>
+                            <div class="text-xs text-gray-500 space-y-1">
+                                <div>• RSI &lt; 35 ("on sale")</div>
+                                <div>• AI Score ≥ 8 (very good)</div>
+                                <div>• Risk: $50/trade</div>
+                                <div>• Max: $5,000</div>
+                            </div>
+                            <div class="text-xs text-yellow-400 mt-2">Best for: Most people</div>
+                        </div>
+                        <div class="glass rounded-lg p-4 border border-red-500/30 cursor-pointer hover:border-red-500/50 transition hover:bg-red-500/10" onclick="selectPreset('aggressive')">
+                            <div class="font-bold text-white mb-1 flex items-center gap-2">
+                                <i class="fas fa-rocket text-red-400"></i>
+                                Aggressive
+                            </div>
+                            <div class="text-xs text-gray-400 mb-2">More opportunities</div>
+                            <div class="text-xs text-gray-500 space-y-1">
+                                <div>• RSI &lt; 40 (somewhat "on sale")</div>
+                                <div>• AI Score ≥ 7 (good)</div>
+                                <div>• Risk: $100/trade</div>
+                                <div>• Max: $10,000</div>
+                            </div>
+                            <div class="text-xs text-red-400 mt-2">Best for: Experienced traders</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="glass rounded-lg p-4 border border-gray-700/50">
+                    <h3 class="font-bold text-white mb-3 flex items-center gap-2">
+                        <i class="fas fa-info-circle text-blue-500"></i>
+                        What These Settings Mean
+                    </h3>
+                    <div class="space-y-3 text-sm">
+                        <div>
+                            <div class="text-gray-400 text-xs mb-1">RSI Threshold</div>
+                            <div class="text-white font-bold mb-2" id="current-rsi">35</div>
+                            <p class="text-gray-500 text-xs">How "on sale" the stock needs to be. Lower = more selective (fewer trades, higher quality).</p>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <div class="text-gray-400 text-xs">AI Score Required</div>
+                                <button onclick="openModal('ai-score-modal')" class="text-gray-500 hover:text-purple-400 transition cursor-pointer tooltip relative group" title="Learn about AI Scores">
+                                    <i class="fas fa-info-circle text-xs"></i>
+                                    <div class="tooltip-text">Learn how AI scores work</div>
+                                </button>
+                            </div>
+                            <div class="text-white font-bold mb-2" id="current-score">8</div>
+                            <p class="text-gray-500 text-xs">Minimum AI confidence score (0-10). Higher = only the best opportunities.</p>
+                        </div>
+                        <div>
+                            <div class="text-gray-400 text-xs mb-1">Risk Per Trade</div>
+                            <div class="text-white font-bold mb-2" id="current-risk">$50</div>
+                            <p class="text-gray-500 text-xs">Maximum amount you're willing to lose per trade. This is protected by stop losses.</p>
+                        </div>
+                        <div>
+                            <div class="text-gray-400 text-xs mb-1">Max Capital Deployed</div>
+                            <div class="text-white font-bold mb-2" id="current-capital">$5,000</div>
+                            <p class="text-gray-500 text-xs">Maximum total amount invested across all positions at once.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="glass rounded-lg p-4 border-l-4 border-yellow-500/50 bg-yellow-500/5">
+                    <h3 class="font-bold text-white mb-2 text-sm flex items-center gap-2">
+                        <i class="fas fa-lightbulb text-yellow-500"></i>
+                        Which Should I Choose?
+                    </h3>
+                    <ul class="text-gray-400 text-xs space-y-1">
+                        <li><strong>New to investing?</strong> Start with Conservative. You'll get fewer suggestions, but they'll be higher quality.</li>
+                        <li><strong>Comfortable with some risk?</strong> Moderate is a good balance - more opportunities without being too risky.</li>
+                        <li><strong>Experienced trader?</strong> Aggressive gives you more trading opportunities, but requires more careful review.</li>
+                    </ul>
+                </div>
+                
+                <div class="text-xs text-gray-500 italic bg-red-500/10 border border-red-500/30 rounded p-2">
+                    <i class="fas fa-exclamation-triangle mr-1 text-red-400"></i>
+                    Note: Changes require app restart to take effect
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- How It Works Modal -->
+    <div id="how-it-works-modal" class="modal">
+        <div class="modal-content fade-in" style="max-width: 700px;">
+            <span class="close-modal" onclick="closeModal('how-it-works-modal')">&times;</span>
+            <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                <i class="fas fa-lightbulb text-yellow-500"></i>
+                How This Trading Assistant Works
+            </h2>
+            
+            <div class="space-y-6 text-sm">
+                <div class="glass rounded-lg p-4 border-l-4 border-blue-500/50">
+                    <h3 class="font-bold text-white mb-2 flex items-center gap-2">
+                        <span class="badge badge-info">1</span>
+                        Automatic Market Scanning (Every 15 Minutes)
+                    </h3>
+                    <p class="text-gray-300 mb-2">The system automatically checks your watchlist for good buying opportunities.</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li>Skips stocks you already own (to avoid buying more)</li>
+                        <li>Looks at the stock's price history (500+ days)</li>
+                        <li>Calculates three important numbers (RSI, SMA-200, ATR) - explained below</li>
+                        <li>Only continues if the numbers look good</li>
+                    </ul>
+                </div>
+                
+                <div class="glass rounded-lg p-4 border-l-4 border-green-500/50">
+                    <h3 class="font-bold text-white mb-2 flex items-center gap-2">
+                        <span class="badge badge-success">2</span>
+                        Checking the Numbers (Technical Analysis)
+                    </h3>
+                    <p class="text-gray-300 mb-2">Three key indicators help decide if it's a good time to buy:</p>
+                    <div class="grid grid-cols-3 gap-2 mt-3 mb-3">
+                        <div class="glass rounded p-3 text-center cursor-pointer hover:bg-blue-500/10 transition" onclick="openModal('learn-modal'); setTimeout(() => document.getElementById('rsi-section').scrollIntoView({behavior: 'smooth'}), 100);">
+                            <div class="text-xs text-gray-400 mb-1">RSI</div>
+                            <div class="text-xs text-white font-bold">Oversold &lt; 30</div>
+                            <div class="text-xs text-gray-500 mt-1">Momentum</div>
+                            <div class="text-xs text-blue-400 mt-1">Click to learn</div>
+                        </div>
+                        <div class="glass rounded p-3 text-center cursor-pointer hover:bg-blue-500/10 transition" onclick="openModal('learn-modal'); setTimeout(() => document.getElementById('sma-section').scrollIntoView({behavior: 'smooth'}), 100);">
+                            <div class="text-xs text-gray-400 mb-1">SMA-200</div>
+                            <div class="text-xs text-white font-bold">Price &gt; SMA</div>
+                            <div class="text-xs text-gray-500 mt-1">Trend</div>
+                            <div class="text-xs text-blue-400 mt-1">Click to learn</div>
+                        </div>
+                        <div class="glass rounded p-3 text-center cursor-pointer hover:bg-blue-500/10 transition" onclick="openModal('learn-modal'); setTimeout(() => document.getElementById('atr-section').scrollIntoView({behavior: 'smooth'}), 100);">
+                            <div class="text-xs text-gray-400 mb-1">ATR</div>
+                            <div class="text-xs text-white font-bold">Volatility</div>
+                            <div class="text-xs text-gray-500 mt-1">Risk</div>
+                            <div class="text-xs text-blue-400 mt-1">Click to learn</div>
+                        </div>
+                    </div>
+                    <p class="text-gray-300 text-sm mt-3 mb-2"><strong>Simple Rule:</strong> We only suggest buying when:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li>RSI is low (stock is "on sale") - threshold depends on your risk level</li>
+                        <li>Price is above the 200-day average (stock is in an uptrend)</li>
+                    </ul>
+                    <p class="text-gray-500 text-xs mt-2">💡 <strong>Think of it like shopping:</strong> We wait for a sale (low RSI) but only on items that are generally going up in value (above SMA-200).</p>
+                </div>
+                
+                <div class="glass rounded-lg p-4 border-l-4 border-purple-500/50">
+                    <h3 class="font-bold text-white mb-2 flex items-center gap-2">
+                        <span class="badge badge-info">3</span>
+                        AI Checks the News
+                    </h3>
+                    <p class="text-gray-300 mb-2">If the numbers look good, AI reads recent news about the company:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li>Gets the latest 3 news headlines</li>
+                        <li>Reads the full articles (not just headlines - they can be misleading!)</li>
+                        <li>AI analyzes: Is this good news or bad news?</li>
+                        <li>Gives a score from 0-10 (10 = amazing opportunity, 0 = avoid at all costs)</li>
+                        <li>If there's terrible news (fraud, bankruptcy), it automatically says "NO" (score 0)</li>
+                    </ul>
+                    <p class="text-gray-500 text-xs mt-2">💡 <strong>Example:</strong> Stock has good numbers, but news says "CEO arrested for fraud" → Score = 0, trade rejected.</p>
+                </div>
+                
+                <div class="glass rounded-lg p-4 border-l-4 border-orange-500/50">
+                    <h3 class="font-bold text-white mb-2 flex items-center gap-2">
+                        <span class="badge badge-warning">4</span>
+                        You Review and Decide
+                    </h3>
+                    <p class="text-gray-300 mb-2">If the AI score is high enough (8+ for moderate strategy), a <strong>trade suggestion</strong> appears in "Trade Suggestions".</p>
+                    <p class="text-gray-400 text-xs mb-2">You'll see:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li>Why the AI thinks it's a good buy (its reasoning)</li>
+                        <li>The score (0-10)</li>
+                        <li>All the numbers (RSI, SMA, ATR)</li>
+                        <li>How much you might lose (risk assessment)</li>
+                        <li>What news influenced the decision</li>
+                    </ul>
+                    <p class="text-gray-300 text-sm mt-3"><strong>🛡️ Important:</strong> Nothing happens automatically! You must click "Approve" for any trade to execute.</p>
+                </div>
+                
+                <div class="glass rounded-lg p-4 border-l-4 border-red-500/50">
+                    <h3 class="font-bold text-white mb-2 flex items-center gap-2">
+                        <span class="badge badge-danger">5</span>
+                        Automatic Safety Features
+                    </h3>
+                    <p class="text-gray-300 mb-2">When you approve a trade, the system automatically sets up safety features:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li><strong>How many shares:</strong> Based on how volatile the stock is (more volatile = fewer shares)</li>
+                        <li><strong>Stop Loss:</strong> If price drops too much, automatically sell to limit losses</li>
+                        <li><strong>Take Profit:</strong> If price goes up enough, automatically sell to lock in gains</li>
+                        <li><strong>Risk/Reward:</strong> We risk $1 to potentially make $1.50 (better than 1:1)</li>
+                    </ul>
+                    <p class="text-gray-500 text-xs mt-2">💡 <strong>Example:</strong> Buy at $100, stop loss at $96 (lose $4 max), take profit at $106 (gain $6). Risk $4 to make $6.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scanner Info Modal -->
+    <div id="scanner-info-modal" class="modal">
+        <div class="modal-content fade-in" style="max-width: 700px;">
+            <span class="close-modal" onclick="closeModal('scanner-info-modal')">&times;</span>
+            <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                <i class="fas fa-search text-red-500"></i>
+                How the Market Scanner Works
+            </h2>
+            <div class="space-y-4 text-sm">
+                <p class="text-gray-300">The Market Scanner lets you check any stock manually. Just type in a stock symbol (like AAPL or NVDA) and it will analyze it using the same system that automatically scans your watchlist.</p>
+                
+                <div class="glass rounded-lg p-4 border-l-4 border-red-500/50">
+                    <h3 class="font-bold text-white mb-2">What Happens When You Scan</h3>
+                    <p class="text-gray-300 text-xs mb-2">The scanner does a complete analysis in seconds:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li>Looks at 500+ days of price history</li>
+                        <li>Calculates RSI (is it "on sale"?), SMA-200 (is it trending up?), and ATR (how volatile?)</li>
+                        <li>Gets the latest 3 news headlines about the company</li>
+                        <li>Reads the full news articles (not just headlines - they can be misleading!)</li>
+                        <li>AI analyzes everything and gives you a score from 0-10</li>
+                    </ul>
+                </div>
+                
+                <div class="glass rounded-lg p-4 border-l-4 border-blue-500/50">
+                    <h3 class="font-bold text-white mb-2">Understanding the AI Score</h3>
+                    <p class="text-gray-300 text-xs mb-2">The score tells you how good of a buying opportunity this is:</p>
+                    <div class="space-y-2">
+                        <div class="glass rounded p-2 bg-green-500/10 border border-green-500/30">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs font-bold text-green-400">8-10: Excellent Opportunity</span>
+                                <span class="text-xs text-gray-500">✅</span>
+                            </div>
+                            <p class="text-gray-300 text-sm">Strong buy signal! If this was in your watchlist, it would create a trade suggestion for you to review.</p>
+                        </div>
+                        <div class="glass rounded p-2 bg-yellow-500/10 border border-yellow-500/30">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm font-bold text-yellow-400">5-7: Maybe, But Wait</span>
+                                <span class="text-sm text-gray-500">⚠️</span>
+                            </div>
+                            <p class="text-gray-300 text-sm">Moderate opportunity. The numbers look okay, but not great. Might be worth watching, but not buying yet.</p>
+                        </div>
+                        <div class="glass rounded p-2 bg-red-500/10 border border-red-500/30">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm font-bold text-red-400">0-4: Avoid This Stock</span>
+                                <span class="text-sm text-gray-500">❌</span>
+                            </div>
+                            <p class="text-gray-300 text-sm">Weak signal or bad news. The AI found reasons to avoid this stock right now. Better opportunities exist elsewhere.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="glass rounded-lg p-4 border-l-4 border-purple-500/50">
+                    <h3 class="font-bold text-white mb-2">What You'll See</h3>
+                    <p class="text-gray-300 text-xs mb-2">After scanning, you'll get a detailed report showing:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li><strong>The AI Score</strong> - Overall rating (0-10)</li>
+                        <li><strong>RSI Value</strong> - Is the stock "on sale"? (lower is better for buying)</li>
+                        <li><strong>SMA-200 Status</strong> - Is it trending up or down?</li>
+                        <li><strong>ATR Value</strong> - How volatile is it?</li>
+                        <li><strong>AI's Reasoning</strong> - Why it gave this score (in plain English!)</li>
+                        <li><strong>Recent News</strong> - What news influenced the decision</li>
+                    </ul>
+                </div>
+                
+                <div class="glass rounded-lg p-4 border-l-4 border-yellow-500/50 bg-yellow-500/5">
+                    <h3 class="font-bold text-white mb-2 text-sm">💡 Pro Tip</h3>
+                    <p class="text-gray-300 text-xs">Use the scanner to learn! Try scanning different stocks and see how the scores change. Notice patterns - stocks with low RSI and good news tend to score higher. This helps you understand what makes a good investment.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stock Discovery Modal -->
+    <div id="discovery-modal" class="modal">
+        <div class="modal-content fade-in" style="max-width: 900px; max-height: 90vh;">
+            <span class="close-modal" onclick="closeModal('discovery-modal')">&times;</span>
+            <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                <i class="fas fa-compass text-green-500"></i>
+                Discover Stocks to Watch
+            </h2>
+            <p class="text-gray-400 text-sm mb-4">Browse popular stocks by category. Click "Add to Watchlist" to start monitoring them for trading opportunities.</p>
+            
+            <!-- Search Bar -->
+            <div class="mb-4">
+                <input type="text" id="stock-search" placeholder="Search stocks (e.g., AAPL, Tesla, Microsoft)..." 
+                       class="w-full glass rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500/50"
+                       onkeyup="filterStocks()">
+            </div>
+            
+            <!-- Stock Categories -->
+            <div id="discovery-content" hx-get="/api/discover-stocks" hx-trigger="load" hx-swap="innerHTML" class="space-y-4 max-h-[60vh] overflow-y-auto">
+                <div class="text-center py-8 text-gray-500">
+                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                    <p class="text-sm">Loading stocks...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Backtest Info Modal -->
+    <div id="backtest-info-modal" class="modal">
+        <div class="modal-content fade-in">
+            <span class="close-modal" onclick="closeModal('backtest-info-modal')">&times;</span>
+            <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                <i class="fas fa-clock-rotate-left text-pink-500"></i>
+                What is Backtesting?
+            </h2>
+            <div class="space-y-4 text-sm">
+                <p class="text-gray-300">Backtesting is like a time machine - it shows you how this strategy would have worked if you used it over the past year.</p>
+                <div class="glass rounded-lg p-4 border-l-4 border-pink-500/50">
+                    <h3 class="font-bold text-white mb-2">How It Works</h3>
+                    <p class="text-gray-300 text-xs mb-2">The system pretends to trade using historical data:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li>Looks at 365+ days of past stock prices</li>
+                        <li>Goes day-by-day and asks: "Would I buy here?"</li>
+                        <li>Buys when: RSI is low AND price is above the 200-day average</li>
+                        <li>Sells when: Price hits stop loss (limit losses) or take profit (lock in gains)</li>
+                        <li>Shows you: How many trades, win rate, and total profit/loss</li>
+                    </ul>
+                </div>
+                <div class="glass rounded-lg p-4 border-l-4 border-blue-500/50">
+                    <h3 class="font-bold text-white mb-2">What the Results Mean</h3>
+                    <ul class="text-gray-400 text-xs space-y-1">
+                        <li><strong>Win Rate:</strong> % of trades that made money (higher is better, 50%+ is good)</li>
+                        <li><strong>Total Return:</strong> How much profit/loss over the year (e.g., +15% means you'd be up 15%)</li>
+                        <li><strong>Number of Trades:</strong> How many times the strategy would have bought/sold</li>
+                    </ul>
+                </div>
+                <div class="glass rounded-lg p-4 border-l-4 border-yellow-500/50">
+                    <h3 class="font-bold text-white mb-2">⚠️ Important Limitations</h3>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li>This only uses price numbers - doesn't check news like the real system does</li>
+                        <li><strong>Past performance doesn't guarantee future results</strong> - markets change!</li>
+                        <li>Real trading has fees, delays, and emotions that backtesting doesn't include</li>
+                        <li>Use this as a <strong>learning tool</strong> to understand the strategy, not a promise of profits</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Learn Modal - Beginner's Guide -->
+    <div id="learn-modal" class="modal">
+        <div class="modal-content fade-in" style="max-width: 800px;">
+            <span class="close-modal" onclick="closeModal('learn-modal')">&times;</span>
+            <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                <i class="fas fa-graduation-cap text-green-500"></i>
+                Beginner's Guide to Trading Indicators
+            </h2>
+            
+            <div class="space-y-6 text-sm">
+                <!-- Introduction -->
+                <div class="glass rounded-lg p-4 border-l-4 border-green-500/50">
+                    <h3 class="font-bold text-white mb-2">What Are Trading Indicators?</h3>
+                    <p class="text-gray-300 text-xs mb-2">Think of indicators like tools that help you understand what's happening with a stock's price. Just like a thermometer tells you the temperature, indicators tell you if a stock is "hot" (overbought), "cold" (oversold), or trending up/down.</p>
+                    <p class="text-gray-400 text-xs">This system uses three main indicators to help decide when to buy stocks. Let's learn about each one!</p>
+                </div>
+
+                <!-- RSI Section -->
+                <div id="rsi-section" class="glass rounded-lg p-4 border-l-4 border-red-500/50">
+                    <h3 class="font-bold text-white mb-3 flex items-center gap-2">
+                        <i class="fas fa-chart-line text-red-500"></i>
+                        RSI (Relative Strength Index) - The "On Sale" Indicator
+                    </h3>
+                    
+                    <div class="mb-3">
+                        <p class="text-gray-300 text-xs mb-2"><strong>Simple Explanation:</strong> RSI tells you if a stock is "on sale" (oversold) or "overpriced" (overbought).</p>
+                        <p class="text-gray-400 text-xs mb-2">It's like shopping - when something is on sale, you might want to buy it. When it's marked up too high, you wait.</p>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 mb-3">
+                        <div class="glass rounded p-2 text-center bg-red-500/10">
+                            <div class="text-xs font-bold text-red-400">0-30</div>
+                            <div class="text-xs text-gray-300 mt-1">Oversold</div>
+                            <div class="text-xs text-gray-500 mt-1">"On Sale"</div>
+                        </div>
+                        <div class="glass rounded p-2 text-center bg-yellow-500/10">
+                            <div class="text-xs font-bold text-yellow-400">30-70</div>
+                            <div class="text-xs text-gray-300 mt-1">Normal</div>
+                            <div class="text-xs text-gray-500 mt-1">Fair Price</div>
+                        </div>
+                        <div class="glass rounded p-2 text-center bg-green-500/10">
+                            <div class="text-xs font-bold text-green-400">70-100</div>
+                            <div class="text-xs text-gray-300 mt-1">Overbought</div>
+                            <div class="text-xs text-gray-500 mt-1">"Too Expensive"</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <p class="text-gray-300 text-sm mb-2"><strong>Real Example:</strong></p>
+                        <div class="glass rounded p-3 bg-gray-800/50">
+                            <p class="text-gray-300 text-sm">Imagine Apple (AAPL) stock:</p>
+                            <ul class="text-gray-400 text-sm list-disc list-inside ml-4 mt-2 space-y-1">
+                                <li>RSI = 25 → Stock is "on sale" (oversold), might be a good time to buy</li>
+                                <li>RSI = 50 → Stock is at a fair price, not particularly cheap or expensive</li>
+                                <li>RSI = 80 → Stock is "overpriced" (overbought), probably not a good time to buy</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <p class="text-gray-300 text-sm mb-2"><strong>How It Works:</strong></p>
+                        <p class="text-gray-400 text-sm">RSI compares how many days the stock went up vs. down over the last 14 days. If it went down a lot recently, RSI is low (oversold). If it went up a lot, RSI is high (overbought).</p>
+                    </div>
+
+                    <div class="glass rounded p-2 bg-blue-500/10 border border-blue-500/30">
+                        <p class="text-gray-300 text-sm"><strong>💡 Our Strategy:</strong> We look for RSI below 30-40 (depending on your risk level). This means the stock has been dropping and might be ready to bounce back up.</p>
+                    </div>
+                </div>
+
+                <!-- SMA Section -->
+                <div id="sma-section" class="glass rounded-lg p-4 border-l-4 border-blue-500/50">
+                    <h3 class="font-bold text-white mb-3 flex items-center gap-2">
+                        <i class="fas fa-arrow-trend-up text-blue-500"></i>
+                        SMA-200 (Simple Moving Average) - The "Trend" Indicator
+                    </h3>
+                    
+                    <div class="mb-3">
+                        <p class="text-gray-300 text-xs mb-2"><strong>Simple Explanation:</strong> SMA-200 shows you the average price over the last 200 days. It tells you if the stock is generally going up or down.</p>
+                        <p class="text-gray-400 text-xs mb-2">Think of it like a trend line - if the current price is above the average, the trend is up. If it's below, the trend is down.</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 mb-3">
+                        <div class="glass rounded p-3 text-center bg-green-500/10">
+                            <div class="text-lg font-bold text-green-400 mb-1">↑</div>
+                            <div class="text-xs font-bold text-white">Price > SMA-200</div>
+                            <div class="text-xs text-gray-400 mt-1">Uptrend</div>
+                            <div class="text-xs text-gray-500 mt-1">Good to buy</div>
+                        </div>
+                        <div class="glass rounded p-3 text-center bg-red-500/10">
+                            <div class="text-lg font-bold text-red-400 mb-1">↓</div>
+                            <div class="text-xs font-bold text-white">Price < SMA-200</div>
+                            <div class="text-xs text-gray-400 mt-1">Downtrend</div>
+                            <div class="text-xs text-gray-500 mt-1">Avoid buying</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <p class="text-gray-300 text-xs mb-2"><strong>Real Example:</strong></p>
+                        <div class="glass rounded p-3 bg-gray-800/50">
+                            <p class="text-gray-300 text-xs">Imagine Tesla (TSLA):</p>
+                            <ul class="text-gray-400 text-xs list-disc list-inside ml-4 mt-2 space-y-1">
+                                <li>Current price: $250</li>
+                                <li>SMA-200: $220</li>
+                                <li>Since $250 > $220 → Stock is in an uptrend ✅</li>
+                                <li>This is good! We only buy stocks that are trending up.</li>
+                            </ul>
+                            <p class="text-gray-400 text-xs mt-2">But if price was $200 and SMA-200 was $220 → Downtrend ❌ (we'd skip this)</p>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <p class="text-gray-300 text-xs mb-2"><strong>Why 200 Days?</strong></p>
+                        <p class="text-gray-400 text-xs">200 days is about 10 months of trading. This is long enough to show the "big picture" trend, not just short-term noise. It's like looking at a year's weather pattern instead of just today's temperature.</p>
+                    </div>
+
+                    <div class="glass rounded p-2 bg-blue-500/10 border border-blue-500/30">
+                        <p class="text-gray-300 text-xs"><strong>💡 Our Strategy:</strong> We only buy when price is ABOVE SMA-200. This means we're buying stocks that are in an uptrend - like buying a house in a neighborhood that's getting better, not worse.</p>
+                    </div>
+                </div>
+
+                <!-- ATR Section -->
+                <div id="atr-section" class="glass rounded-lg p-4 border-l-4 border-purple-500/50">
+                    <h3 class="font-bold text-white mb-3 flex items-center gap-2">
+                        <i class="fas fa-wave-square text-purple-500"></i>
+                        ATR (Average True Range) - The "Volatility" Indicator
+                    </h3>
+                    
+                    <div class="mb-3">
+                        <p class="text-gray-300 text-xs mb-2"><strong>Simple Explanation:</strong> ATR measures how much a stock's price moves up and down each day. High ATR = big swings, Low ATR = small swings.</p>
+                        <p class="text-gray-400 text-xs mb-2">Think of it like measuring how bumpy a road is. A smooth highway has low "volatility" (low ATR). A rocky mountain road has high "volatility" (high ATR).</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 mb-3">
+                        <div class="glass rounded p-3 bg-yellow-500/10">
+                            <div class="text-xs font-bold text-yellow-400 mb-1">Low ATR</div>
+                            <div class="text-xs text-gray-300">Small price swings</div>
+                            <div class="text-xs text-gray-500 mt-1">Example: $100 → $101 → $100.50</div>
+                            <div class="text-xs text-green-400 mt-1">Less risky</div>
+                        </div>
+                        <div class="glass rounded p-3 bg-red-500/10">
+                            <div class="text-xs font-bold text-red-400 mb-1">High ATR</div>
+                            <div class="text-xs text-gray-300">Big price swings</div>
+                            <div class="text-xs text-gray-500 mt-1">Example: $100 → $105 → $98</div>
+                            <div class="text-xs text-yellow-400 mt-1">More risky</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <p class="text-gray-300 text-xs mb-2"><strong>Real Example:</strong></p>
+                        <div class="glass rounded p-3 bg-gray-800/50">
+                            <p class="text-gray-300 text-xs">Compare two stocks:</p>
+                            <ul class="text-gray-400 text-xs list-disc list-inside ml-4 mt-2 space-y-1">
+                                <li><strong>Apple (AAPL):</strong> ATR = $2 → Price moves about $2 per day (stable)</li>
+                                <li><strong>Small tech stock:</strong> ATR = $10 → Price moves about $10 per day (volatile)</li>
+                            </ul>
+                            <p class="text-gray-400 text-xs mt-2">If both stocks are at $100, Apple might go $98-$102, but the tech stock might go $90-$110. The tech stock is riskier!</p>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <p class="text-gray-300 text-xs mb-2"><strong>How We Use ATR:</strong></p>
+                        <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                            <li><strong>Position Sizing:</strong> More volatile stocks = buy fewer shares (to limit risk)</li>
+                            <li><strong>Stop Loss:</strong> Set stop loss at 2×ATR below entry price</li>
+                            <li><strong>Take Profit:</strong> Set take profit at 3×ATR above entry price</li>
+                        </ul>
+                    </div>
+
+                    <div class="glass rounded p-3 bg-gray-800/50 mb-3">
+                        <p class="text-gray-300 text-xs mb-2"><strong>Example Calculation:</strong></p>
+                        <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                            <li>Stock price: $100</li>
+                            <li>ATR: $5</li>
+                            <li>Buy at: $100</li>
+                            <li>Stop Loss: $100 - (2 × $5) = $90 (if it drops to $90, sell to limit loss)</li>
+                            <li>Take Profit: $100 + (3 × $5) = $115 (if it goes to $115, sell to lock in profit)</li>
+                        </ul>
+                        <p class="text-gray-400 text-xs mt-2">Risk: $10 per share | Potential Gain: $15 per share (better than 1:1 ratio!)</p>
+                    </div>
+
+                    <div class="glass rounded p-2 bg-blue-500/10 border border-blue-500/30">
+                        <p class="text-gray-300 text-xs"><strong>💡 Our Strategy:</strong> ATR helps us size positions correctly and set stop losses/take profits. More volatile stocks get smaller positions and wider stop losses. This protects your money!</p>
+                    </div>
+                </div>
+
+                <!-- Putting It Together -->
+                <div class="glass rounded-lg p-4 border-l-4 border-green-500/50 bg-green-500/5">
+                    <h3 class="font-bold text-white mb-3 flex items-center gap-2">
+                        <i class="fas fa-puzzle-piece text-green-500"></i>
+                        Putting It All Together
+                    </h3>
+                    <p class="text-gray-300 text-xs mb-3">Our strategy combines all three indicators:</p>
+                    <div class="space-y-2">
+                        <div class="glass rounded p-2 bg-gray-800/50">
+                            <p class="text-gray-300 text-xs font-bold mb-1">✅ Good Buy Signal:</p>
+                            <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                                <li>RSI is low (stock is "on sale")</li>
+                                <li>Price is above SMA-200 (stock is trending up)</li>
+                                <li>ATR helps us size the position and set stop loss/take profit</li>
+                            </ul>
+                        </div>
+                        <div class="glass rounded p-2 bg-gray-800/50">
+                            <p class="text-gray-300 text-xs font-bold mb-1">❌ Bad Buy Signal:</p>
+                            <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                                <li>RSI is high (stock is "overpriced")</li>
+                                <li>Price is below SMA-200 (stock is trending down)</li>
+                                <li>Or bad news about the company</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <p class="text-gray-400 text-xs mt-3 italic">Remember: No indicator is perfect! That's why we also check the news and require your approval before making any trades.</p>
+                </div>
+
+                <!-- Risk Management -->
+                <div class="glass rounded-lg p-4 border-l-4 border-yellow-500/50">
+                    <h3 class="font-bold text-white mb-3 flex items-center gap-2">
+                        <i class="fas fa-shield-alt text-yellow-500"></i>
+                        Understanding Risk Management
+                    </h3>
+                    <p class="text-gray-300 text-xs mb-2">Trading involves risk. Here's how we protect your money:</p>
+                    <div class="space-y-2">
+                        <div class="glass rounded p-2">
+                            <p class="text-gray-300 text-xs font-bold mb-1">🛡️ Stop Loss</p>
+                            <p class="text-gray-400 text-xs">Automatically sells if price drops too much. Like a safety net - limits how much you can lose.</p>
+                        </div>
+                        <div class="glass rounded p-2">
+                            <p class="text-gray-300 text-xs font-bold mb-1">🎯 Take Profit</p>
+                            <p class="text-gray-400 text-xs">Automatically sells when price goes up enough. Locks in your gains so you don't get greedy and lose it.</p>
+                        </div>
+                        <div class="glass rounded p-2">
+                            <p class="text-gray-300 text-xs font-bold mb-1">📊 Position Sizing</p>
+                            <p class="text-gray-400 text-xs">We buy fewer shares of volatile stocks. This way, even if a volatile stock crashes, you don't lose too much.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Score Educational Modal -->
+    <div id="ai-score-modal" class="modal">
+        <div class="modal-content fade-in" style="max-width: 700px;">
+            <span class="close-modal" onclick="closeModal('ai-score-modal')">&times;</span>
+            <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                <i class="fas fa-brain text-purple-500"></i>
+                Understanding the AI Score
+            </h2>
+            <div class="space-y-4 text-sm">
+                <p class="text-gray-300">The AI Score (0-10) is a comprehensive rating that combines technical indicators, news analysis, and market sentiment to help you make informed trading decisions.</p>
+                
+                <div class="glass rounded-lg p-4 border-l-4 border-purple-500/50">
+                    <h3 class="font-bold text-white mb-2">How the AI Calculates the Score</h3>
+                    <p class="text-gray-300 text-xs mb-2">The AI analyzes multiple factors:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li><strong>Technical Indicators:</strong> RSI, SMA-200 trend, ATR volatility</li>
+                        <li><strong>News Analysis:</strong> Reads full articles (not just headlines!) to understand context</li>
+                        <li><strong>Market Sentiment:</strong> Positive vs negative news, company fundamentals</li>
+                        <li><strong>Risk Assessment:</strong> Volatility, market conditions, company stability</li>
+                    </ul>
+                </div>
+
+                <div class="glass rounded-lg p-4 border-l-4 border-green-500/50">
+                    <h3 class="font-bold text-white mb-2">Score Breakdown</h3>
+                    <div class="space-y-2">
+                        <div class="glass rounded p-3 bg-green-500/10 border border-green-500/30">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm font-bold text-green-400">8-10: Excellent Opportunity</span>
+                                <span class="text-xs text-gray-500">✅</span>
+                            </div>
+                            <p class="text-gray-300 text-xs">Strong buy signal! Technical indicators look great, news is positive, and risk is manageable. This is what we're looking for.</p>
+                        </div>
+                        <div class="glass rounded p-3 bg-yellow-500/10 border border-yellow-500/30">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm font-bold text-yellow-400">5-7: Moderate Opportunity</span>
+                                <span class="text-xs text-gray-500">⚠️</span>
+                            </div>
+                            <p class="text-gray-300 text-xs">Mixed signals. Some indicators look good, but there might be concerns in the news or technicals. Worth watching, but not a strong buy.</p>
+                        </div>
+                        <div class="glass rounded p-3 bg-red-500/10 border border-red-500/30">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm font-bold text-red-400">0-4: Avoid This Stock</span>
+                                <span class="text-xs text-gray-500">❌</span>
+                            </div>
+                            <p class="text-gray-300 text-xs">Weak signal or bad news detected. The AI found reasons to avoid this stock - could be negative news, poor technicals, or high risk.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass rounded-lg p-4 border-l-4 border-blue-500/50">
+                    <h3 class="font-bold text-white mb-2">Why News Matters</h3>
+                    <p class="text-gray-300 text-xs mb-2">The AI doesn't just read headlines - it reads full articles to understand context:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li><strong>Headlines can be misleading:</strong> "Stock drops 5%" might sound bad, but the article might explain it's temporary</li>
+                        <li><strong>Context matters:</strong> The AI understands if news is company-specific or market-wide</li>
+                        <li><strong>Automatic rejection:</strong> If it finds serious issues (fraud, bankruptcy), score = 0 automatically</li>
+                    </ul>
+                </div>
+
+                <div class="glass rounded-lg p-4 border-l-4 border-yellow-500/50 bg-yellow-500/5">
+                    <h3 class="font-bold text-white mb-2 text-sm">💡 Pro Tip</h3>
+                    <p class="text-gray-300 text-xs">The AI Score is a tool, not a guarantee. Always review the reasoning and your own research. A score of 8+ means the AI thinks it's a good opportunity based on the data it analyzed, but markets are unpredictable!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Risk Levels Educational Modal -->
+    <div id="risk-levels-modal" class="modal">
+        <div class="modal-content fade-in" style="max-width: 700px;">
+            <span class="close-modal" onclick="closeModal('risk-levels-modal')">&times;</span>
+            <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                <i class="fas fa-shield-alt text-yellow-500"></i>
+                Understanding Risk Levels
+            </h2>
+            <div class="space-y-4 text-sm">
+                <p class="text-gray-300">Every stock analysis includes a risk assessment. Understanding these levels helps you make informed decisions about which trades to approve.</p>
+                
+                <div class="glass rounded-lg p-4 border-l-4 border-green-500/50">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="badge badge-success text-sm">LOW RISK</span>
+                        <span class="text-gray-400 text-xs">Safest opportunities</span>
+                    </div>
+                    <p class="text-gray-300 text-xs mb-2">Low risk stocks typically have:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li>Stable price movements (low volatility)</li>
+                        <li>Positive news and strong fundamentals</li>
+                        <li>Established companies with good track records</li>
+                        <li>Clear uptrend with strong technical indicators</li>
+                    </ul>
+                    <p class="text-gray-400 text-xs mt-2"><strong>Example:</strong> Large tech companies like Apple or Microsoft during stable market conditions.</p>
+                </div>
+
+                <div class="glass rounded-lg p-4 border-l-4 border-yellow-500/50">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="badge badge-warning text-sm">MEDIUM RISK</span>
+                        <span class="text-gray-400 text-xs">Moderate opportunities</span>
+                    </div>
+                    <p class="text-gray-300 text-xs mb-2">Medium risk stocks typically have:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li>Moderate price volatility</li>
+                        <li>Mixed or neutral news</li>
+                        <li>Some uncertainty in market conditions</li>
+                        <li>Good technicals but some concerns</li>
+                    </ul>
+                    <p class="text-gray-400 text-xs mt-2"><strong>Example:</strong> Growth stocks or companies in competitive industries.</p>
+                </div>
+
+                <div class="glass rounded-lg p-4 border-l-4 border-red-500/50">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="badge badge-danger text-sm">HIGH RISK</span>
+                        <span class="text-gray-400 text-xs">Risky opportunities</span>
+                    </div>
+                    <p class="text-gray-300 text-xs mb-2">High risk stocks typically have:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li>High price volatility (big swings)</li>
+                        <li>Negative or concerning news</li>
+                        <li>Uncertain market conditions</li>
+                        <li>Weaker technical indicators</li>
+                    </ul>
+                    <p class="text-gray-400 text-xs mt-2"><strong>Example:</strong> Small-cap stocks, volatile sectors, or companies facing challenges.</p>
+                    <p class="text-red-400 text-xs mt-2 font-bold">⚠️ High risk trades require extra caution and may not be suitable for all investors.</p>
+                </div>
+
+                <div class="glass rounded-lg p-4 border-l-4 border-blue-500/50">
+                    <h3 class="font-bold text-white mb-2">How Risk Affects Your Strategy</h3>
+                    <p class="text-gray-300 text-xs mb-2">The system automatically adjusts position sizing based on risk:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li><strong>Low Risk:</strong> Larger position sizes (more shares)</li>
+                        <li><strong>Medium Risk:</strong> Moderate position sizes</li>
+                        <li><strong>High Risk:</strong> Smaller position sizes (fewer shares) to limit potential losses</li>
+                    </ul>
+                    <p class="text-gray-400 text-xs mt-2">This protects your capital - riskier stocks get smaller positions so you don't lose too much if they drop.</p>
+                </div>
+
+                <div class="glass rounded-lg p-4 border-l-4 border-yellow-500/50 bg-yellow-500/5">
+                    <h3 class="font-bold text-white mb-2 text-sm">💡 Remember</h3>
+                    <p class="text-gray-300 text-xs">Risk level is just one factor. Always consider the AI score, your own research, and your risk tolerance. Even "low risk" trades can lose money - never invest more than you can afford to lose!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Watchlist Educational Modal -->
+    <div id="watchlist-info-modal" class="modal">
+        <div class="modal-content fade-in" style="max-width: 700px;">
+            <span class="close-modal" onclick="closeModal('watchlist-info-modal')">&times;</span>
+            <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                <i class="fas fa-compass text-green-500"></i>
+                How the Watchlist Works
+            </h2>
+            <div class="space-y-4 text-sm">
+                <p class="text-gray-300">Your watchlist is like a shopping list for stocks. Add stocks you're interested in, and the system will automatically monitor them for trading opportunities.</p>
+                
+                <div class="glass rounded-lg p-4 border-l-4 border-green-500/50">
+                    <h3 class="font-bold text-white mb-2">What Happens to Stocks in Your Watchlist?</h3>
+                    <p class="text-gray-300 text-xs mb-2">Every 15 minutes, the system automatically:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li>Checks each stock's price and technical indicators</li>
+                        <li>Calculates RSI, SMA-200, and ATR</li>
+                        <li>Looks for buying signals (low RSI + uptrend)</li>
+                        <li>If signals are found, AI analyzes the news</li>
+                        <li>If AI score is high enough, creates a trade suggestion</li>
+                    </ul>
+                </div>
+
+                <div class="glass rounded-lg p-4 border-l-4 border-blue-500/50">
+                    <h3 class="font-bold text-white mb-2">Adding Stocks to Your Watchlist</h3>
+                    <p class="text-gray-300 text-xs mb-2">You can add stocks in several ways:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li><strong>Stock Discovery:</strong> Browse curated lists by category (Tech Giants, Growth Stocks, etc.)</li>
+                        <li><strong>From Stock Cards:</strong> Click the "+" button on any stock card in "What's New"</li>
+                        <li><strong>Manual Entry:</strong> Use the discovery modal to search for specific stocks</li>
+                    </ul>
+                    <p class="text-gray-400 text-xs mt-2">💡 <strong>Tip:</strong> Start with 5-10 stocks you're interested in. Too many stocks can make it hard to track opportunities.</p>
+                </div>
+
+                <div class="glass rounded-lg p-4 border-l-4 border-purple-500/50">
+                    <h3 class="font-bold text-white mb-2">What Makes a Good Watchlist?</h3>
+                    <p class="text-gray-300 text-xs mb-2">A well-balanced watchlist includes:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li><strong>Diversification:</strong> Mix of different sectors (tech, finance, healthcare, etc.)</li>
+                        <li><strong>Different Risk Levels:</strong> Some stable stocks, some growth stocks</li>
+                        <li><strong>Stocks You Understand:</strong> Companies you know and follow</li>
+                        <li><strong>Reasonable Size:</strong> 5-15 stocks is manageable</li>
+                    </ul>
+                </div>
+
+                <div class="glass rounded-lg p-4 border-l-4 border-yellow-500/50">
+                    <h3 class="font-bold text-white mb-2">Managing Your Watchlist</h3>
+                    <p class="text-gray-300 text-xs mb-2">Keep your watchlist fresh:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li><strong>Remove stocks</strong> you're no longer interested in (click the X button)</li>
+                        <li><strong>Add new stocks</strong> as you discover interesting opportunities</li>
+                        <li><strong>Review regularly</strong> - markets change, and so should your watchlist</li>
+                    </ul>
+                </div>
+
+                <div class="glass rounded-lg p-4 border-l-4 border-red-500/50">
+                    <h3 class="font-bold text-white mb-2">⚠️ Important Notes</h3>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li>The system <strong>skips stocks you already own</strong> - it won't suggest buying more shares</li>
+                        <li>Watchlist monitoring happens automatically - you don't need to do anything</li>
+                        <li>Trade suggestions appear in "Trade Suggestions" - you must approve them manually</li>
+                        <li>Having a stock in your watchlist doesn't guarantee a trade suggestion</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Positions Educational Modal -->
+    <div id="positions-info-modal" class="modal">
+        <div class="modal-content fade-in" style="max-width: 700px;">
+            <span class="close-modal" onclick="closeModal('positions-info-modal')">&times;</span>
+            <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                <i class="fas fa-wallet text-purple-500"></i>
+                Understanding Your Positions
+            </h2>
+            <div class="space-y-4 text-sm">
+                <p class="text-gray-300">Your positions show all the stocks you currently own. Understanding this section helps you track your investments and manage your portfolio.</p>
+                
+                <div class="glass rounded-lg p-4 border-l-4 border-purple-500/50">
+                    <h3 class="font-bold text-white mb-2">What You'll See</h3>
+                    <p class="text-gray-300 text-xs mb-2">For each position, you'll see:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li><strong>Symbol:</strong> The stock ticker (e.g., AAPL, NVDA)</li>
+                        <li><strong>Shares:</strong> How many shares you own</li>
+                        <li><strong>Average Price:</strong> The price you bought at</li>
+                        <li><strong>Current Value:</strong> Total value of your position (shares × current price)</li>
+                        <li><strong>P&L (Profit & Loss):</strong> How much you've gained or lost</li>
+                        <li><strong>P&L %:</strong> Your gain/loss as a percentage</li>
+                    </ul>
+                </div>
+
+                <div class="glass rounded-lg p-4 border-l-4 border-green-500/50">
+                    <h3 class="font-bold text-white mb-2">Understanding Profit & Loss</h3>
+                    <div class="space-y-2">
+                        <div class="glass rounded p-2 bg-green-500/10 border border-green-500/30">
+                            <p class="text-gray-300 text-xs"><strong>Green P&L:</strong> You're making money! The stock price is above what you paid.</p>
+                            <p class="text-gray-400 text-xs mt-1">Example: Bought at $100, now worth $110 → +$10 profit (+10%)</p>
+                        </div>
+                        <div class="glass rounded p-2 bg-red-500/10 border border-red-500/30">
+                            <p class="text-gray-300 text-xs"><strong>Red P&L:</strong> You're losing money. The stock price is below what you paid.</p>
+                            <p class="text-gray-400 text-xs mt-1">Example: Bought at $100, now worth $95 → -$5 loss (-5%)</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-400 text-xs mt-2">💡 <strong>Remember:</strong> P&L is "unrealized" until you sell. It changes with the stock price!</p>
+                </div>
+
+                <div class="glass rounded-lg p-4 border-l-4 border-blue-500/50">
+                    <h3 class="font-bold text-white mb-2">Position Actions</h3>
+                    <p class="text-gray-300 text-xs mb-2">You can take actions on your positions:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li><strong>CLOSE:</strong> Sell all shares and close the position</li>
+                        <li><strong>Analyze:</strong> Run a new analysis to see current AI score and indicators</li>
+                    </ul>
+                    <p class="text-gray-400 text-xs mt-2">💡 <strong>Tip:</strong> Use the analyze button to check if you should hold or sell based on current conditions.</p>
+                </div>
+
+                <div class="glass rounded-lg p-4 border-l-4 border-yellow-500/50">
+                    <h3 class="font-bold text-white mb-2">Automatic Safety Features</h3>
+                    <p class="text-gray-300 text-xs mb-2">When you approved a trade, the system automatically set up:</p>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li><strong>Stop Loss:</strong> Automatically sells if price drops too much (limits losses)</li>
+                        <li><strong>Take Profit:</strong> Automatically sells if price goes up enough (locks in gains)</li>
+                    </ul>
+                    <p class="text-gray-400 text-xs mt-2">These protect your capital - you don't need to watch constantly!</p>
+                </div>
+
+                <div class="glass rounded-lg p-4 border-l-4 border-red-500/50">
+                    <h3 class="font-bold text-white mb-2">⚠️ Important Notes</h3>
+                    <ul class="text-gray-400 text-xs list-disc list-inside ml-4 space-y-1">
+                        <li>Positions update in real-time as stock prices change</li>
+                        <li>P&L is "unrealized" - you haven't actually made/lost money until you sell</li>
+                        <li>The system won't suggest buying more shares of stocks you already own</li>
+                        <li>Always review positions regularly and consider taking profits or cutting losses</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+        
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('active');
+            }
+        }
+        
+        function selectPreset(preset) {
+            // Update UI to show selected preset
+            const presets = {
+                conservative: { rsi: 30, score: 9, risk: '$25', capital: '$2,500' },
+                moderate: { rsi: 35, score: 8, risk: '$50', capital: '$5,000' },
+                aggressive: { rsi: 40, score: 7, risk: '$100', capital: '$10,000' }
+            };
+            
+            const config = presets[preset];
+            document.getElementById('current-rsi').textContent = config.rsi;
+            document.getElementById('current-score').textContent = config.score;
+            document.getElementById('current-risk').textContent = config.risk;
+            document.getElementById('current-capital').textContent = config.capital;
+            
+            // Visual feedback
+            document.querySelectorAll('.glass').forEach(el => {
+                if (el.onclick && el.onclick.toString().includes(preset)) {
+                    el.classList.add('glow-red');
+                } else {
+                    el.classList.remove('glow-red');
+                }
+            });
+        }
+        
+        function filterStocks() {
+            const searchTerm = document.getElementById('stock-search').value.toLowerCase();
+            const stockCards = document.querySelectorAll('.stock-card');
+            stockCards.forEach(card => {
+                const symbol = card.getAttribute('data-symbol') || '';
+                const name = card.getAttribute('data-name') || '';
+                if (symbol.toLowerCase().includes(searchTerm) || name.toLowerCase().includes(searchTerm)) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+        
+        
+        function removeFromWatchlist(symbol) {
+            if (!confirm(`Remove ${symbol} from your watchlist?`)) return;
+            
+            fetch('/api/watchlist/remove', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `symbol=${encodeURIComponent(symbol)}`
+            })
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('watchlist-display').innerHTML = html;
+            })
+            .catch(err => {
+                console.error('Error removing from watchlist:', err);
+                alert('Failed to remove stock. Please try again.');
+            });
+        }
+        
+        let wsConnection = null;
+        let isLoadingMore = false;
+        let currentPage = 0;
+        let allStocks = [];
+        let displayedStocks = [];
+        let cachedStocks = null;
+        let cacheTimestamp = null;
+        const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes - longer cache for resource optimization
+        const STOCKS_PER_PAGE = 6;
+        const CACHE_KEY = 'whats_new_stocks_cache';
+        const CACHE_TIMESTAMP_KEY = 'whats_new_cache_timestamp';
+        
+        // Load cache from localStorage on page load
+        function loadCacheFromStorage() {
+            try {
+                const storedCache = localStorage.getItem(CACHE_KEY);
+                const storedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+                
+                if (storedCache && storedTimestamp) {
+                    cachedStocks = JSON.parse(storedCache);
+                    cacheTimestamp = parseInt(storedTimestamp);
+                    return true;
+                }
+            } catch (e) {
+                console.warn('Failed to load cache from storage:', e);
+            }
+            return false;
+        }
+        
+        // Save cache to localStorage
+        function saveCacheToStorage(stocks) {
+            try {
+                localStorage.setItem(CACHE_KEY, JSON.stringify(stocks));
+                localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+                cachedStocks = stocks;
+                cacheTimestamp = Date.now();
+            } catch (e) {
+                console.warn('Failed to save cache to storage:', e);
+            }
+        }
+        
+        // Check if cache is valid
+        function isCacheValid() {
+            if (!cachedStocks || !cacheTimestamp) return false;
+            const age = Date.now() - cacheTimestamp;
+            return age < CACHE_DURATION && cachedStocks.length > 0;
+        }
+        
+        async function checkFirstLoad() {
+            // Try to load from localStorage first
+            loadCacheFromStorage();
+            
+            // Check if cache is valid
+            if (isCacheValid()) {
+                console.log('Using cached stocks from storage');
+                showWhatsNew(cachedStocks);
+                
+                // Optionally refresh in background (don't wait for it)
+                setTimeout(() => {
+                    loadTrendingStocksWithProgress(true); // true = background refresh
+                }, 1000);
+                return;
+            }
+            
+            // No valid cache, load fresh data
+            loadTrendingStocksWithProgress(false);
+        }
+        
+        function loadTrendingStocksWithProgress(backgroundRefresh = false) {
+            const section = document.getElementById('whats-new-section');
+            const slider = document.getElementById('trending-stocks-slider');
+            const progressContainer = document.getElementById('progress-container');
+            const progressBar = document.getElementById('progress-bar');
+            const progressMessage = document.getElementById('progress-message');
+            const progressPercentage = document.getElementById('progress-percentage');
+            const progressDetails = document.getElementById('progress-details');
+            
+            // Show section
+            section.classList.remove('hidden');
+            
+            // If background refresh, don't show progress UI
+            if (backgroundRefresh) {
+                progressContainer.classList.add('hidden');
+                // Keep existing content, just refresh in background
+            } else {
+                // Show progress UI for foreground refresh
+                slider.innerHTML = '<div class="text-center py-8 text-gray-500 min-w-full flex items-center justify-center"><div><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><p class="text-sm">Discovering trending stocks...</p></div></div>';
+                progressContainer.classList.remove('hidden');
+                progressBar.style.width = '0%';
+                progressMessage.textContent = 'Connecting...';
+                progressPercentage.textContent = '0%';
+                progressDetails.textContent = '';
+            }
+            
+            // Reset state
+            allStocks = [];
+            displayedStocks = [];
+            currentPage = 0;
+            isLoadingMore = false;
+            
+            // Determine WebSocket URL
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            
+            // Close existing connection if any
+            if (wsConnection) {
+                wsConnection.close();
+            }
+            
+            // Create WebSocket connection
+            wsConnection = new WebSocket(wsUrl);
+            
+            wsConnection.onopen = () => {
+                console.log('WebSocket connected');
+                progressMessage.textContent = 'Connected - discovering trending stocks...';
+            };
+            
+            wsConnection.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'progress') {
+                        // Update progress bar
+                        const percentage = data.percentage || 0;
+                        progressBar.style.width = `${percentage}%`;
+                        progressPercentage.textContent = `${percentage}%`;
+                        progressMessage.textContent = data.message || 'Analyzing...';
+                        
+                        if (data.symbol) {
+                            progressDetails.textContent = `Current: ${data.symbol} (${data.current}/${data.total})`;
+                        }
+                        
+                        // Show stage if available
+                        if (data.stage === 'technicals') {
+                            progressDetails.textContent += ' • Calculating indicators...';
+                        } else if (data.stage === 'ai') {
+                            progressDetails.textContent += ' • AI analyzing...';
+                        }
+                    } else if (data.type === 'stock_complete') {
+                        // Store stock in array
+                        allStocks.push(data.stock);
+                        
+                        // Add to displayed stocks if we haven't reached the limit
+                        if (displayedStocks.length < STOCKS_PER_PAGE) {
+                            displayedStocks.push(data.stock);
+                            const card = createStockCard(data.stock);
+                            slider.appendChild(card);
+                        }
+                        
+                        // Update progress
+                        progressBar.style.width = `${data.percentage}%`;
+                        progressPercentage.textContent = `${data.percentage}%`;
+                        progressMessage.textContent = `Completed ${data.current}/${data.total} stocks`;
+                        progressDetails.textContent = `Latest: ${data.stock.symbol}`;
+                        
+                        // Update navigation arrows
+                        updateSliderArrows();
+                    } else if (data.type === 'complete') {
+                        // All done - store all stocks
+                        allStocks = data.stocks || [];
+                        
+                        // Cache the results (both in memory and localStorage)
+                        saveCacheToStorage(allStocks);
+                        
+                        // Check for warnings
+                        const hasWarnings = data.warnings && data.warnings.length > 0;
+                        const isPartial = data.expected && data.total < data.expected;
+                        
+                        // Display initial batch
+                        displayedStocks = allStocks.slice(0, STOCKS_PER_PAGE);
+                        slider.innerHTML = '';
+                        displayedStocks.forEach(stock => {
+                            const card = createStockCard(stock);
+                            slider.appendChild(card);
+                        });
+                        
+                        // Update progress
+                        progressBar.style.width = '100%';
+                        progressPercentage.textContent = '100%';
+                        
+                        if (hasWarnings || isPartial) {
+                            progressMessage.textContent = `Analysis complete! Found ${data.total} stocks (${data.expected || data.total} expected)`;
+                            progressDetails.textContent = hasWarnings ? data.warnings[0] : 'Some stocks may have limited data';
+                            progressBar.style.background = 'linear-gradient(to right, #f59e0b, #d97706)';
+                            
+                            // Show warning banner
+                            showWarningBanner(hasWarnings ? data.warnings.join(' ') : 'Some stocks have limited analysis data');
+                        } else {
+                            progressMessage.textContent = `Analysis complete! Found ${data.total} stocks`;
+                            progressDetails.textContent = '';
+                        }
+                        
+                        // Hide progress after a moment
+                        setTimeout(() => {
+                            progressContainer.classList.add('hidden');
+                        }, hasWarnings || isPartial ? 4000 : 2000);
+                        
+                        // Setup infinite scroll
+                        setupInfiniteScroll();
+                        updateSliderArrows();
+                        
+                        // Initial check after a brief delay to ensure DOM is ready
+                        setTimeout(() => {
+                            updateSliderArrows();
+                        }, 100);
+                    } else if (data.type === 'error') {
+                        const isRateLimit = data.is_rate_limit || data.error_type === 'rate_limit';
+                        progressMessage.textContent = isRateLimit 
+                            ? `⚠️ Rate limit reached - using cached data` 
+                            : `Error: ${data.message}`;
+                        progressDetails.textContent = isRateLimit 
+                            ? 'Some news analysis may be limited. Retrying...' 
+                            : `Failed: ${data.symbol || 'Unknown'}`;
+                        
+                        if (isRateLimit) {
+                            progressBar.style.background = 'linear-gradient(to right, #f59e0b, #d97706)';
+                        } else {
+                            progressBar.style.background = 'linear-gradient(to right, #ef4444, #dc2626)';
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error parsing WebSocket message:', err);
+                }
+            };
+            
+            wsConnection.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                progressMessage.textContent = 'Connection error - falling back to standard mode...';
+                progressDetails.textContent = 'Using cached data if available';
+                progressBar.style.background = 'linear-gradient(to right, #f59e0b, #d97706)';
+                
+                // Fallback to regular fetch
+                setTimeout(() => {
+                    loadTrendingStocksFallback();
+                }, 1000);
+            };
+            
+            wsConnection.onclose = () => {
+                console.log('WebSocket closed');
+                // Setup infinite scroll if we have stocks
+                if (allStocks.length > 0) {
+                    setupInfiniteScroll();
+                    setTimeout(() => {
+                        updateSliderArrows();
+                    }, 100);
+                }
+            };
+        }
+        
+        async function loadTrendingStocksFallback() {
+            // Fallback to regular HTTP fetch if WebSocket fails
+            const slider = document.getElementById('trending-stocks-slider');
+            const progressContainer = document.getElementById('progress-container');
+            
+            try {
+                // Show loading state only if slider is empty
+                if (!slider.innerHTML.trim() || slider.innerHTML.includes('Discovering')) {
+                    slider.innerHTML = '<div class="text-center py-8 text-gray-400 min-w-full flex items-center justify-center"><div><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><p class="text-sm">Loading stocks...</p></div></div>';
+                }
+                
+                const response = await fetch('/api/auto-setup');
+                const data = await response.json();
+                
+                if (data.success && data.stocks && data.stocks.length > 0) {
+                    // Check if we got fewer stocks than expected
+                    if (data.expected && data.stocks.length < data.expected) {
+                        showWarningBanner(`Only ${data.stocks.length} of ${data.expected} stocks loaded. Some may have limited data.`);
+                    }
+                    
+                    showWhatsNew(data.stocks);
+                    progressContainer.classList.add('hidden');
+                } else {
+                    // Try to use cache if available
+                    if (isCacheValid() && cachedStocks && cachedStocks.length > 0) {
+                        showWarningBanner('Using cached data - fresh analysis unavailable');
+                        showWhatsNew(cachedStocks);
+                        progressContainer.classList.add('hidden');
+                    } else {
+                        throw new Error('No stocks available');
+                    }
+                }
+            } catch (err) {
+                console.error('Error loading trending stocks:', err);
+                
+                // Try cache as last resort
+                if (isCacheValid() && cachedStocks && cachedStocks.length > 0) {
+                    showWarningBanner('Using cached data - connection error occurred');
+                    showWhatsNew(cachedStocks);
+                    progressContainer.classList.add('hidden');
+                } else {
+                    slider.innerHTML = '<div class="text-center py-8 text-red-400 min-w-full flex items-center justify-center"><div><i class="fas fa-exclamation-circle text-2xl mb-2"></i><p class="text-sm mb-2">Failed to load stocks</p><p class="text-xs text-gray-500">Please check your connection and try refreshing</p><button onclick="refreshTrendingStocks()" class="mt-3 badge badge-info cursor-pointer">Retry</button></div></div>';
+                }
+            }
+        }
+        
+        // Also allow manual refresh of trending stocks
+        async function refreshTrendingStocks() {
+            // Clear cache to force refresh (both memory and localStorage)
+            cachedStocks = null;
+            cacheTimestamp = null;
+            try {
+                localStorage.removeItem(CACHE_KEY);
+                localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+            } catch (e) {
+                console.warn('Failed to clear cache from storage:', e);
+            }
+            
+            // Reset state
+            allStocks = [];
+            displayedStocks = [];
+            currentPage = 0;
+            isLoadingMore = false;
+            
+            // Close existing WebSocket if open
+            if (wsConnection) {
+                wsConnection.close();
+                wsConnection = null;
+            }
+            
+            loadTrendingStocksWithProgress(false);
+        }
+        
+        async function showWhatsNew(stocks) {
+            const section = document.getElementById('whats-new-section');
+            const slider = document.getElementById('trending-stocks-slider');
+            const progressContainer = document.getElementById('progress-container');
+            
+            // Show the section
+            section.classList.remove('hidden');
+            progressContainer.classList.add('hidden');
+            
+            // Store all stocks
+            allStocks = stocks;
+            displayedStocks = stocks.slice(0, STOCKS_PER_PAGE);
+            currentPage = 0;
+            
+            // Save to cache (both memory and localStorage)
+            saveCacheToStorage(stocks);
+            
+            // Clear and populate slider with smooth transition
+            slider.style.opacity = '0';
+            setTimeout(() => {
+                slider.innerHTML = '';
+                displayedStocks.forEach(stockData => {
+                    const card = createStockCard(stockData);
+                    slider.appendChild(card);
+                });
+                slider.style.opacity = '1';
+            }, 150);
+            
+            // Setup infinite scroll
+            setupInfiniteScroll();
+            updateSliderArrows();
+            
+            // Initial check after a brief delay
+            setTimeout(() => {
+                updateSliderArrows();
+            }, 100);
+        }
+        
+        function setupInfiniteScroll() {
+            const slider = document.getElementById('trending-stocks-slider');
+            
+            // Remove existing listener
+            slider.removeEventListener('scroll', handleScroll);
+            
+            // Add scroll listener for infinite scroll
+            slider.addEventListener('scroll', handleScroll);
+        }
+        
+        let scrollTimeout = null;
+        function handleScroll() {
+            const slider = document.getElementById('trending-stocks-slider');
+            if (!slider) return;
+            
+            // Debounce scroll handling for performance
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                const loadingIndicator = document.getElementById('loading-more-indicator');
+                
+                // Check if near the end (within 200px)
+                const scrollLeft = slider.scrollLeft;
+                const scrollWidth = slider.scrollWidth;
+                const clientWidth = slider.clientWidth;
+                const distanceFromEnd = scrollWidth - scrollLeft - clientWidth;
+                
+                // Show/hide navigation arrows based on scroll position
+                updateSliderArrows();
+                
+                // Load more if near end and not already loading
+                if (distanceFromEnd < 200 && !isLoadingMore && displayedStocks.length < allStocks.length) {
+                    loadMoreStocks();
+                }
+            }, 50); // Debounce scroll events
+        }
+        
+        function loadMoreStocks() {
+            if (isLoadingMore || displayedStocks.length >= allStocks.length) return;
+            
+            isLoadingMore = true;
+            const loadingIndicator = document.getElementById('loading-more-indicator');
+            const slider = document.getElementById('trending-stocks-slider');
+            
+            // Show loading indicator with smooth fade
+            loadingIndicator.style.opacity = '0';
+            loadingIndicator.classList.remove('hidden');
+            setTimeout(() => {
+                loadingIndicator.style.opacity = '1';
+            }, 10);
+            
+            // Use requestAnimationFrame for smooth rendering
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    currentPage++;
+                    const startIndex = displayedStocks.length;
+                    const endIndex = Math.min(startIndex + STOCKS_PER_PAGE, allStocks.length);
+                    const newStocks = allStocks.slice(startIndex, endIndex);
+                    
+                    // Add new cards with fade-in
+                    newStocks.forEach((stock, index) => {
+                        displayedStocks.push(stock);
+                        const card = createStockCard(stock);
+                        card.style.opacity = '0';
+                        slider.appendChild(card);
+                        
+                        // Animate in
+                        setTimeout(() => {
+                            card.style.transition = 'opacity 0.3s ease';
+                            card.style.opacity = '1';
+                        }, index * 50);
+                    });
+                    
+                    // Hide loading indicator
+                    loadingIndicator.style.opacity = '0';
+                    setTimeout(() => {
+                        loadingIndicator.classList.add('hidden');
+                    }, 300);
+                    
+                    isLoadingMore = false;
+                    
+                    // Update arrows
+                    updateSliderArrows();
+                }, 200);
+            });
+        }
+        
+        function updateSliderArrows() {
+            const slider = document.getElementById('trending-stocks-slider');
+            const prevBtn = document.getElementById('slider-prev');
+            const nextBtn = document.getElementById('slider-next');
+            
+            if (!slider || slider.children.length === 0) {
+                prevBtn.classList.add('opacity-0', 'pointer-events-none');
+                nextBtn.classList.add('opacity-0', 'pointer-events-none');
+                return;
+            }
+            
+            const scrollLeft = slider.scrollLeft;
+            const scrollWidth = slider.scrollWidth;
+            const clientWidth = slider.clientWidth;
+            const canScrollLeft = scrollLeft > 0;
+            const canScrollRight = scrollLeft < scrollWidth - clientWidth - 10;
+            
+            // Show/hide arrows
+            if (canScrollLeft) {
+                prevBtn.classList.remove('opacity-0', 'pointer-events-none');
+            } else {
+                prevBtn.classList.add('opacity-0', 'pointer-events-none');
+            }
+            
+            if (canScrollRight) {
+                nextBtn.classList.remove('opacity-0', 'pointer-events-none');
+            } else {
+                nextBtn.classList.add('opacity-0', 'pointer-events-none');
+            }
+        }
+        
+        function showWarningBanner(message) {
+            const banner = document.getElementById('warning-banner');
+            const messageEl = document.getElementById('warning-message');
+            if (banner && messageEl) {
+                messageEl.textContent = message;
+                banner.style.opacity = '0';
+                banner.classList.remove('hidden');
+                
+                // Fade in
+                setTimeout(() => {
+                    banner.style.transition = 'opacity 0.3s ease';
+                    banner.style.opacity = '1';
+                }, 10);
+                
+                // Auto-hide after 10 seconds with fade out
+                setTimeout(() => {
+                    banner.style.opacity = '0';
+                    setTimeout(() => {
+                        banner.classList.add('hidden');
+                    }, 300);
+                }, 10000);
+            }
+        }
+        
+        function scrollSlider(direction) {
+            const slider = document.getElementById('trending-stocks-slider');
+            if (!slider) return;
+            
+            // Calculate scroll amount based on card width + gap
+            const cardWidth = 280; // min-width of card
+            const gap = 12; // gap-3 = 12px
+            const scrollAmount = cardWidth + gap;
+            const currentScroll = slider.scrollLeft;
+            const newScroll = currentScroll + (direction * scrollAmount);
+            
+            // Smooth scroll with requestAnimationFrame for better performance
+            slider.scrollTo({
+                left: newScroll,
+                behavior: 'smooth'
+            });
+            
+            // Update arrows after scroll with debounce
+            clearTimeout(window.sliderArrowUpdateTimeout);
+            window.sliderArrowUpdateTimeout = setTimeout(updateSliderArrows, 150);
+        }
+        
+        function createStockCard(stockData) {
+            const symbol = stockData.symbol || stockData;
+            const price = stockData.price;
+            const rsi = stockData.rsi;
+            const trend = stockData.trend;
+            const aiScore = stockData.ai_score;
+            const aiReason = stockData.ai_reason;
+            const riskLevel = stockData.risk_level;
+            const hasLimitedData = stockData.has_limited_data || (price && !aiScore && !rsi);
+            
+            // Determine card colors and badges based on analysis
+            let scoreColor = "text-gray-400";
+            let scoreBadge = "badge-info";
+            let scoreBg = "bg-gray-500/20";
+            let scoreIcon = "fa-question-circle";
+            let trendColor = "text-gray-400";
+            let trendIcon = "fa-minus";
+            let trendBg = "bg-gray-500/10";
+            let rsiStatus = "Neutral";
+            let rsiColor = "text-gray-400";
+            let rsiIcon = "fa-equals";
+            let rsiBg = "bg-gray-500/10";
+            let description = "Trending stock - check analysis";
+            let overallSignal = "neutral";
+            
+            if (aiScore !== null && aiScore !== undefined) {
+                if (aiScore >= 8) {
+                    scoreColor = "text-green-400";
+                    scoreBadge = "badge-success";
+                    scoreBg = "bg-green-500/20";
+                    scoreIcon = "fa-check-circle";
+                    description = "Strong buy opportunity";
+                    overallSignal = "strong";
+                } else if (aiScore >= 5) {
+                    scoreColor = "text-yellow-400";
+                    scoreBadge = "badge-warning";
+                    scoreBg = "bg-yellow-500/20";
+                    scoreIcon = "fa-exclamation-circle";
+                    description = "Worth investigating";
+                    overallSignal = "moderate";
+                } else {
+                    scoreColor = "text-red-400";
+                    scoreBadge = "badge-danger";
+                    scoreBg = "bg-red-500/20";
+                    scoreIcon = "fa-times-circle";
+                    description = "Weak signal - proceed with caution";
+                    overallSignal = "weak";
+                }
+            }
+            
+            if (trend === "UP") {
+                trendColor = "text-green-400";
+                trendIcon = "fa-arrow-trend-up";
+                trendBg = "bg-green-500/10";
+            } else if (trend === "DOWN") {
+                trendColor = "text-red-400";
+                trendIcon = "fa-arrow-trend-down";
+                trendBg = "bg-red-500/10";
+            }
+            
+            if (rsi !== null && rsi !== undefined) {
+                if (rsi < 30) {
+                    rsiStatus = "Oversold";
+                    rsiColor = "text-green-400";
+                    rsiIcon = "fa-arrow-down";
+                    rsiBg = "bg-green-500/10";
+                } else if (rsi > 70) {
+                    rsiStatus = "Overbought";
+                    rsiColor = "text-red-400";
+                    rsiIcon = "fa-arrow-up";
+                    rsiBg = "bg-red-500/10";
+                } else {
+                    rsiStatus = "Neutral";
+                    rsiColor = "text-gray-400";
+                    rsiIcon = "fa-equals";
+                    rsiBg = "bg-gray-500/10";
+                }
+            }
+            
+            const card = document.createElement('div');
+            card.className = 'glass rounded-xl p-4 card-hover stock-card-new stock-card-slider border-l-4';
+            
+            // Set border color based on overall signal
+            if (overallSignal === "strong") {
+                card.classList.add('border-green-500/50');
+            } else if (overallSignal === "moderate") {
+                card.classList.add('border-yellow-500/50');
+            } else if (overallSignal === "weak") {
+                card.classList.add('border-red-500/50');
+            } else {
+                card.classList.add('border-gray-500/30');
+            }
+            
+            let analysisSection = '';
+            if (price && rsi !== undefined && trend) {
+                analysisSection = `
+                    <div class="grid grid-cols-3 gap-2 mb-3 pt-3 border-t border-gray-700/50">
+                        <div class="text-center tooltip relative group">
+                            <div class="flex items-center justify-center gap-1 mb-1">
+                                <div class="w-8 h-8 rounded-lg ${rsiBg} flex items-center justify-center">
+                                    <i class="fas ${rsiIcon} ${rsiColor} text-xs"></i>
+                                </div>
+                            </div>
+                            <div class="text-xs font-bold ${rsiColor} mb-0.5">${rsi ? rsi.toFixed(1) : 'N/A'}</div>
+                            <div class="text-[10px] text-gray-500 uppercase tracking-wider">RSI</div>
+                            <div class="text-[10px] ${rsiColor} mt-0.5">${rsiStatus}</div>
+                            <div class="tooltip-text">
+                                <strong>RSI (Relative Strength Index)</strong><br>
+                                ${rsi < 30 ? '✅ Oversold - Stock is "on sale", good buying opportunity' : rsi > 70 ? '⚠️ Overbought - Stock may be overpriced' : '➖ Neutral - Stock is at fair price'}<br>
+                                <span class="text-gray-400 text-xs">Range: 0-100 | Lower is better for buying</span>
+                            </div>
+                        </div>
+                        <div class="text-center tooltip relative group">
+                            <div class="flex items-center justify-center gap-1 mb-1">
+                                <div class="w-8 h-8 rounded-lg ${trendBg} flex items-center justify-center">
+                                    <i class="fas ${trendIcon} ${trendColor} text-xs"></i>
+                                </div>
+                            </div>
+                            <div class="text-xs font-bold ${trendColor} mb-0.5">${trend || 'N/A'}</div>
+                            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Trend</div>
+                            <div class="text-[10px] text-gray-500 mt-0.5">vs SMA-200</div>
+                            <div class="tooltip-text">
+                                <strong>Price Trend vs 200-Day Average</strong><br>
+                                ${trend === "UP" ? '✅ Uptrend - Price is above 200-day average, generally rising' : trend === "DOWN" ? '⚠️ Downtrend - Price is below 200-day average, generally falling' : '➖ Neutral - Price near average'}<br>
+                                <span class="text-gray-400 text-xs">We prefer buying stocks in uptrends</span>
+                            </div>
+                        </div>
+                        <div class="text-center tooltip relative group">
+                            <div class="flex items-center justify-center gap-1 mb-1">
+                                <div class="w-8 h-8 rounded-lg ${scoreBg} flex items-center justify-center">
+                                    <i class="fas ${scoreIcon} ${scoreColor} text-xs"></i>
+                                </div>
+                            </div>
+                            <div class="text-xs font-bold ${scoreColor} mb-0.5">${aiScore !== null && aiScore !== undefined ? aiScore + '/10' : 'N/A'}</div>
+                            <div class="text-[10px] text-gray-500 uppercase tracking-wider">AI Score</div>
+                            <div class="text-[10px] ${scoreColor} mt-0.5">${aiScore >= 8 ? 'Strong' : aiScore >= 5 ? 'Moderate' : aiScore !== null ? 'Weak' : 'N/A'}</div>
+                            <div class="tooltip-text">
+                                <strong>AI Analysis Score (0-10)</strong><br>
+                                ${aiScore >= 8 ? '✅ Strong Buy - Excellent opportunity based on news and technicals' : aiScore >= 5 ? '⚠️ Moderate - Decent opportunity, review carefully' : aiScore !== null ? '❌ Weak - Low confidence, proceed with caution' : 'No AI analysis available'}<br>
+                                <span class="text-gray-400 text-xs">Based on news sentiment and technical indicators</span>
+                            </div>
+                        </div>
+                    </div>
+                    ${aiReason ? `
+                        <div class="mb-2 pt-2 border-t border-gray-700/30">
+                            <div class="flex items-start gap-2">
+                                <i class="fas fa-lightbulb text-yellow-400 text-xs mt-0.5 flex-shrink-0"></i>
+                                <p class="text-xs text-gray-300 leading-relaxed line-clamp-2">${aiReason}</p>
+                            </div>
+                        </div>
+                    ` : ''}
+                `;
+            }
+            
+            card.innerHTML = `
+                <div class="flex items-start justify-between mb-3">
+                    <div class="flex items-center gap-2.5 flex-1 min-w-0">
+                        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center flex-shrink-0 border border-blue-500/30 tooltip relative group">
+                            <span class="font-bold text-white text-sm">${symbol}</span>
+                            <div class="tooltip-text">
+                                <strong>${symbol}</strong><br>
+                                <span class="text-gray-400 text-xs">Stock ticker symbol</span>
+                            </div>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-2">
+                                <p class="text-sm font-semibold text-white truncate">${description}</p>
+                                ${hasLimitedData ? '<i class="fas fa-exclamation-circle text-yellow-400 text-xs flex-shrink-0 tooltip relative group"><div class="tooltip-text">Limited data available - some analysis may be incomplete</div></i>' : ''}
+                            </div>
+                            ${price ? `
+                                <div class="flex items-center gap-1.5 mt-0.5">
+                                    <span class="text-xs text-gray-400">Price:</span>
+                                    <span class="text-xs font-bold text-white">$${price.toFixed(2)}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    ${aiScore !== null && aiScore !== undefined ? `
+                        <div class="badge ${scoreBadge} flex-shrink-0 ml-2 tooltip relative group">
+                            <span class="text-sm font-bold">${aiScore}</span>/10
+                            <div class="tooltip-text">
+                                <strong>Overall AI Score: ${aiScore}/10</strong><br>
+                                ${aiScore >= 8 ? 'Excellent buying opportunity' : aiScore >= 5 ? 'Moderate opportunity' : 'Weak signal'}<br>
+                                <span class="text-gray-400 text-xs">Click "Analyze" for full details</span>
+                            </div>
+                        </div>
+                    ` : '<div class="badge badge-info flex-shrink-0 ml-2 tooltip relative group"><i class="fas fa-fire text-orange-400 text-xs"></i><div class="tooltip-text">Analysis pending - Click "Analyze" for details</div></div>'}
+                </div>
+                ${analysisSection}
+                <div class="flex gap-2 mt-3">
+                    <button onclick="quickBuy('${symbol}', event)" 
+                            class="flex-1 glass-strong py-2 rounded-lg text-sm font-bold text-white hover:bg-green-600/30 transition-all bg-green-500/30 flex items-center justify-center gap-1.5 tooltip relative group border border-green-500/50">
+                        <i class="fas fa-arrow-up text-xs"></i>
+                        <span>BUY</span>
+                        <div class="tooltip-text">Execute buy order for ${symbol}</div>
+                    </button>
+                    <button onclick="quickSell('${symbol}', event)" 
+                            class="flex-1 glass-strong py-2 rounded-lg text-sm font-bold text-white hover:bg-red-600/30 transition-all bg-red-500/30 flex items-center justify-center gap-1.5 tooltip relative group border border-red-500/50">
+                        <i class="fas fa-arrow-down text-xs"></i>
+                        <span>SELL</span>
+                        <div class="tooltip-text">Close position for ${symbol}</div>
+                    </button>
+                    <button onclick="addToWatchlist('${symbol}', '${symbol}', event)" 
+                            class="glass-strong py-2 px-3 rounded-lg text-sm font-semibold text-white hover:bg-blue-600/20 transition-all bg-blue-500/20 flex items-center justify-center tooltip relative group">
+                        <i class="fas fa-plus text-xs"></i>
+                        <div class="tooltip-text">Add to watchlist</div>
+                    </button>
+                </div>
+            `;
+            return card;
+        }
+        
+        function quickScan(symbol) {
+            // Fill in the scanner form and submit
+            const scannerInput = document.querySelector('input[name="ticker"]');
+            if (scannerInput) {
+                scannerInput.value = symbol;
+                // Trigger form submission via htmx
+                if (htmx) {
+                    htmx.trigger(scannerInput.form, 'submit');
+                } else {
+                    scannerInput.form.submit();
+                }
+                // Scroll to scanner results
+                setTimeout(() => {
+                    document.getElementById('ai-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 500);
+            }
+        }
+        
+        function addToWatchlist(symbol, name, event) {
+            const btn = event.target.closest('button');
+            const originalText = btn.innerHTML;
+            const originalDisabled = btn.disabled;
+            
+            // Immediate UI feedback
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Adding...';
+            btn.style.opacity = '0.7';
+            
+            // Optimistic update - update UI immediately
+            const watchlistDisplay = document.getElementById('watchlist-display');
+            const currentContent = watchlistDisplay.innerHTML;
+            
+            // Add to watchlist display immediately (optimistic update)
+            if (!currentContent.includes(symbol)) {
+                const optimisticHtml = `
+                    <div class="flex items-center justify-between glass rounded-lg p-2 mb-2 animate-fade-in">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-white text-sm">${symbol}</span>
+                            <span class="text-xs text-gray-400">${name}</span>
+                        </div>
+                        <button onclick="removeFromWatchlist('${symbol}')" class="text-red-400 hover:text-red-300 transition text-xs">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+                
+                // If watchlist is empty, replace the empty message
+                if (currentContent.includes('No stocks') || currentContent.includes('Loading')) {
+                    watchlistDisplay.innerHTML = optimisticHtml;
+                } else {
+                    watchlistDisplay.insertAdjacentHTML('beforeend', optimisticHtml);
+                }
+            }
+            
+            // Make the actual API call
+            fetch('/api/watchlist/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `symbol=${encodeURIComponent(symbol)}&name=${encodeURIComponent(name)}`
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to add');
+                return response.text();
+            })
+            .then(html => {
+                // Update watchlist display with server response (replaces optimistic update)
+                watchlistDisplay.innerHTML = html;
+                
+                // Show success feedback on button
+                btn.innerHTML = '<i class="fas fa-check mr-1"></i>Added!';
+                btn.classList.add('bg-green-500/30');
+                btn.style.opacity = '1';
+                
+                // Reset button after delay
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('bg-green-500/30');
+                    btn.disabled = originalDisabled;
+                }, 2000);
+            })
+            .catch(err => {
+                console.error('Error adding to watchlist:', err);
+                
+                // Revert optimistic update on error
+                watchlistDisplay.innerHTML = currentContent;
+                
+                // Show error feedback
+                btn.innerHTML = '<i class="fas fa-exclamation-circle mr-1"></i>Failed';
+                btn.classList.add('bg-red-500/30');
+                btn.style.opacity = '1';
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('bg-red-500/30');
+                    btn.disabled = originalDisabled;
+                }, 2000);
+            });
+        }
+        
+        function closeWhatsNew() {
+            document.getElementById('whats-new-section').classList.add('hidden');
+        }
+        
+        async function quickBuy(symbol, event) {
+            const btn = event.target.closest('button');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xs"></i>';
+            btn.style.opacity = '0.7';
+            
+            try {
+                const formData = new URLSearchParams();
+                formData.append('symbol', symbol);
+                
+                const response = await fetch('/api/quick-buy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    btn.innerHTML = '<i class="fas fa-check text-xs"></i>';
+                    btn.classList.add('bg-green-500/50');
+                    
+                    // Refresh positions and logs immediately
+                    if (htmx) {
+                        htmx.trigger('#positions-list', 'refresh');
+                        setTimeout(() => {
+                            htmx.trigger('tbody', 'refresh');
+                        }, 500);
+                    }
+                    
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.classList.remove('bg-green-500/50');
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                    }, 2000);
+                } else {
+                    throw new Error(data.error || 'Buy failed');
+                }
+            } catch (err) {
+                console.error('Quick buy error:', err);
+                btn.innerHTML = '<i class="fas fa-times text-xs"></i>';
+                btn.classList.add('bg-red-500/50');
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('bg-red-500/50');
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                }, 2000);
+            }
+        }
+        
+        async function quickSell(symbol, event) {
+            const btn = event.target.closest('button');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xs"></i>';
+            btn.style.opacity = '0.7';
+            
+            if (!confirm(`Close position for ${symbol}?`)) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                btn.style.opacity = '1';
+                return;
+            }
+            
+            try {
+                const formData = new URLSearchParams();
+                formData.append('symbol', symbol);
+                
+                const response = await fetch('/api/quick-sell', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    btn.innerHTML = '<i class="fas fa-check text-xs"></i>';
+                    btn.classList.add('bg-green-500/50');
+                    
+                    // Refresh positions and logs immediately
+                    if (htmx) {
+                        htmx.trigger('#positions-list', 'refresh');
+                        setTimeout(() => {
+                            htmx.trigger('tbody', 'refresh');
+                        }, 500);
+                    }
+                    
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.classList.remove('bg-green-500/50');
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                    }, 2000);
+                } else {
+                    throw new Error(data.error || 'Sell failed');
+                }
+            } catch (err) {
+                console.error('Quick sell error:', err);
+                btn.innerHTML = '<i class="fas fa-times text-xs"></i>';
+                btn.classList.add('bg-red-500/50');
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('bg-red-500/50');
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                }, 2000);
+            }
+        }
+        
+        async function cancelAllOrders() {
+            if (!confirm('Cancel all open orders?')) return;
+            
+            try {
+                const formData = new URLSearchParams();
+                const response = await fetch('/api/cancel-orders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert('All orders cancelled');
+                    // Refresh positions
+                    if (htmx) {
+                        htmx.trigger('#positions-list', 'refresh');
+                    }
+                } else {
+                    alert('Failed to cancel orders: ' + data.error);
+                }
+            } catch (err) {
+                console.error('Cancel orders error:', err);
+                alert('Error cancelling orders');
+            }
+        }
+    </script>
+
+</body>
+</html>
+

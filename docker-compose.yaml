@@ -1,0 +1,102 @@
+# Docker Compose setup for Sauron's Eye - AI-Augmented Swing Trading Bot
+#
+# Quick Start:
+#   1. Copy env.example to .env and fill in your API keys:
+#      cp env.example .env
+#      # Edit .env with your Alpaca and Azure OpenAI credentials
+#
+#   2. Start all services:
+#      docker-compose up -d
+#
+#   3. Access the application:
+#      - Web UI: http://localhost:5000
+#      - MongoDB: mongodb://admin:secret@localhost:27017/
+#
+#   4. View logs:
+#      docker-compose logs -f app
+#
+#   5. Stop services:
+#      docker-compose down
+#
+# Services:
+#   - atlas-local: MongoDB Atlas Local instance with Search capabilities
+#   - app: FastAPI application with trading bot and web dashboard
+
+version: '3.8'
+
+services:
+  atlas-local:
+    image: mongodb/mongodb-atlas-local:latest
+    hostname: atlas-local
+    container_name: mdb_swing_atlas
+    restart: unless-stopped
+    environment:
+      - MONGODB_INITDB_ROOT_USERNAME=admin
+      - MONGODB_INITDB_ROOT_PASSWORD=secret
+      - DO_NOT_TRACK=1
+    ports:
+      - "27017:27017"
+    volumes:
+      - db:/data/db
+      - configdb:/data/configdb
+      - mongot:/data/mongot
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mdb_swing_network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mdb_swing_app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      # MongoDB Configuration
+      - MONGO_HOST=atlas-local
+      - MONGO_URI=mongodb://admin:secret@atlas-local:27017/
+      - MONGO_DB=sauron_eye
+      
+      # Alpaca Trading API (Paper Trading)
+      - ALPACA_API_KEY=${ALPACA_API_KEY:-}
+      - ALPACA_SECRET_KEY=${ALPACA_SECRET_KEY:-}
+      - ALPACA_BASE_URL=${ALPACA_BASE_URL:-https://paper-api.alpaca.markets}
+      
+      # Azure OpenAI Configuration
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT:-}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-}
+      - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-4o}
+      - AZURE_OPENAI_MODEL_NAME=${AZURE_OPENAI_MODEL_NAME:-gpt-4o}
+      
+      # Firecrawl Configuration
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-}
+      
+      # Trading Configuration
+      - TARGET_SYMBOLS=${TARGET_SYMBOLS:-NVDA,AMD,MSFT,GOOGL,AMZN,TSLA,COIN,AAPL}
+      - MAX_CAPITAL_DEPLOYED=${MAX_CAPITAL_DEPLOYED:-5000.00}
+      
+      # Python Configuration
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      atlas-local:
+        condition: service_healthy
+    networks:
+      - mdb_swing_network
+    volumes:
+      - ./src:/app/src
+      - ./frontend:/app/frontend
+      - ./config:/app/config
+
+networks:
+  mdb_swing_network:
+    driver: bridge
+
+volumes:
+  db:
+  configdb:
+  mongot:

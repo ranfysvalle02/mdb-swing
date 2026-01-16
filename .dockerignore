@@ -1,0 +1,65 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Docker - exclude docker directory but allow nginx.conf
+docker/*
+!docker/nginx.conf
+.dockerignore
+
+# Documentation
+docs/
+*.md
+!README.md
+LICENSE
+
+# Logs
+*.log
+logs/
+
+# Testing
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Frontend (will be built separately)
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+
+# Old files (to be removed)
+main.py

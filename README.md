@@ -1,862 +1,339 @@
-# Building "The Sentinel": A Hybrid AI Swing Trading Bot
+# 👁️ Sauron's Eye - AI-Augmented Swing Trading Bot
 
-**The Problem:** Automated trading bots are terrifying. If you leave them alone, they can drain your account in minutes due to a single bug or a market crash.
+**The Watching Eye - Extracting Capital Through Swing Strategies**
 
-**The Solution:** A "Hybrid" system. The bot does the heavy lifting (scanning, math, AI analysis), but it keeps a human in the loop.
-
-In this guide, we are going to build **The Sentinel**, a Python-based agent that:
-
-1. **Scans the market** every hour for technical setups (Trend + RSI).
-2. **Reads the news** using an LLM to validate the move.
-3. **Executes a "Shadow Trade"** (Paper Trade) to track performance.
-4. **Pings your phone** so you can decide if you want to mirror the trade with real money.
-
-## Executive Summary
-
-**The Sentinel** is a hybrid AI trading agent designed to mitigate the risks of fully autonomous trading while leveraging the speed of algorithmic analysis. It solves the "black box" problem by acting as a high-speed analyst rather than a reckless trader—automating the research, but leaving the final financial decision to a human.
-
-* **Goal:** Automate the 99% of trading that is boring (scanning, math, news reading) to focus on the 1% that matters (decision making).
-* **Mechanism:** It scans for technical dips in uptrending stocks, uses an LLM (GPT-4) to verify the move against real-time news sentiment, and executes a "paper trade" to track hypothetical performance.
-* **Stack:** Python, Docker, MongoDB (Storage), OpenAI (Sentiment Analysis), Alpaca (Market Data & Paper Execution).
-* **Outcome:** A push notification on your phone containing a pre-validated, high-probability trade setup with entry, stop-loss, and take-profit targets calculated for you.
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 ---
 
-## The Strategy: Explained Simply
+## 🎯 What Is This?
 
-Think of **The Sentinel** like a professional house flipper looking for a deal in a nice neighborhood. It uses three specific checks before it calls you:
+Sauron's Eye is an **AI-powered swing trading bot** that automates the boring 99% of trading (scanning markets, calculating indicators, reading news) so you can focus on the 1% that matters: **decision making**.
 
-### 1. The "Good Neighborhood" Check (Trend)
+### The Philosophy
 
-* **Technical Term:** 50-Day Moving Average (SMA).
-* **The Analogy:** We only want to buy houses in neighborhoods where property values are generally going *up* over time. If the whole neighborhood is crashing (Price < SMA), we don't care how cheap the house is—we aren't interested.
+> *"The lawn is overgrown because the owner was lazy. The foundation is solid. The house is cheap. This is a good buy."*
 
-### 2. The "Ugly Paint" Check (Discount)
+The bot identifies stocks that are:
+1. **In a good trend** (price above 200-day moving average)
+2. **Currently cheap** (RSI < 35, oversold)
+3. **News confirms** the "foundation" is solid (AI analyzes sentiment)
 
-* **Technical Term:** RSI (Relative Strength Index) < 35.
-* **The Analogy:** We found a great neighborhood, but we don't want to pay full price. We look for the one house that looks a little ugly right now—maybe the paint is peeling or the lawn is overgrown (Oversold). It’s a good asset temporarily looking bad.
-
-### 3. The "Foundation" Check (AI Analysis)
-
-* **Technical Term:** LLM Sentiment Analysis.
-* **The Analogy:** This is the most critical step. Before we buy that ugly house, we hire an inspector ( The AI) to check *why* it's cheap.
-* **Good Cheap:** The lawn is overgrown because the owner was lazy. (Market overreaction to minor news). **Result: BUY.**
-* **Bad Cheap:** The foundation is cracked and the house is sinking. (CEO fraud, bankruptcy, major lawsuit). **Result: WALK AWAY.**
-
-
-
-Only when a stock passes all three checks—it's in a good trend, it's currently cheap, and the news confirms the "foundation" is solid—does the bot ping your phone.
+Only when all three align does it create a **pending trade** for your approval.
 
 ---
 
-## The Architecture
+## 🧠 How It Works
 
-We are ditching complex cloud architectures for a robust **All-In-One** Python script running in Docker.
+### The Strategy: Swing Trading with AI Validation
 
-* **The Brain:** Python (Logic) + OpenAI (Sentiment).
-* **The Hands:** Alpaca API (Paper Trading Execution).
-* **The Eyes:** Alpaca Data API (Price History & News).
-* **The Memory:** MongoDB (Trade History).
-* **The Nervous System:** `ntfy.sh` (Push Notifications).
+**Swing Trading** = Buy dips in uptrending stocks, hold for days/weeks, sell when profit target or stop loss is hit.
+
+#### Step 1: Market Scanning (Every 15 Minutes)
+- Scans your watchlist (default: NVDA, AMD, MSFT, GOOGL, AMZN, TSLA, COIN, AAPL)
+- Checks if you already have a position (skips if you do)
+- Fetches 500+ days of historical data using Alpaca's IEX feed
+
+#### Step 2: Technical Analysis
+Calculates three key indicators:
+- **RSI (Relative Strength Index)**: Measures if stock is oversold (< 30) or overbought (> 70)
+- **SMA-200 (200-day Simple Moving Average)**: Determines long-term trend
+- **ATR (Average True Range)**: Measures volatility for position sizing
+
+**Entry Signal**: RSI < 35 AND price > SMA-200 (uptrending but oversold)
+
+#### Step 3: News Analysis with AI
+- Fetches latest 3 news headlines from Alpaca
+- **Scrapes article content** using Firecrawl (first ~500 chars)
+- Sends to Azure OpenAI (GPT-4o) for sentiment analysis
+- AI scores the trade 0-10 based on:
+  - Technical indicators
+  - News sentiment
+  - Risk assessment
+  - Catastrophic news detection (fraud, bankruptcy = automatic veto)
+
+#### Step 4: Manual Approval (YOU DECIDE)
+- If AI score >= 8, creates a **pending trade**
+- Shows in UI with:
+  - Symbol, price, RSI, trend, risk level
+  - AI reasoning
+  - Score (0-10)
+- You click **APPROVE** or **REJECT**
+- Approved trades execute with bracket orders (limit + stop loss + take profit)
+
+#### Step 5: Position Management
+- **Position sizing** based on ATR volatility (risk $50 per trade by default)
+- **Stop loss**: Entry price - (2 × ATR)
+- **Take profit**: Entry price + (3 × ATR)
+- **Risk/Reward**: 1:1.5 ratio
 
 ---
 
-## Part 1: The Setup
+## 🚀 Quick Start
 
-### 1. `requirements.txt`
+### Prerequisites
 
-We need a lightweight environment. We use `alpaca-trade-api` for both data and execution to keep things consistent.
+- Docker & Docker Compose
+- Alpaca Paper Trading Account (free)
+- Azure OpenAI API key (or OpenAI API key)
+- Firecrawl API key (optional, for article scraping)
 
-```text
-flask
-apscheduler
-requests
-pymongo
-langchain
-langchain-openai
-alpaca-trade-api
-pandas
-numpy
+### Installation
 
+1. **Clone the repository**
+   ```bash
+   git clone <your-repo-url>
+   cd mdb-swing
+   ```
+
+2. **Set up environment variables**
+   ```bash
+   cp env.example .env
+   # Edit .env with your API keys
+   ```
+
+3. **Start the application**
+   ```bash
+   docker-compose up --build
+   ```
+
+4. **Access the dashboard**
+   - Web UI: http://localhost:5000
+   - MongoDB: mongodb://admin:secret@localhost:27017/
+
+---
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+```bash
+# Alpaca Trading API (Paper Trading)
+ALPACA_API_KEY=your_key_here
+ALPACA_SECRET_KEY=your_secret_here
+ALPACA_BASE_URL=https://paper-api.alpaca.markets
+
+# Azure OpenAI Configuration
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_API_KEY=your_key_here
+AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o
+AZURE_OPENAI_MODEL_NAME=gpt-4o
+
+# Firecrawl (for article content scraping)
+FIRECRAWL_API_KEY=fc-your_key_here
+
+# Trading Configuration
+TARGET_SYMBOLS=NVDA,AMD,MSFT,GOOGL,AMZN,TSLA,COIN,AAPL
+MAX_CAPITAL_DEPLOYED=5000.00
 ```
 
-### 2. `Dockerfile`
+### Strategy Presets
 
-This ensures our bot runs identically on your laptop or a cheap cloud VPS.
+The bot supports different strategy presets (configurable via UI):
 
-```dockerfile
-FROM python:3.9-slim
+1. **Conservative** (Default)
+   - RSI threshold: < 30 (very oversold)
+   - AI score required: >= 9
+   - Risk per trade: $25
+   - Max capital: $2,500
 
-# Keep Python from buffering stdout so logs show up immediately
-ENV PYTHONUNBUFFERED=1
+2. **Moderate**
+   - RSI threshold: < 35
+   - AI score required: >= 8
+   - Risk per trade: $50
+   - Max capital: $5,000
 
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY main.py .
-CMD ["python", "main.py"]
-
-```
-
-### 3. `docker-compose.yml`
-
-We spin up a local MongoDB instance alongside our bot.
-
-```yaml
-version: '3.8'
-services:
-  mongo:
-    image: mongo:latest
-    container_name: sentinel_mongo
-    restart: always
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-
-  sentinel:
-    build: .
-    restart: on-failure
-    depends_on:
-      - mongo
-    environment:
-      # SYSTEM CONFIG
-      MONGO_URI: "mongodb://mongo:27017/"
-      NTFY_TOPIC: "my_sentinel_bot"
-      PUBLIC_URL: "http://localhost:5000"
-      
-      # API KEYS (Replace these!)
-      OPENAI_API_KEY: "sk-..."
-      ALPACA_API_KEY: "PK..."
-      ALPACA_SECRET_KEY: "..."
-      # Use Paper URL for safety
-      ALPACA_BASE_URL: "https://paper-api.alpaca.markets" 
-
-volumes:
-  mongo_data:
-
-```
+3. **Aggressive**
+   - RSI threshold: < 40
+   - AI score required: >= 7
+   - Risk per trade: $100
+   - Max capital: $10,000
 
 ---
 
-## Part 2: The Code (`main.py`)
+## 📊 Features
 
-This is the core logic. It implements the "Three-Green-Lights" strategy: **Trend + Discount + Sentiment**.
+### 🤖 AI-Powered Analysis
+- **Azure OpenAI Integration**: Uses GPT-4o for trade analysis
+- **News Scraping**: Firecrawl extracts article content (not just headlines)
+- **Sentiment Analysis**: AI reads news and validates trade signals
+- **Risk Assessment**: AI provides risk level (Low/Medium/High)
 
-```python
-import time
-import os
-import math
-import requests
-import logging
-import io
-import base64
-from datetime import datetime
+### 📈 Technical Indicators
+- **RSI**: Identifies oversold/overbought conditions
+- **SMA-200**: Confirms long-term trend direction
+- **ATR**: Calculates volatility for position sizing
 
-# --- DATA & MATH ---
-import pandas as pd
-import pandas_ta as ta
-import numpy as np
-import matplotlib
-matplotlib.use('Agg') # Set non-interactive backend for server
-import matplotlib.pyplot as plt
+### 🎯 Risk Management
+- **Position Sizing**: Based on ATR volatility
+- **Stop Loss**: Automatic stop at 2× ATR below entry
+- **Take Profit**: Automatic target at 3× ATR above entry
+- **Capital Limits**: Configurable max capital per trade
 
-# --- TRADING ---
-import alpaca_trade_api as tradeapi
-from alpaca_trade_api.rest import TimeFrame
+### 🔔 Manual Approval System
+- **No Auto-Trading**: All trades require your approval
+- **Pending Trades Panel**: See all AI recommendations
+- **One-Click Approval**: Approve or reject with a button
+- **Trade History**: Complete ledger of all executed trades
 
-# --- WEB & SCHEDULING ---
-from flask import Flask, request, jsonify, render_template_string
-from apscheduler.schedulers.background import BackgroundScheduler
-from pymongo import MongoClient
+### 📱 Real-Time Dashboard
+- **Live Account Balance**: Updates every 10 seconds
+- **Current Positions**: Shows P&L and unrealized gains/losses
+- **Trade History**: Complete log of all trades
+- **TradingView Charts**: Integrated charting for analysis
+- **Backtesting**: Test strategies on historical data
 
-# --- AI & LOGIC ---
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.pydantic_v1 import BaseModel, Field
+---
 
-# ==========================================
-# CONFIGURATION & LOGGING
-# ==========================================
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("Sentinel_Commander")
+## 🎨 UI/UX Features
 
-# Environment Variables
-SYMBOLS_ENV = os.getenv("TARGET_SYMBOLS", "NVDA,AMD,MSFT,GOOGL,AMZN,TSLA,COIN,AAPL")
-SYMBOLS = [s.strip() for s in SYMBOLS_ENV.split(',')]
-MAX_CAPITAL_DEPLOYED = float(os.getenv("MAX_CAPITAL_DEPLOYED", "5000.00"))
+### Glassmorphism Design
+- Modern glassmorphic UI with backdrop blur effects
+- Smooth animations and transitions
+- Responsive layout for all screen sizes
 
-# ALPACA KEYS
-ALPACA_KEY = os.getenv("ALPACA_API_KEY")
-ALPACA_SECRET = os.getenv("ALPACA_SECRET_KEY")
-ALPACA_URL = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+### Educational Elements
+- **Tooltips**: Hover over icons for explanations
+- **Modal Dialogs**: Detailed explanations of features
+- **Status Badges**: Visual indicators for risk, trends, scores
+- **Icons**: Font Awesome icons throughout for clarity
 
-api = tradeapi.REST(ALPACA_KEY, ALPACA_SECRET, ALPACA_URL, api_version='v2')
+### Transparency
+- **AI Reasoning**: See exactly why the AI recommended a trade
+- **Technical Details**: All indicators visible and explained
+- **News Context**: Read the actual news articles analyzed
+- **Risk Levels**: Clear risk assessment for each trade
 
-# MONGO CONNECTION
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
-try:
-    client = MongoClient(MONGO_URI)
-    db = client['sentinel_pro']
-    history_col = db['history']
-except Exception as e:
-    logger.critical(f"DB Fail: {e}")
-    # Fallback for no DB (avoids crash, creates in-memory list)
-    class MockCol:
-        def __init__(self): self.data = []
-        def insert_one(self, d): self.data.append(d)
-        def find(self): 
-            # Mock cursor
-            class Cursor:
-                def sort(self, *args): return self
-                def limit(self, *args): return mock_col.data[-10:]
-            return Cursor()
-    history_col = MockCol()
-    logger.warning("Running without Database (In-Memory Only)")
+---
 
-app = Flask(__name__)
+## 🔧 Architecture
 
-# ==========================================
-# 1. AI AGENT DEFINITIONS
-# ==========================================
-class TradeVerdict(BaseModel):
-    score: int = Field(description="Bullish score 0-10.")
-    action: str = Field(description="One of: 'BUY', 'WAIT', 'SELL_NOW'.")
-    reason: str = Field(description="Concise strategic reasoning (max 20 words).")
-    risk_level: str = Field(description="Low, Medium, or High based on volatility.")
+### Tech Stack
+- **Backend**: FastAPI (Python 3.11+)
+- **Database**: MongoDB (via mdb-engine)
+- **AI**: Azure OpenAI (GPT-4o)
+- **Trading**: Alpaca API (Paper Trading)
+- **Scraping**: Firecrawl API
+- **Frontend**: HTMX + Tailwind CSS
+- **Charts**: TradingView Widgets
 
-class SentinelBrain:
-    def __init__(self):
-        # Ensure OPENAI_API_KEY is set in env
-        self.llm = ChatOpenAI(model="gpt-4-turbo", temperature=0.2) 
-        
-    def analyze(self, ticker, price, rsi, atr, trend, headlines):
-        system_prompt = (
-            "You are a Senior Quant Trader. Analyze Technicals + Sentiment. "
-            "Technicals: RSI < 30 is Oversold (Buy zone), > 70 Overbought. "
-            "ATR indicates volatility. If news is catastrophic (fraud/bankruptcy), VETO the trade (Score 0)."
-        )
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("human", (
-                f"Ticker: {ticker} | Price: ${price}\n"
-                f"Technicals: RSI={rsi}, ATR={atr}, Trend={trend}\n"
-                f"News:\n{headlines}"
-            ))
-        ])
-        chain = prompt | self.llm.with_structured_output(TradeVerdict)
-        return chain.invoke({})
-
-# Initialize AI
-try:
-    brain = SentinelBrain()
-except:
-    logger.warning("OpenAI Key missing. AI features will fail.")
-    brain = None
-
-# ==========================================
-# 2. MARKET DATA & MATH
-# ==========================================
-def get_market_data(symbol, days=100):
-    try:
-        # Fetch data (Day candles)
-        bars = api.get_bars(symbol, TimeFrame.Day, limit=days).df
-        if bars.empty: return None, []
-        if isinstance(bars.index, pd.MultiIndex): bars = bars.reset_index()
-        
-        # Fetch News
-        news = api.get_news(symbol=symbol, limit=3)
-        headlines = [f"- {n.headline}" for n in news] if news else ["No recent news."]
-        
-        return bars, headlines
-    except Exception as e:
-        logger.error(f"Data fail {symbol}: {e}")
-        return None, []
-
-def analyze_technicals(df):
-    """Calculates RSI, SMA, and ATR."""
-    df.columns = [c.lower() for c in df.columns]
-    
-    # Pandas-TA
-    df['rsi'] = ta.rsi(df['close'], length=14)
-    df['sma_200'] = ta.sma(df['close'], length=200)
-    df['atr'] = ta.atr(df['high'], df['low'], df['close'], length=14)
-    
-    current = df.iloc[-1]
-    
-    # Determine Trend (Simple: Price > 200 SMA)
-    sma_val = current['sma_200'] if not math.isnan(current['sma_200']) else 0
-    trend = "UP" if current['close'] > sma_val else "DOWN"
-    
-    return {
-        "price": round(current['close'], 2),
-        "rsi": round(current['rsi'], 2) if not math.isnan(current['rsi']) else 50,
-        "atr": round(current['atr'], 2) if not math.isnan(current['atr']) else 1,
-        "trend": trend,
-        "sma": round(sma_val, 2)
-    }
-
-# ==========================================
-# 3. EXECUTION LOGIC
-# ==========================================
-def calculate_position_size(price, atr, risk_per_trade_dollars=50.0):
-    """Volatility Sizing: High ATR = Fewer Shares."""
-    stop_distance = 2 * atr 
-    if stop_distance == 0: return 0
-    
-    shares_risk = math.floor(risk_per_trade_dollars / stop_distance)
-    
-    # Cap at budget
-    try:
-        acct = api.get_account()
-        buying_power = float(acct.buying_power)
-    except:
-        buying_power = 10000.0 # Fallback
-        
-    max_shares_budget = math.floor(min(buying_power, MAX_CAPITAL_DEPLOYED) / price)
-    
-    return int(min(shares_risk, max_shares_budget))
-
-def place_order(symbol, side, reason, score):
-    df, _ = get_market_data(symbol)
-    if df is None: return False
-    techs = analyze_technicals(df)
-    
-    qty = calculate_position_size(techs['price'], techs['atr'])
-    if qty < 1: 
-        logger.info(f"Skipping {symbol}: Position size 0 (Risk/Budget)")
-        return False
-
-    # Dynamic Bracket Orders
-    limit_price = techs['price']
-    stop_price = round(techs['price'] - (2 * techs['atr']), 2) # 2x ATR Stop
-    take_profit = round(techs['price'] + (3 * techs['atr']), 2) # 3x ATR Target
-    
-    try:
-        order = api.submit_order(
-            symbol=symbol, qty=qty, side=side, type='limit', limit_price=limit_price,
-            time_in_force='day', order_class='bracket',
-            take_profit={'limit_price': take_profit},
-            stop_loss={'stop_price': stop_price}
-        )
-        
-        # Log to DB
-        history_col.insert_one({
-            "timestamp": datetime.now(), "symbol": symbol, "action": side,
-            "qty": qty, "price": limit_price, "reason": reason, "score": score
-        })
-        return order
-    except Exception as e:
-        logger.error(f"Order failed: {e}")
-        return None
-
-# ==========================================
-# 4. BACKTESTING ENGINE
-# ==========================================
-def run_backtest_simulation(symbol, days=365):
-    try:
-        # Fetch extra data for SMA calculation
-        limit = days + 250
-        bars = api.get_bars(symbol, TimeFrame.Day, limit=limit).df
-        if bars.empty: return None, "No Data"
-        
-        bars = bars.reset_index()
-        bars.columns = [c.lower() for c in bars.columns]
-        
-        # Calc Indicators on full set
-        bars['rsi'] = ta.rsi(bars['close'], length=14)
-        bars['sma_200'] = ta.sma(bars['close'], length=200)
-        bars['atr'] = ta.atr(bars['high'], bars['low'], bars['close'], length=14)
-        
-        # Slice to requested period
-        data = bars.iloc[-days:].copy().reset_index(drop=True)
-        
-    except Exception as e:
-        return None, str(e)
-
-    # Simulation Variables
-    initial_capital = 10000.0
-    cash = initial_capital
-    equity_curve = [initial_capital]
-    trades = []
-    
-    position = 0
-    entry_price = 0
-    stop_loss = 0
-    take_profit = 0
-    state = 'SCANNING' # 'SCANNING' | 'HOLDING'
-
-    for index, row in data.iterrows():
-        current_price = row['close']
-        current_date = row['timestamp'].strftime('%Y-%m-%d')
-        
-        if math.isnan(row['sma_200']) or math.isnan(row['atr']):
-            equity_curve.append(cash + (position * current_price))
-            continue
-
-        if state == 'SCANNING':
-            # LOGIC: Trend UP + RSI LOW
-            if current_price > row['sma_200'] and row['rsi'] < 35:
-                atr = row['atr']
-                stop_dist = 2 * atr
-                target_dist = 3 * atr
-                
-                risk_dollars = 100 # Risk $100 per trade
-                shares = math.floor(risk_dollars / stop_dist)
-                cost = shares * current_price
-                
-                if shares > 0 and cost < cash:
-                    state = 'HOLDING'
-                    position = shares
-                    entry_price = current_price
-                    stop_loss = current_price - stop_dist
-                    take_profit = current_price + target_dist
-                    cash -= cost
-                    trades.append({"date": current_date, "type": "BUY", "price": entry_price})
-
-        elif state == 'HOLDING':
-            sell_price = None
-            result = ""
-            
-            # Simplified exits based on High/Low
-            if row['low'] <= stop_loss:
-                sell_price = stop_loss
-                result = "STOP LOSS"
-            elif row['high'] >= take_profit:
-                sell_price = take_profit
-                result = "WIN"
-            
-            if sell_price:
-                pnl = (sell_price - entry_price) * position
-                cash += (position * sell_price)
-                state = 'SCANNING'
-                trades.append({"date": current_date, "type": "SELL", "price": sell_price, "result": result, "pnl": pnl})
-                position = 0
-
-        # Update Equity
-        current_val = cash + (position * current_price)
-        equity_curve.append(current_val)
-
-    # Stats
-    sells = [t for t in trades if t['type'] == 'SELL']
-    total_trades = len(sells)
-    wins = len([t for t in sells if t.get('result') == 'WIN'])
-    win_rate = (wins / total_trades * 100) if total_trades > 0 else 0.0
-    total_return = ((equity_curve[-1] - initial_capital) / initial_capital) * 100
-    
-    # Plotting
-    plt.figure(figsize=(6, 2.5), facecolor='#111827')
-    ax = plt.gca()
-    ax.set_facecolor('#111827')
-    plt.plot(equity_curve, color='#4ade80', linewidth=1.5)
-    plt.title(f"{symbol} 1yr Sim (Pure Technical)", color='white', fontsize=10)
-    plt.tick_params(colors='gray', labelsize=8)
-    plt.grid(color='#374151', linestyle='--', linewidth=0.5)
-    
-    img = io.BytesIO()
-    plt.savefig(img, format='png', transparent=False, bbox_inches='tight')
-    img.seek(0)
-    plot_url = base64.b64encode(img.getvalue()).decode()
-    plt.close()
-
-    return {
-        "trades": total_trades,
-        "win_rate": round(win_rate, 1),
-        "return": round(total_return, 2),
-        "plot": plot_url
-    }, trades
-
-# ==========================================
-# 5. AUTOMATED SCANNER JOB
-# ==========================================
-def scanner_job():
-    logger.info("📡 Scanning Markets...")
-    for sym in SYMBOLS:
-        try:
-            # Check existing position
-            try:
-                pos = api.get_position(sym)
-                if float(pos.qty) > 0: continue
-            except: pass
-
-            bars, headlines = get_market_data(sym)
-            if bars is None: continue
-            
-            techs = analyze_technicals(bars)
-            
-            # PRE-FILTER: Technical Setup (Trend + Oversold)
-            if techs['rsi'] < 35 and techs['trend'] == "UP":
-                logger.info(f"🔎 Technical Match: {sym}")
-                
-                if brain:
-                    verdict = brain.analyze(sym, techs['price'], techs['rsi'], techs['atr'], techs['trend'], "\n".join(headlines))
-                    
-                    if verdict.score >= 8:
-                        logger.info(f"🚀 AI APPROVED: {sym} (Score: {verdict.score})")
-                        place_order(sym, 'buy', verdict.reason, verdict.score)
-                    else:
-                        logger.info(f"🛑 AI VETO: {sym} (Score: {verdict.score})")
-                else:
-                    logger.warning("AI Brain missing, skipping trade.")
-
-        except Exception as e:
-            logger.error(f"Scan error {sym}: {e}")
-
-# ==========================================
-# 6. HTML TEMPLATE (Modern Dashboard)
-# ==========================================
-DASHBOARD_HTML = """
-<!DOCTYPE html>
-<html lang="en" class="dark">
-<head>
-    <meta charset="UTF-8">
-    <title>Sentinel Pro Commander</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <style>
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #1f2937; }
-        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
-        .htmx-indicator{display:none} 
-        .htmx-request .htmx-indicator{display:inline} 
-        .htmx-request.htmx-indicator{display:inline}
-    </style>
-</head>
-<body class="bg-gray-900 text-gray-100 font-mono min-h-screen p-6">
-
-    <div class="flex justify-between items-center mb-8 border-b border-gray-700 pb-4">
-        <div>
-            <h1 class="text-3xl font-bold text-green-400">⚡ SENTINEL PRO</h1>
-            <p class="text-sm text-gray-400">AI-Augmented Algorithmic Trading</p>
-        </div>
-        <div class="text-right">
-            <div id="account-info" hx-get="/api/balance" hx-trigger="load, every 10s">
-                <span class="animate-pulse text-gray-500">Connecting to Broker...</span>
-            </div>
-        </div>
-    </div>
-
-    <div class="grid grid-cols-12 gap-6">
-        
-        <div class="col-span-12 md:col-span-4 space-y-6">
-            
-            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-lg">
-                <h2 class="text-xl font-bold text-blue-400 mb-4">🧠 AI Analyst</h2>
-                <form hx-post="/api/analyze" hx-target="#ai-result" hx-indicator="#loading">
-                    <div class="flex gap-2">
-                        <input type="text" name="ticker" placeholder="Symbol (e.g. AAPL)" 
-                               class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 uppercase">
-                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-bold">SCAN</button>
-                    </div>
-                </form>
-                <div id="loading" class="htmx-indicator mt-4 text-center text-gray-500 text-xs">
-                    🛰️ Querying GPT-4 & Market Data...
-                </div>
-                <div id="ai-result" class="mt-4"></div>
-            </div>
-
-            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-lg">
-                <h2 class="text-xl font-bold text-pink-400 mb-4">🕰️ Time Machine</h2>
-                <form hx-post="/api/backtest" hx-target="#backtest-results" hx-indicator="#bt-loading">
-                    <div class="flex gap-2">
-                        <input type="text" name="ticker" placeholder="Validate (e.g. NVDA)" 
-                               class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white uppercase">
-                        <button type="submit" class="bg-pink-700 hover:bg-pink-800 px-4 py-2 rounded font-bold">TEST</button>
-                    </div>
-                </form>
-                <div id="bt-loading" class="htmx-indicator mt-4 text-center text-gray-500 text-xs">
-                    🧮 Crunching 365 days of OHLCV data...
-                </div>
-                <div id="backtest-results" class="mt-4"></div>
-            </div>
-
-            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-lg">
-                <h2 class="text-xl font-bold text-yellow-400 mb-4">⚡ Manual Override</h2>
-                <form hx-post="/api/trade" hx-target="#trade-status">
-                    <div class="flex gap-2 mb-2">
-                        <input type="text" name="ticker" placeholder="Symbol" class="w-20 bg-gray-900 border border-gray-600 rounded px-2 uppercase">
-                        <select name="action" class="bg-gray-900 border border-gray-600 rounded px-2">
-                            <option value="buy">BUY</option>
-                            <option value="sell">SELL</option>
-                        </select>
-                        <button type="submit" class="w-full bg-green-600 hover:bg-green-700 rounded font-bold">EXECUTE</button>
-                    </div>
-                </form>
-                <div id="trade-status" class="text-sm mt-2"></div>
-            </div>
-
-            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-lg">
-                <h2 class="text-xl font-bold text-purple-400 mb-2">💼 Positions</h2>
-                <div id="positions-list" hx-get="/api/positions" hx-trigger="load, every 5s"></div>
-            </div>
-        </div>
-
-        <div class="col-span-12 md:col-span-8 space-y-6">
-            
-            <div class="bg-gray-800 p-1 rounded-lg border border-gray-700 h-96 relative" id="chart-container">
-                <div class="tradingview-widget-container" style="height:100%;width:100%">
-                  <div id="tradingview_12345" style="height:100%;width:100%"></div>
-                  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-                  <script type="text/javascript">
-                  new TradingView.widget({
-                    "autosize": true, "symbol": "NASDAQ:NVDA",
-                    "interval": "D", "timezone": "Etc/UTC", "theme": "dark",
-                    "style": "1", "locale": "en", "toolbar_bg": "#f1f3f6",
-                    "enable_publishing": false, "container_id": "tradingview_12345"
-                  });
-                  </script>
-                </div>
-            </div>
-
-            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold text-gray-300">📜 Neural Ledger</h2>
-                    <button class="text-xs bg-red-900 text-red-200 px-2 py-1 rounded border border-red-700 hover:bg-red-800" 
-                            hx-post="/api/panic" 
-                            onclick="return confirm('WARNING: This will liquidate ALL positions and cancel ALL orders. Proceed?')">
-                        ☢️ LIQUIDATE ALL
-                    </button>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left text-gray-400">
-                        <thead class="text-xs text-gray-500 uppercase bg-gray-700">
-                            <tr>
-                                <th class="px-4 py-3">Time</th>
-                                <th class="px-4 py-3">Sym</th>
-                                <th class="px-4 py-3">Action</th>
-                                <th class="px-4 py-3">Price</th>
-                                <th class="px-4 py-3">Reason</th>
-                            </tr>
-                        </thead>
-                        <tbody hx-get="/api/logs" hx-trigger="load, every 5s"></tbody>
-                    </table>
-                </div>
-            </div>
-
-        </div>
-    </div>
-</body>
-</html>
-"""
-
-# ==========================================
-# 7. FLASK ROUTES
-# ==========================================
-
-@app.route('/')
-def index():
-    return render_template_string(DASHBOARD_HTML)
-
-@app.route('/api/balance')
-def api_balance():
-    try:
-        acct = api.get_account()
-        pl = float(acct.equity) - float(acct.last_equity)
-        pl_color = "text-green-400" if pl >= 0 else "text-red-400"
-        return f"""
-        <div class="text-2xl font-bold {pl_color}">${float(acct.equity):,.2f}</div>
-        <div class="text-xs text-gray-500">BP: ${float(acct.buying_power):,.2f}</div>
-        """
-    except:
-        return "<span class='text-red-500'>API Error</span>"
-
-@app.route('/api/analyze', methods=['POST'])
-def api_analyze():
-    symbol = request.form.get('ticker').upper().strip()
-    if not symbol: return "Enter Symbol"
-    
-    bars, headlines = get_market_data(symbol)
-    if bars is None: return "<div class='text-red-500'>Data Error / Symbol Not Found</div>"
-    
-    techs = analyze_technicals(bars)
-    
-    # Run AI
-    if brain:
-        verdict = brain.analyze(symbol, techs['price'], techs['rsi'], techs['atr'], techs['trend'], "\n".join(headlines))
-        color = "text-green-400" if verdict.score > 6 else "text-red-400"
-        
-        return f"""
-        <div class="border-l-4 border-blue-500 pl-4 py-2 bg-gray-900 rounded fade-in">
-            <div class="flex justify-between mb-2">
-                <span class="font-bold text-xl">{symbol}</span>
-                <span class="font-bold text-xl {color}">{verdict.score}/10</span>
-            </div>
-            <div class="grid grid-cols-2 gap-2 text-xs text-gray-400 mb-2">
-                <div>RSI: {techs['rsi']}</div>
-                <div>Trend: {techs['trend']}</div>
-                <div class="col-span-2">Rec: <span class="uppercase font-bold text-white">{verdict.action}</span></div>
-            </div>
-            <p class="text-sm italic text-gray-300">"{verdict.reason}"</p>
-            <script>
-                new TradingView.widget({{
-                    "autosize": true, "symbol": "{symbol}",
-                    "interval": "D", "timezone": "Etc/UTC", "theme": "dark", "style": "1",
-                    "container_id": "tradingview_12345"
-                }});
-            </script>
-        </div>
-        """
-    else:
-        return "AI Module Not Loaded."
-
-@app.route('/api/backtest', methods=['POST'])
-def api_backtest():
-    sym = request.form.get('ticker', 'NVDA').upper()
-    stats, trade_log = run_backtest_simulation(sym)
-    
-    if not stats:
-        return f"<div class='text-red-500 p-2'>Backtest Failed: {trade_log}</div>"
-    
-    html = f"""
-    <div class="animate-pulse-once">
-        <div class="grid grid-cols-3 gap-2 mb-4 text-center">
-            <div class="bg-gray-900 p-2 rounded border border-gray-700">
-                <div class="text-[10px] text-gray-500 uppercase">Trades</div>
-                <div class="text-lg font-bold text-white">{stats['trades']}</div>
-            </div>
-            <div class="bg-gray-900 p-2 rounded border border-gray-700">
-                <div class="text-[10px] text-gray-500 uppercase">Win Rate</div>
-                <div class="text-lg font-bold {'text-green-400' if stats['win_rate'] > 50 else 'text-red-400'}">{stats['win_rate']}%</div>
-            </div>
-            <div class="bg-gray-900 p-2 rounded border border-gray-700">
-                <div class="text-[10px] text-gray-500 uppercase">Return</div>
-                <div class="text-lg font-bold {'text-green-400' if stats['return'] > 0 else 'text-red-400'}">{stats['return']}%</div>
-            </div>
-        </div>
-        
-        <div class="bg-gray-900 rounded p-1 mb-4 border border-gray-700">
-            <img src="data:image/png;base64,{stats['plot']}" class="w-full rounded" />
-        </div>
-        
-        <div class="max-h-32 overflow-y-auto text-xs border-t border-gray-700 pt-2">
-             <table class="w-full text-left text-gray-400">
-                <thead><tr class="text-gray-600"><th>Date</th><th>Res</th><th class="text-right">PnL</th></tr></thead>
-                <tbody>
-    """
-    for t in trade_log:
-        if t['type'] == 'SELL':
-            color = "text-green-400" if t['pnl'] > 0 else "text-red-400"
-            html += f"<tr><td>{t['date']}</td><td>{t['result']}</td><td class='{color} text-right'>${t['pnl']:.2f}</td></tr>"
-            
-    html += "</tbody></table></div></div>"
-    return html
-
-@app.route('/api/trade', methods=['POST'])
-def api_trade():
-    sym = request.form.get('ticker').upper()
-    action = request.form.get('action')
-    
-    if action == 'buy':
-        order = place_order(sym, 'buy', "Manual Override", 10)
-        if order: return f"<span class='text-green-500'>Order Placed</span>"
-        return "<span class='text-red-500'>Failed</span>"
-    else:
-        try:
-            api.close_position(sym)
-            return "<span class='text-yellow-500'>Closed</span>"
-        except:
-             return "<span class='text-red-500'>No Position</span>"
-
-@app.route('/api/positions')
-def api_positions():
-    try:
-        pos = api.list_positions()
-        if not pos: return "<div class='text-gray-500 text-sm italic'>Cash Gang 💰</div>"
-        
-        html = ""
-        for p in pos:
-            pl = float(p.unrealized_pl)
-            color = "text-green-400" if pl > 0 else "text-red-400"
-            html += f"""
-            <div class="flex justify-between items-center bg-gray-900 p-2 mb-1 rounded text-sm border border-gray-700">
-                <div>
-                    <span class="font-bold text-white">{p.symbol}</span>
-                    <span class="text-xs text-gray-500 ml-1">{p.qty}sh</span>
-                </div>
-                <span class="{color}">${pl:.2f}</span>
-            </div>
-            """
-        return html
-    except:
-        return "API Error"
-
-@app.route('/api/logs')
-def api_logs():
-    trades = list(history_col.find().sort("timestamp", -1).limit(10))
-    html = ""
-    for t in trades:
-        ts = t['timestamp'].strftime('%H:%M')
-        style = "text-green-400" if t['action'] == 'buy' else "text-red-400"
-        html += f"""
-        <tr class="bg-gray-800 border-b border-gray-700 hover:bg-gray-700 transition">
-            <td class="px-4 py-2 font-mono text-gray-500">{ts}</td>
-            <td class="px-4 py-2 font-bold text-white">{t['symbol']}</td>
-            <td class="px-4 py-2 {style} uppercase text-xs font-bold">{t['action']}</td>
-            <td class="px-4 py-2 text-gray-300">${t.get('price', 0)}</td>
-            <td class="px-4 py-2 text-gray-500 text-xs truncate max-w-[100px]" title="{t['reason']}">{t['reason']}</td>
-        </tr>
-        """
-    return html
-
-@app.route('/api/panic', methods=['POST'])
-def panic():
-    api.cancel_all_orders()
-    api.close_all_positions()
-    logger.critical("☢️ PANIC PRESSED - LIQUIDATING ALL")
-    return ""
-
-# ==========================================
-# 8. STARTUP
-# ==========================================
-if __name__ == '__main__':
-    # Scheduler
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(scanner_job, 'interval', minutes=15)
-    scheduler.start()
-    
-    print("\n⚡ SENTINEL COMMANDER ONLINE")
-    print("👉 UI: http://localhost:5000")
-    print("👉 LOGS: See terminal output\n")
-    
-    # Run Flask
-    app.run(host='0.0.0.0', port=5000)
+### Project Structure
+```
+mdb-swing/
+├── src/app/
+│   ├── api/          # API routes
+│   ├── core/         # Configuration & engine
+│   ├── models/       # Pydantic models
+│   ├── services/     # Business logic
+│   │   ├── ai.py     # AI analysis
+│   │   ├── analysis.py # Market data & indicators
+│   │   ├── indicators.py # Technical indicators
+│   │   └── trading.py # Trade execution
+│   └── main.py       # Application entry point
+├── frontend/         # HTML/CSS/JS
+├── config/           # MongoDB manifest
+└── docker-compose.yaml
 ```
 
 ---
 
-## How It Works
+## 📖 How to Use
 
-### 1. The Trend Filter (SMA 50)
+### 1. Market Scanner
+- Enter a symbol (e.g., AAPL, NVDA)
+- Click **SCAN**
+- See AI analysis with score, reasoning, and technical indicators
+- Chart updates automatically
 
-We never trade against the trend. The bot calculates the **50-Day Moving Average**. If the current price is *below* this line, we assume the stock is dying, and we do nothing.
+### 2. Pending Trades
+- When the Eye detects a signal, it appears in **Pending Trades**
+- Review the AI's reasoning and score
+- Click **APPROVE** to execute or **REJECT** to dismiss
+- Trades auto-refresh every 3 seconds
 
-### 2. The Discount Filter (RSI)
+### 3. Manual Trading
+- Use **Manual Override** for direct execution
+- Enter symbol and select BUY/SELL
+- Click **EXECUTE**
 
-If the trend is UP, we look for a dip. We use **RSI (Relative Strength Index)**.
+### 4. Backtesting
+- Enter a symbol in **Time Machine**
+- Click **TEST**
+- See 1-year performance with win rate and return %
+- Review trade-by-trade results
 
-* **RSI < 35:** The stock is "Oversold."
-* If RSI > 35, we wait.
-
-### 3. The AI Filter (The Vibe Check)
-
-If the math looks good, the AI reads the last 3 news headlines.
-
-* **Scenario A:** "CEO resigns in scandal" -> AI Score: 2/10 -> **BLOCK TRADE.**
-* **Scenario B:** "Market dips on inflation fears" -> AI Score: 8/10 -> **EXECUTE.**
-
-### 4. The Shadow Trade
-
-If all lights are green, the bot executes a **Paper Trade** via Alpaca. This tracks your hypothetical P&L. Simultaneously, it sends a notification to your phone. If you agree with the logic, you open your brokerage app and place the real trade yourself.
+### 5. Monitoring
+- **Positions**: See all open positions with P&L
+- **Ledger**: Complete trade history
+- **Balance**: Real-time account balance
 
 ---
 
-## Next Steps: Making it Smarter
+## 🛡️ Risk Disclaimer
 
-To take this from a fun project to an enterprise-grade tool, consider implementing **Vector Search**.
+**⚠️ IMPORTANT**: This is a trading bot for **educational purposes**. 
 
-Currently, the AI has no memory. By using **MongoDB Atlas Vector Search**, you could embed every news headline you analyze. Before placing a trade, the bot could query its own memory:
+- Uses **paper trading** (simulated money) by default
+- Past performance does not guarantee future results
+- Always do your own research
+- Never trade with money you can't afford to lose
+- The AI is a tool, not a guarantee
 
-> *"Last time I saw headlines about 'CEO Investigation' for this stock, did the price recover?"*
+---
 
-If the answer is "No," the bot can veto the trade based on historical performance, creating a self-improving feedback loop.
+## 🔍 Troubleshooting
+
+### "Insufficient Data" Error
+- **Cause**: API only returning 1 day of data
+- **Fix**: Using `feed='iex'` parameter (paper trading compatible)
+- **Check**: Verify Alpaca API credentials
+
+### "Azure OpenAI Error"
+- **Cause**: API version mismatch
+- **Fix**: Updated to `2024-08-01-preview` for structured output
+- **Check**: Verify Azure OpenAI endpoint and API key
+
+### "Firecrawl Not Working"
+- **Cause**: API key not set in Docker environment
+- **Fix**: Added `FIRECRAWL_API_KEY` to docker-compose.yaml
+- **Check**: Restart container after adding key
+
+### "No Pending Trades"
+- **Cause**: No signals detected or AI score too low
+- **Check**: 
+  - Are symbols in your watchlist?
+  - Is market open?
+  - Are RSI conditions met?
+  - Is AI score >= 8?
+
+---
+
+## 📝 License
+
+MIT License - See LICENSE file for details
+
+---
+
+## 🙏 Acknowledgments
+
+- **Alpaca**: Paper trading API
+- **Azure OpenAI**: AI analysis
+- **Firecrawl**: Article scraping
+- **mdb-engine**: MongoDB integration
+- **TradingView**: Charting widgets
+
+---
+
+## 🚧 Roadmap
+
+- [ ] Strategy presets UI
+- [ ] SMS/Email notifications for pending trades
+- [ ] Portfolio performance analytics
+- [ ] Multi-timeframe analysis
+- [ ] Custom indicator support
+- [ ] Paper trading → Live trading toggle
+
+---
+
+**Stop building scaffolding. Start extracting capital.** 👁️

@@ -1,0 +1,43 @@
+{
+  "schema_version": "2.0",
+  "slug": "sauron_eye",
+  "name": "Sauron's Eye - AI-Augmented Swing Trading Bot",
+  "status": "active",
+  "websockets": {
+    "realtime": {
+      "path": "/ws",
+      "description": "Real-time stock analysis progress and updates",
+      "auth": {
+        "required": false,
+        "allow_anonymous": true
+      },
+      "ping_interval": 30
+    }
+  },
+  "managed_indexes": {
+    "history": [
+      {
+        "type": "regular",
+        "keys": {"timestamp": -1},
+        "name": "timestamp_idx"
+      },
+      {
+        "type": "regular",
+        "keys": {"symbol": 1},
+        "name": "symbol_idx"
+      }
+    ],
+    "pending_trades": [
+      {
+        "type": "regular",
+        "keys": {"status": 1, "timestamp": -1},
+        "name": "status_timestamp_idx"
+      },
+      {
+        "type": "regular",
+        "keys": {"symbol": 1},
+        "name": "symbol_idx"
+      }
+    ]
+  }
+}
