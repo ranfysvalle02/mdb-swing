@@ -380,99 +380,7 @@ async def analyze_symbol(ticker: str = Form(...)) -> HTMLResponse:
             </div>
         """)
 
-async def backtest_symbol(ticker: str = Form("NVDA")) -> HTMLResponse:
-    """Run backtest for a symbol."""
-    if not check_alpaca_config():
-        return HTMLResponse(content="<div class='text-yellow-500 p-2'>Alpaca API not configured</div>")
-    
-    if api is None:
-        return HTMLResponse(content="<div class='text-red-500 p-2'>Alpaca API not initialized</div>")
-    
-    sym = ticker.upper()
-    try:
-        stats, trade_log = run_backtest_simulation(sym)
-        
-        if not stats:
-            return HTMLResponse(content=f"<div class='text-red-500 p-2'>Backtest Failed: {trade_log}</div>")
-    except Exception as e:
-        logger.error(f"Backtest failed for {sym}: {e}", exc_info=True)
-        return HTMLResponse(content=f"<div class='text-red-500 p-2'>Backtest Error: {str(e)[:100]}</div>")
-    
-    html = f"""
-    <div class="fade-in">
-        <div class="grid grid-cols-3 gap-3 mb-4">
-            <div class="glass rounded-xl p-4 text-center border border-blue-500/20">
-                <div class="text-xs text-gray-400 mb-2 uppercase tracking-wider flex items-center justify-center gap-1">
-                    <i class="fas fa-exchange-alt"></i>
-                    <span>Trades</span>
-                </div>
-                <div class="text-2xl font-bold text-white">{stats['trades']}</div>
-                <div class="text-xs text-gray-500 mt-1">Total</div>
-            </div>
-            <div class="glass rounded-xl p-4 text-center border border-green-500/20">
-                <div class="text-xs text-gray-400 mb-2 uppercase tracking-wider flex items-center justify-center gap-1">
-                    <i class="fas fa-trophy"></i>
-                    <span>Win Rate</span>
-                </div>
-                <div class="text-2xl font-bold {'text-green-400' if stats['win_rate'] > 50 else 'text-red-400'}">{stats['win_rate']}%</div>
-                <div class="text-xs text-gray-500 mt-1">{'Excellent' if stats['win_rate'] > 60 else 'Good' if stats['win_rate'] > 50 else 'Needs Work'}</div>
-            </div>
-            <div class="glass rounded-xl p-4 text-center border border-yellow-500/20">
-                <div class="text-xs text-gray-400 mb-2 uppercase tracking-wider flex items-center justify-center gap-1">
-                    <i class="fas fa-chart-line"></i>
-                    <span>Return</span>
-                </div>
-                <div class="text-2xl font-bold {'text-green-400' if stats['return'] > 0 else 'text-red-400'}">{stats['return']:+.1f}%</div>
-                <div class="text-xs text-gray-500 mt-1">1 Year</div>
-            </div>
-        </div>
-        
-        <div class="glass rounded-xl p-3 mb-4 border border-gray-700/50">
-            <div class="text-xs text-gray-400 mb-2 uppercase tracking-wider flex items-center gap-1">
-                <i class="fas fa-chart-area"></i>
-                <span>Equity Curve</span>
-            </div>
-            <img src="data:image/png;base64,{stats['plot']}" class="w-full rounded-lg" />
-        </div>
-        
-        <div class="glass rounded-xl p-4 border border-gray-700/50">
-            <div class="text-xs text-gray-400 mb-3 uppercase tracking-wider flex items-center gap-1">
-                <i class="fas fa-list"></i>
-                <span>Trade History</span>
-            </div>
-            <div class="max-h-40 overflow-y-auto">
-                <table class="w-full text-xs">
-                    <thead>
-                        <tr class="text-gray-500 border-b border-gray-700/30">
-                            <th class="px-2 py-2 text-left">Date</th>
-                            <th class="px-2 py-2 text-left">Result</th>
-                            <th class="px-2 py-2 text-right">P&L</th>
-                        </tr>
-                    </thead>
-                    <tbody class="text-gray-300">
-    """
-    for t in trade_log:
-        if t['type'] == 'SELL':
-            color = "text-green-400" if t['pnl'] > 0 else "text-red-400"
-            badge = "badge-success" if t['pnl'] > 0 else "badge-danger"
-            html += f"""
-                        <tr class="border-b border-gray-700/20 hover:bg-white/5">
-                            <td class="px-2 py-2 font-mono">{t['date']}</td>
-                            <td class="px-2 py-2">
-                                <span class="badge {badge}">{t['result']}</span>
-                            </td>
-                            <td class="px-2 py-2 text-right font-bold {color}">${t['pnl']:.2f}</td>
-                        </tr>
-            """
-            
-    html += """
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    """
-    return HTMLResponse(content=html)
+# Backtest functionality removed - keeping UI focused on actionable insights
 
 async def execute_trade(ticker: str = Form(...), action: str = Form(...), db = Depends(get_scoped_db)) -> HTMLResponse:
     """Execute a manual trade."""
@@ -509,7 +417,7 @@ async def execute_trade(ticker: str = Form(...), action: str = Form(...), db = D
             return HTMLResponse(content="""
                 <div class="glass rounded-lg p-3 border border-yellow-500/30 flex items-center gap-2 text-yellow-400">
                     <i class="fas fa-check-circle"></i>
-                    <span class="font-semibold">Position Closed</span>
+                    <span class="font-semibold">Position Sold</span>
                 </div>
             """)
         except Exception as e:
@@ -737,18 +645,10 @@ async def get_positions(db = Depends(get_scoped_db)) -> HTMLResponse:
                         hx-vals='{{"symbol": "{p.symbol}"}}'
                         hx-target="#positions-list"
                         hx-swap="innerHTML"
-                        hx-confirm="Close position for {p.symbol}?"
+                        hx-confirm="Sell position for {p.symbol}?"
                             class="flex-1 glass-strong py-1.5 rounded-lg text-xs font-bold text-white hover:bg-red-600/30 transition-all bg-red-500/30 flex items-center justify-center gap-1 border border-red-500/50">
-                        <i class="fas fa-times text-xs"></i>
-                        <span>CLOSE</span>
-                    </button>
-                    <button 
-                        hx-get="/api/position-chart/{p.symbol}"
-                        hx-target="#position-chart-content"
-                        hx-trigger="click"
-                        onclick="openModal('position-chart-modal')"
-                            class="glass-strong py-1.5 px-3 rounded-lg text-xs font-semibold text-white hover:bg-blue-600/20 transition-all bg-blue-500/20 flex items-center justify-center">
-                        <i class="fas fa-chart-line text-xs"></i>
+                        <i class="fas fa-arrow-down text-xs"></i>
+                        <span>SELL</span>
                     </button>
                 </div>
             </div>
@@ -837,184 +737,7 @@ async def cancel_order(order_id: str = Form(...), db = Depends(get_scoped_db)) -
         """
         return HTMLResponse(content=error_html, status_code=500)
 
-async def get_position_chart(symbol: str, db = Depends(get_scoped_db)) -> HTMLResponse:
-    """Get position chart with entry, stop loss, and take profit levels.
-    
-    MDB-Engine Pattern: Uses Depends(get_scoped_db) for automatic connection management.
-    Returns HTML with embedded matplotlib chart showing buy low/sell high levels.
-    """
-    if not check_alpaca_config():
-        return HTMLResponse(content="<div class='text-yellow-500 text-sm'>Alpaca API not configured</div>")
-    
-    if api is None:
-        return HTMLResponse(content="<div class='text-red-500 text-sm'>Alpaca API not initialized</div>")
-    
-    try:
-        symbol = symbol.upper().strip()
-        
-        # Get position from Alpaca
-        positions = api.list_positions()
-        position = None
-        for p in positions:
-            if p.symbol == symbol:
-                position = p
-                break
-        
-        if not position:
-            return HTMLResponse(content="<div class='text-yellow-500 text-sm'>Position not found</div>")
-        
-        avg_entry_price = float(position.avg_entry_price)
-        current_price = float(position.current_price)
-        qty = float(position.qty)
-        
-        # Get entry/stop/take_profit from db.history (most recent buy for this symbol)
-        trade_record = await db.history.find_one(
-            {"symbol": symbol, "action": "buy"},
-            sort=[("timestamp", -1)]
-        )
-        
-        entry_price = trade_record.get("entry_price") if trade_record else avg_entry_price
-        stop_loss = trade_record.get("stop_loss") if trade_record else None
-        take_profit = trade_record.get("take_profit") if trade_record else None
-        
-        # If not in DB, calculate from strategy defaults
-        if stop_loss is None or take_profit is None:
-            df, _, _ = get_market_data(symbol, days=60)
-            if df is not None and not df.empty:
-                techs = analyze_technicals(df)
-                atr_value = techs.get('atr', 0)
-                if stop_loss is None:
-                    stop_loss = round(entry_price - (2 * atr_value), 2)
-                if take_profit is None:
-                    take_profit = round(entry_price + (3 * atr_value), 2)
-            else:
-                # Fallback: use 5% stop, 10% target
-                stop_loss = round(entry_price * 0.95, 2)
-                take_profit = round(entry_price * 1.10, 2)
-        
-        # Get price history for chart (last 60 days)
-        df, _, _ = get_market_data(symbol, days=60)
-        if df is None or df.empty:
-            return HTMLResponse(content="<div class='text-yellow-500 text-sm'>Insufficient data for chart</div>")
-        
-        # Generate matplotlib chart
-        import matplotlib
-        matplotlib.use('Agg')
-        import matplotlib.pyplot as plt
-        import io
-        import base64
-        
-        plt.figure(figsize=(10, 5), facecolor='#111827')
-        ax = plt.gca()
-        ax.set_facecolor('#111827')
-        
-        # Plot price history
-        prices = df['close'].values
-        dates = range(len(prices))
-        plt.plot(dates, prices, color='#60a5fa', linewidth=2, label='Price')
-        
-        # Add entry price line (green)
-        plt.axhline(y=entry_price, color='#10b981', linestyle='--', linewidth=2, label=f'Entry: ${entry_price:.2f}')
-        plt.text(len(prices) * 0.02, entry_price, f'Entry: ${entry_price:.2f}', 
-                color='#10b981', fontsize=9, bbox=dict(boxstyle='round,pad=0.3', facecolor='#111827', edgecolor='#10b981', alpha=0.8))
-        
-        # Add stop loss line (red)
-        plt.axhline(y=stop_loss, color='#ef4444', linestyle='--', linewidth=2, label=f'Stop Loss: ${stop_loss:.2f}')
-        plt.text(len(prices) * 0.02, stop_loss, f'Risk Limit: ${stop_loss:.2f}', 
-                color='#ef4444', fontsize=9, bbox=dict(boxstyle='round,pad=0.3', facecolor='#111827', edgecolor='#ef4444', alpha=0.8))
-        
-        # Add take profit line (green)
-        plt.axhline(y=take_profit, color='#10b981', linestyle='--', linewidth=2, label=f'Take Profit: ${take_profit:.2f}')
-        plt.text(len(prices) * 0.02, take_profit, f'Profit Target: ${take_profit:.2f}', 
-                color='#10b981', fontsize=9, bbox=dict(boxstyle='round,pad=0.3', facecolor='#111827', edgecolor='#10b981', alpha=0.8))
-        
-        # Add current price indicator
-        plt.axhline(y=current_price, color='#fbbf24', linestyle='-', linewidth=1.5, alpha=0.7, label=f'Current: ${current_price:.2f}')
-        plt.plot(len(prices) - 1, current_price, 'o', color='#fbbf24', markersize=10, label='Current Price')
-        
-        plt.title(f"{symbol} - Buy Low, Sell High", color='white', fontsize=12, fontweight='bold')
-        plt.xlabel('Days', color='gray', fontsize=9)
-        plt.ylabel('Price ($)', color='gray', fontsize=9)
-        plt.tick_params(colors='gray', labelsize=8)
-        plt.grid(color='#374151', linestyle='--', linewidth=0.5, alpha=0.5)
-        plt.legend(loc='upper left', fontsize=8, facecolor='#111827', edgecolor='#374151', labelcolor='white')
-        
-        img = io.BytesIO()
-        plt.savefig(img, format='png', transparent=False, bbox_inches='tight', facecolor='#111827')
-        img.seek(0)
-        plot_url = base64.b64encode(img.getvalue()).decode()
-        plt.close()
-        
-        # Calculate metrics
-        risk_amount = entry_price - stop_loss
-        reward_amount = take_profit - entry_price
-        risk_reward_ratio = round(reward_amount / risk_amount, 2) if risk_amount > 0 else 0
-        distance_to_stop = current_price - stop_loss
-        distance_to_target = take_profit - current_price
-        distance_to_stop_pct = round((distance_to_stop / entry_price) * 100, 2) if entry_price > 0 else 0
-        distance_to_target_pct = round((distance_to_target / entry_price) * 100, 2) if entry_price > 0 else 0
-        
-        # Build HTML response
-        html_content = f"""
-        <div class="glass rounded-xl p-6 border border-purple-500/20" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-            <div class="flex items-center justify-between mb-6 pb-4 border-b border-gray-700/50">
-                <h3 class="text-2xl font-bold text-white">{symbol} - Position Chart</h3>
-                <button onclick="closeModal('position-chart-modal')" class="text-gray-400 hover:text-white transition text-2xl">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            
-            <div class="mb-6">
-                <img src="data:image/png;base64,{plot_url}" alt="{symbol} Chart" class="w-full rounded-lg border-2 border-gray-700/50">
-            </div>
-            
-            <div class="grid grid-cols-2 gap-4 mb-6">
-                <div class="glass rounded-lg p-5 border-2 border-green-500/30 bg-green-500/10">
-                    <div class="text-sm text-gray-300 mb-2 font-medium">Entry Price (Low Buy)</div>
-                    <div class="text-3xl font-bold text-green-400 mb-2">${entry_price:.2f}</div>
-                    <div class="text-sm text-gray-400">{qty:.0f} shares</div>
-                </div>
-                <div class="glass rounded-lg p-5 border-2 border-yellow-500/30 bg-yellow-500/10">
-                    <div class="text-sm text-gray-300 mb-2 font-medium">Current Price</div>
-                    <div class="text-3xl font-bold text-yellow-400 mb-2">${current_price:.2f}</div>
-                    <div class="text-sm text-gray-400">{((current_price - entry_price) / entry_price * 100):+.2f}%</div>
-                </div>
-                <div class="glass rounded-lg p-5 border-2 border-red-500/30 bg-red-500/10">
-                    <div class="text-sm text-gray-300 mb-2 font-medium">Risk Limit (Stop Loss)</div>
-                    <div class="text-3xl font-bold text-red-400 mb-2">${stop_loss:.2f}</div>
-                    <div class="text-sm text-gray-400">-${abs(distance_to_stop):.2f} ({distance_to_stop_pct:.1f}%)</div>
-                </div>
-                <div class="glass rounded-lg p-5 border-2 border-green-500/30 bg-green-500/10">
-                    <div class="text-sm text-gray-300 mb-2 font-medium">Profit Target (Sell High)</div>
-                    <div class="text-3xl font-bold text-green-400 mb-2">${take_profit:.2f}</div>
-                    <div class="text-sm text-gray-400">+${distance_to_target:.2f} ({distance_to_target_pct:.1f}%)</div>
-                </div>
-            </div>
-            
-            <div class="glass rounded-lg p-5 border-2 border-blue-500/30 bg-blue-500/10">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <div class="text-sm text-gray-300 mb-2 font-medium">Risk/Reward Ratio</div>
-                        <div class="text-2xl font-bold text-blue-400 mb-1">{risk_reward_ratio}:1</div>
-                        <div class="text-sm text-gray-400">For every $1 risked, potential ${risk_reward_ratio:.2f} reward</div>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-sm text-gray-300 mb-2 font-medium">Unrealized P&L</div>
-                        <div class="text-2xl font-bold {'text-green-400' if float(position.unrealized_pl) > 0 else 'text-red-400'} mb-1">
-                            ${float(position.unrealized_pl):.2f}
-                        </div>
-                        <div class="text-sm text-gray-400">{((current_price - entry_price) / entry_price * 100):+.2f}%</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        """
-        
-        return HTMLResponse(content=html_content)
-    except Exception as e:
-        logger.error(f"Failed to get position chart: {e}", exc_info=True)
-        error_msg = str(e)[:50] if str(e) else "Unknown error"
-        return HTMLResponse(content=f"<div class='text-red-500 text-sm'>Error: {error_msg}</div>")
+# Position chart endpoint removed - keeping UI focused on actionable insights only
 
 async def get_trade_logs(db = Depends(get_scoped_db)) -> HTMLResponse:
     """Get trade history logs."""
@@ -1732,7 +1455,7 @@ async def quick_sell(symbol: str = Form(...), db = Depends(get_scoped_db)) -> HT
                 <div class="flex items-start gap-3">
                     <i class="fas fa-check-circle text-green-400 text-lg mt-0.5 flex-shrink-0"></i>
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm font-semibold text-white break-words">Position closed for {symbol}</p>
+                        <p class="text-sm font-semibold text-white break-words">Position sold for {symbol}</p>
                     </div>
                     <button onclick="this.closest('.toast').remove()" class="text-gray-400 hover:text-white transition flex-shrink-0">
                         <i class="fas fa-times text-xs"></i>
@@ -1753,7 +1476,7 @@ async def quick_sell(symbol: str = Form(...), db = Depends(get_scoped_db)) -> HT
                     <div class="flex items-start gap-3">
                         <i class="fas fa-exclamation-triangle text-yellow-400 text-lg mt-0.5 flex-shrink-0"></i>
                         <div class="flex-1 min-w-0">
-                            <p class="text-sm font-semibold text-white break-words">No position to close</p>
+                            <p class="text-sm font-semibold text-white break-words">No position to sell</p>
                         </div>
                         <button onclick="this.closest('.toast').remove()" class="text-gray-400 hover:text-white transition flex-shrink-0">
                             <i class="fas fa-times text-xs"></i>
@@ -2004,9 +1727,9 @@ async def _get_trending_stocks_with_analysis_streaming(websocket: WebSocket, db)
                 start_time = time.time()
                 
                 try:
-                bars, headlines, news_objects = get_market_data(symbol, days=500)
-                fetch_time = time.time() - start_time
-                logger.info(f"⏱️ [WS] [{idx}/{total}] Market data fetch for {symbol} took {fetch_time:.2f}s")
+                    bars, headlines, news_objects = get_market_data(symbol, days=500)
+                    fetch_time = time.time() - start_time
+                    logger.info(f"⏱️ [WS] [{idx}/{total}] Market data fetch for {symbol} took {fetch_time:.2f}s")
                 except Exception as e:
                     error_msg = f"Failed to fetch market data: {str(e)[:100]}"
                     logger.error(f"❌ [WS] [{idx}/{total}] {symbol}: {error_msg}", exc_info=True)

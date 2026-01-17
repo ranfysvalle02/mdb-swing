@@ -25,11 +25,14 @@ SYMBOLS: List[str] = [s.strip() for s in SYMBOLS_ENV.split(',')]
 MAX_CAPITAL_DEPLOYED = float(os.getenv("MAX_CAPITAL_DEPLOYED", "5000.00"))
 
 # Strategy Selection
-# The Eye of Sauron can focus its energy through different strategy lenses
+# PRIMARY STRATEGY: Balanced Low (ONLY active strategy)
+# Other strategies exist as pseudocode placeholders for future implementation
+# Convention: Set via environment variable, defaults to Balanced Low
 CURRENT_STRATEGY = os.getenv("CURRENT_STRATEGY", "balanced_low")
 
-# Strategy Configuration
-# Each strategy has its own configuration
+# Strategy Configuration (legacy - strategies now define their own configs)
+# Kept for backward compatibility and default values
+# NOTE: Balanced Low is the PRIMARY and ONLY active strategy
 STRATEGY_CONFIGS: Dict[str, Dict[str, Any]] = {
     "balanced_low": {
         "name": "Balanced Low",
@@ -43,6 +46,7 @@ STRATEGY_CONFIGS: Dict[str, Dict[str, Any]] = {
 }
 
 # Current strategy config (for backward compatibility and easy access)
+# PRIMARY STRATEGY: Balanced Low (only active strategy)
 STRATEGY_CONFIG = STRATEGY_CONFIGS.get(CURRENT_STRATEGY, STRATEGY_CONFIGS["balanced_low"])
 
 
@@ -75,23 +79,25 @@ async def get_strategy_from_db(db) -> Optional[Dict[str, Any]]:
         logger.warning(f"Could not load strategy from database: {e}")
         return None
 
-def get_strategy_instance(db=None):
+def get_strategy_instance(db=None, strategy_name: Optional[str] = None):
     """Get the current strategy instance.
     
     Args:
         db: Optional MongoDB database instance (not used in sync context)
+        strategy_name: Optional strategy name override (defaults to CURRENT_STRATEGY env var)
     
     Returns:
-        Strategy instance based on CURRENT_STRATEGY setting
+        Strategy instance based on CURRENT_STRATEGY setting or provided name
     """
+    # Original behavior - direct import (most reliable, no registry dependency)
     from ..strategies import BalancedLowStrategy
     
     # In sync context, always use env vars/defaults
     # DB config is loaded in async routes via get_strategy_from_db()
-    if CURRENT_STRATEGY == "balanced_low":
+    if CURRENT_STRATEGY == "balanced_low" or not strategy_name:
         config = STRATEGY_CONFIGS.get("balanced_low", {})
     else:
-        logger.warning(f"Unknown strategy '{CURRENT_STRATEGY}', defaulting to 'balanced_low'")
+        logger.warning(f"Unknown strategy '{strategy_name or CURRENT_STRATEGY}', defaulting to 'balanced_low'")
         config = STRATEGY_CONFIGS.get("balanced_low", {})
     
     return BalancedLowStrategy(config=config)

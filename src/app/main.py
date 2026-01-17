@@ -141,7 +141,7 @@ async def root():
 # Core routes for Balanced Low Buy System
 app.get("/api/balance", response_class=HTMLResponse)(routes.get_balance)
 app.post("/api/analyze", response_class=HTMLResponse)(routes.analyze_symbol)
-app.post("/api/backtest", response_class=HTMLResponse)(routes.backtest_symbol)
+# Backtest route removed - keeping UI focused
 app.post("/api/trade", response_class=HTMLResponse)(routes.execute_trade)
 app.post("/api/panic", response_class=HTMLResponse)(routes.panic_close)
 app.get("/api/positions", response_class=HTMLResponse)(routes.get_positions)
@@ -155,7 +155,7 @@ app.post("/api/strategy")(routes.update_strategy_api)
 app.get("/api/strategy/presets")(routes.get_strategy_presets)
 app.get("/api/discover-stocks", response_class=HTMLResponse)(routes.discover_stocks)
 app.post("/api/explanation")(routes.get_explanation)
-app.get("/api/position-chart/{{symbol}}", response_class=HTMLResponse)(routes.get_position_chart)
+# Position chart endpoint removed - keeping UI focused
 
 # MDB-Engine Pattern: Built-in Observability Endpoints
 # These endpoints are automatically available via mdb-engine:

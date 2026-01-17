@@ -19,9 +19,17 @@
 
 **Why it matters**: Focus on business logic, not infrastructure. This project demonstrates mdb-engine's power by building a production-ready trading bot with minimal boilerplate.
 
-### What is Balanced Low Swing Trading?
+### Current Strategy: Balanced Low (PRIMARY)
 
-This is a swing trading system focused on "balanced lows."
+**This is the PRIMARY and ONLY active strategy in the system.** All trading decisions
+are made using the Balanced Low approach. Other strategies exist as pseudocode
+placeholders for future implementation.
+
+**What is Balanced Low Swing Trading?**
+
+This is a swing trading system focused on "balanced lows" - buying quality stocks
+when they're temporarily "on sale" (oversold) but still in an uptrend. This is
+NOT buying crashes or distressed stocks - it's buying healthy pullbacks in rising stocks.
 
 **Swing Trading Characteristics**:
 
@@ -83,6 +91,19 @@ This is a swing trading system focused on "balanced lows."
 - **Focused strategy** - One thing done exceptionally well (balanced lows)
 
 **Result**: A clean, maintainable trading bot built in days, not weeks, with production-grade infrastructure from day one.
+
+### Convention-Based Architecture (Rails-like)
+
+This project follows **Convention over Configuration** principles, similar to Ruby on Rails:
+
+- **Auto-Discovery**: Strategies, services, and routes are automatically discovered from folder structure
+- **Pluggable Strategies**: Add new trading strategies by simply creating a file in `strategies/` folder
+- **Zero Configuration**: No manual registration needed - folder structure drives behavior
+- **Service Registry**: Services auto-discovered from `services/` folder
+
+**Example**: To add a new strategy, create `strategies/momentum_breakout.py` with a class inheriting from `Strategy`. It's automatically discovered and available!
+
+See [Convention-Based Architecture Guide](docs/convention-based-architecture.md) for details.
 
 ---
 
@@ -389,7 +410,9 @@ The Eye currently focuses on **Balanced Low** opportunities with the following d
 2. **Environment Variables** - Set via `.env` file or environment
 3. **Defaults** - Hardcoded fallbacks in `src/app/core/config.py`
 
-Strategy configuration is loaded dynamically on each scan, so changes take effect immediately without restart. The Eye uses a pluggable strategy system — add a new strategy in `src/app/strategies/` and configure it via `CURRENT_STRATEGY` environment variable. See [Appendix C: Development Guide](#appendix-c-development-guide) for details.
+Strategy configuration is loaded dynamically on each scan, so changes take effect immediately without restart. 
+
+**Current Status**: Balanced Low is the PRIMARY and ONLY active strategy. Other strategies exist as pseudocode placeholders for future implementation. The system uses a pluggable strategy architecture — future strategies can be added in `src/app/strategies/` and configured via `CURRENT_STRATEGY` environment variable. See [Appendix C: Development Guide](#appendix-c-development-guide) for details.
 
 
 ---
@@ -1269,7 +1292,7 @@ The Eye class automatically uses the configured strategy. No code changes needed
 
 **Market Analysis**:
 - `POST /api/analyze` - Analyze a single symbol
-- `POST /api/backtest` - Backtest a symbol
+- Backtest functionality removed - keeping UI focused on actionable insights
 - `GET /api/discover-stocks` - Discover trending stocks
 
 **Position Management**:
