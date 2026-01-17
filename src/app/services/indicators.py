@@ -1,6 +1,9 @@
-"""Technical indicators implementation - stateless utility class for calculating indicators."""
+"""Technical indicators implementation - stateless utility class for calculating indicators.
+
+This module provides technical indicator calculations optimized for Pandas Series/DataFrames.
+All calculations use pandas operations for efficiency and compatibility.
+"""
 import pandas as pd
-import numpy as np
 from typing import Optional
 
 

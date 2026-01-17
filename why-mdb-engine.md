@@ -38,16 +38,33 @@ app = engine.create_app(
 - Index definitions in `manifest.json` instead of scattered migration scripts
 - Automatic index creation and management
 - Version-controlled schema definitions
+- Support for advanced indexes including vector search indexes
 
 **In practice:**
 ```json
 {
   "managed_indexes": {
-    "pending_trades": [
+    "radar_cache": [
       {
         "type": "regular",
-        "keys": {"status": 1, "timestamp": -1},
-        "name": "status_timestamp_idx"
+        "keys": {"symbol": 1, "strategy_id": 1},
+        "name": "symbol_strategy_idx"
+      }
+    ],
+    "radar_history": [
+      {
+        "type": "vectorSearch",
+        "name": "vector_idx",
+        "definition": {
+          "fields": [
+            {
+              "type": "vector",
+              "path": "embedding",
+              "numDimensions": 1536,
+              "similarity": "cosine"
+            }
+          ]
+        }
       }
     ]
   }
@@ -55,13 +72,15 @@ app = engine.create_app(
 ```
 
 **Value:** 
-- **Performance**: Ensures critical queries are optimized (e.g., fetching pending trades by status)
+- **Performance**: Ensures critical queries are optimized (e.g., fetching cached analysis by symbol)
 - **Maintainability**: Index strategy is visible and version-controlled
 - **Reliability**: Prevents missing indexes that degrade performance over time
 
 **Real impact in this project:**
-- `pending_trades` queries filter by `status="pending"` and sort by `timestamp` - the index makes this instant
-- `history` collection queries by `symbol` and `timestamp` - indexes prevent full collection scans
+- `radar_cache` queries filter by `symbol` and `strategy_id` - the index makes cache lookups instant
+- `radar_history` collection uses vector search indexes for semantic similarity matching - enables finding similar signals from history
+- `radar_cache` collection has TTL index for automatic expiration of cached analyses
+- All collections have proper indexes preventing full collection scans
 
 ---
 
@@ -76,8 +95,8 @@ app = engine.create_app(
 ```python
 from mdb_engine.dependencies import get_scoped_db
 
-async def get_pending_trades(db = Depends(get_scoped_db)) -> HTMLResponse:
-    pending = await db.pending_trades.find({"status": "pending"}).sort("timestamp", -1)
+async def get_cached_analysis(symbol: str, db = Depends(get_scoped_db)):
+    cached = await db.radar_cache.find_one({"symbol": symbol, "strategy_id": "balanced_low"})
     # Database connection is automatically managed
 ```
 
@@ -278,7 +297,7 @@ logger.info("👁️ The Eye watches... scanning markets for swing signals...")
 
 **Migration effort estimate:** **Medium (2-3 days)**
 - Replace `get_scoped_db()` with direct MongoDB client: ~4 hours
-- Migrate indexes to migration scripts: ~2 hours
+- Migrate indexes to migration scripts: ~2 hours (including vector search indexes)
 - Replace logging: ~2 hours
 - Testing: ~1 day
 
@@ -354,8 +373,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 client = AsyncIOMotorClient(MONGO_URI)
 db = client[DB_NAME]
 
-async def get_pending_trades():
-    return await db.pending_trades.find({"status": "pending"}).to_list(length=10)
+async def get_positions():
+    return await db.history.find({"status": "open"}).to_list(length=10)
 ```
 
 **Pros:**
@@ -378,13 +397,14 @@ async def get_pending_trades():
 from beanie import init_beanie
 from beanie import Document
 
-class PendingTrade(Document):
+class Position(Document):
     symbol: str
     status: str
+    entry_price: float
     timestamp: datetime
 
-async def get_pending_trades():
-    return await PendingTrade.find(PendingTrade.status == "pending").to_list()
+async def get_positions():
+    return await Position.find(Position.status == "open").to_list()
 ```
 
 **Pros:**
@@ -421,12 +441,15 @@ async def get_pending_trades():
 ### 1. **Keep Business Logic Decoupled**
 ```python
 # ✅ Good: Service layer abstracts database
-async def create_pending_trade(symbol: str, ...):
-    db = engine.get_scoped_db("sauron_eye")
-    await db.pending_trades.insert_one({...})
+async def cache_analysis(symbol: str, analysis_data: dict, db):
+    await db.radar_cache.insert_one({
+        "symbol": symbol,
+        "analysis": analysis_data,
+        "analyzed_at": datetime.now()
+    })
 
 # ❌ Avoid: Business logic in routes
-async def approve_trade(trade_id: str, db = Depends(get_scoped_db)):
+async def get_analysis(symbol: str, db = Depends(get_scoped_db)):
     # Complex logic here mixes concerns
 ```
 
@@ -435,12 +458,12 @@ async def approve_trade(trade_id: str, db = Depends(get_scoped_db)):
 // ✅ Good: Declare indexes in manifest.json
 {
   "managed_indexes": {
-    "pending_trades": [...]
+    "radar_cache": [...]
   }
 }
 
 // ❌ Avoid: Creating indexes in code
-await db.pending_trades.create_index(...)
+await db.radar_cache.create_index(...)
 ```
 
 ### 3. **Leverage Dependency Injection**
@@ -470,10 +493,11 @@ db = engine.get_scoped_db("sauron_eye")  # Global
 **MDB Engine provides significant value** for the Sauron's Eye trading bot:
 
 1. ✅ **Reduces boilerplate** (~140 lines saved)
-2. ✅ **Manages indexes** declaratively
+2. ✅ **Manages indexes** declaratively (including vector search indexes for semantic similarity)
 3. ✅ **Simplifies database access** with dependency injection
 4. ✅ **Integrates observability** out of the box
 5. ✅ **Accelerates development** with consistent patterns
+6. ✅ **Vector search support** enables historical pattern learning without manual index management
 
 **Risks are manageable:**
 - External dependency: Monitor and pin versions
@@ -487,11 +511,8 @@ db = engine.get_scoped_db("sauron_eye")  # Global
 
 ## 📚 References
 
-- Project structure: See `REORGANIZATION.md`
-- Configuration: See `config/manifest.json`
+- Project structure: See `README.md` for current architecture
+- Configuration: See `config/manifest.json` (includes vector search indexes)
 - Usage examples: See `src/app/api/routes.py` and `src/app/main.py`
+- RadarService: See `src/app/services/radar.py` for vector search implementation
 - MongoDB Engine: Check package documentation for latest features
-
----
-
-*Last updated: 2024*

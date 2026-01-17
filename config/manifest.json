@@ -3,16 +3,12 @@
   "slug": "sauron_eye",
   "name": "Sauron's Eye - AI-Augmented Swing Trading Bot",
   "status": "active",
-  "websockets": {
-    "realtime": {
-      "path": "/ws",
-      "description": "Real-time stock analysis progress and updates",
-      "auth": {
-        "required": false,
-        "allow_anonymous": true
-      },
-      "ping_interval": 30
-    }
+  "cors": {
+    "enabled": true,
+    "allow_origins": ["*"],
+    "allow_credentials": true,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"]
   },
   "managed_indexes": {
     "history": [
@@ -27,16 +23,61 @@
         "name": "symbol_idx"
       }
     ],
-    "pending_trades": [
+    "radar_cache": [
       {
         "type": "regular",
-        "keys": {"status": 1, "timestamp": -1},
-        "name": "status_timestamp_idx"
+        "keys": {"symbol": 1, "analyzed_at": -1},
+        "name": "symbol_time_idx"
       },
       {
         "type": "regular",
         "keys": {"symbol": 1},
-        "name": "symbol_idx"
+        "name": "symbol_idx",
+        "unique": true
+      },
+      {
+        "type": "regular",
+        "keys": {"expires_at": 1},
+        "name": "ttl_idx",
+        "expireAfterSeconds": 3600
+      }
+    ],
+    "radar_history": [
+      {
+        "type": "regular",
+        "keys": {"symbol": 1, "timestamp": -1},
+        "name": "symbol_time_idx"
+      },
+      {
+        "type": "regular",
+        "keys": {"timestamp": -1},
+        "name": "timestamp_idx"
+      },
+      {
+        "type": "vectorSearch",
+        "name": "vector_idx",
+        "definition": {
+          "fields": [
+            {
+              "type": "vector",
+              "path": "embedding",
+              "numDimensions": 1536,
+              "similarity": "cosine"
+            }
+          ]
+        },
+        "filter": {
+          "metadata.symbol": {"$exists": true}
+        }
+      }
+    ],
+    "strategy_config": [
+      {
+        "type": "regular",
+        "keys": {"active": 1},
+        "name": "active_idx",
+        "unique": true,
+        "partialFilterExpression": {"active": true}
       }
     ]
   }
