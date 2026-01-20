@@ -376,7 +376,6 @@ def stock_card(stock_data: Dict[str, Any]) -> str:
     profit_potential = take_profit and price and (take_profit - price) or None
     profit_potential_pct = profit_potential and price and ((profit_potential / price) * 100) or None
     risk_amount = stop_loss and price and (price - stop_loss) or None
-    risk_reward_ratio = profit_potential and risk_amount and risk_amount > 0 and round(profit_potential / risk_amount, 2) or None
     
     # Determine score styling
     score_color = "text-gray-400"
@@ -511,7 +510,6 @@ def stock_card(stock_data: Dict[str, Any]) -> str:
         profit_potential=profit_potential,
         profit_potential_pct=profit_potential_pct,
         risk_amount=risk_amount,
-        risk_reward_ratio=risk_reward_ratio,
         score_color=score_color,
         score_badge=score_badge,
         score_bg=score_bg,

@@ -39,14 +39,6 @@ class PositionMetrics:
         self.distance_to_stop = current_price - stop_loss if stop_loss else None
         self.distance_to_target = take_profit - current_price if take_profit else None
         
-        # Calculate risk/reward ratio
-        if stop_loss and take_profit:
-            risk_amount = entry_price - stop_loss
-            reward_amount = take_profit - entry_price
-            self.risk_reward_ratio = round(reward_amount / risk_amount, 2) if risk_amount > 0 else 0
-        else:
-            self.risk_reward_ratio = None
-        
         # Calculate progress percentages
         self.progress_to_stop = self._calculate_stop_progress()
         self.progress_to_profit = self._calculate_profit_progress()

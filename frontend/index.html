@@ -4377,7 +4377,6 @@
             const profitPotential = takeProfit && price ? takeProfit - price : null;
             const profitPotentialPct = profitPotential && price ? ((profitPotential / price) * 100) : null;
             const riskAmount = stopLoss && price ? price - stopLoss : null;
-            const riskRewardRatio = profitPotential && riskAmount && riskAmount > 0 ? (profitPotential / riskAmount).toFixed(2) : null;
             
             let scoreColor = "text-gray-400";
             let scoreBadge = "badge-info";
@@ -4508,7 +4507,6 @@
             card.dataset.score = aiScore || 0;
             card.dataset.rsi = rsi || 0;
             card.dataset.profitPotential = profitPotential || 0;
-            card.dataset.riskReward = riskRewardRatio || 0;
             card.dataset.signal = overallSignal;
             card.dataset.meetsCriteria = meetsCriteria;
             // Note: Card click handling is done via event delegation on slider-track container
@@ -4649,25 +4647,15 @@
                     </div>
                 ` : ''}
                 
-                ${profitPotential !== null && riskRewardRatio !== null ? `
+                ${profitPotential !== null ? `
                     <div class="mt-2 pt-2 border-t border-gray-700/50">
-                        <div class="grid grid-cols-2 gap-1.5 mb-1.5">
-                            <div class="glass rounded-lg p-2 bg-green-500/10 border border-green-500/30 transition-all duration-300 hover:bg-green-500/20 hover:border-green-500/50 hover:scale-105 cursor-pointer group">
-                                <div class="text-[10px] text-gray-300 mb-0.5 font-medium flex items-center gap-1">
-                                    <i data-lucide="trending-up" class="text-green-400 group-hover:animate-bounce w-3 h-3"></i>
-                                    Profit
-                                </div>
-                                <div class="text-base font-bold text-green-400 profit-highlight number-transition">+$${profitPotential.toFixed(2)}</div>
-                                <div class="text-[10px] text-green-400 mt-0.5 font-semibold">+${profitPotentialPct.toFixed(1)}%</div>
+                        <div class="glass rounded-lg p-2 bg-green-500/10 border border-green-500/30 transition-all duration-300 hover:bg-green-500/20 hover:border-green-500/50 hover:scale-105 cursor-pointer group">
+                            <div class="text-[10px] text-gray-300 mb-0.5 font-medium flex items-center gap-1">
+                                <i data-lucide="trending-up" class="text-green-400 group-hover:animate-bounce w-3 h-3"></i>
+                                Profit Potential
                             </div>
-                            <div class="glass rounded-lg p-2 bg-blue-500/10 border border-blue-500/30 transition-all duration-300 hover:bg-blue-500/20 hover:border-blue-500/50 hover:scale-105">
-                                <div class="text-[10px] text-gray-300 mb-0.5 font-medium flex items-center gap-1">
-                                    <i data-lucide="scale" class="text-blue-400 w-3 h-3"></i>
-                                    R/R
-                                </div>
-                                <div class="text-base font-bold text-blue-400">${riskRewardRatio}:1</div>
-                                <div class="text-[10px] text-gray-400 mt-0.5">${riskAmount ? `$${riskAmount.toFixed(2)}` : ''}</div>
-                            </div>
+                            <div class="text-base font-bold text-green-400 profit-highlight number-transition">+$${profitPotential.toFixed(2)}</div>
+                            <div class="text-[10px] text-green-400 mt-0.5 font-semibold">+${profitPotentialPct.toFixed(1)}%</div>
                         </div>
                         ${stopLoss && takeProfit ? `
                             <div class="text-[10px] text-gray-400 mt-1.5 pt-1.5 border-t border-gray-700/30 space-y-0.5">
@@ -4996,10 +4984,6 @@
                     return (a.rsi || 50) - (b.rsi || 50);
                 } else if (sortValue === 'rsi_desc') {
                     return (b.rsi || 50) - (a.rsi || 50);
-                } else if (sortValue === 'risk_reward_desc') {
-                    const rrA = a.price && a.atr && (a.price - (2 * a.atr)) > 0 ? ((a.price + (3 * a.atr)) - a.price) / (a.price - (a.price - (2 * a.atr))) : 0;
-                    const rrB = b.price && b.atr && (b.price - (2 * b.atr)) > 0 ? ((b.price + (3 * b.atr)) - b.price) / (b.price - (b.price - (2 * b.atr))) : 0;
-                    return rrB - rrA;
                 }
                 return 0;
             });

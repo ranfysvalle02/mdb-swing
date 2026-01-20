@@ -3351,9 +3351,6 @@ async def get_explanation(
         # Calculate exit levels for buy low/sell high framing
         stop_loss_price = round(price_value - (2 * atr_value), 2) if atr_value > 0 else round(price_value * 0.95, 2)
         take_profit_price = round(price_value + (3 * atr_value), 2) if atr_value > 0 else round(price_value * 1.10, 2)
-        risk_amount = price_value - stop_loss_price
-        reward_amount = take_profit_price - price_value
-        risk_reward_ratio = round(reward_amount / risk_amount, 2) if risk_amount > 0 else 0
         
         # Prepare similar signals for template
         template_similar_signals = []
@@ -3405,7 +3402,6 @@ async def get_explanation(
             meets_criteria=meets_criteria,
             stop_loss_price=stop_loss_price,
             take_profit_price=take_profit_price,
-            risk_reward_ratio=risk_reward_ratio,
             bars_count=bars_count,
             headlines=analysis_data.get('headlines', []),
             similar_signals_list=template_similar_signals,

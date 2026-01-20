@@ -5,7 +5,7 @@ MongoDB stores configuration and decisions, NOT computed indicators.
 
 Simple strategy that users can adjust based on their budget:
 - Conservative: Lower risk, smaller positions
-- Moderate: Balanced risk/reward
+- Moderate: Balanced approach
 - Aggressive: Higher risk, larger positions
 
 MongoDB remembers what *happened*. Python decides what *should happen*.

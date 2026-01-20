@@ -43,7 +43,6 @@ NOT buying crashes or distressed stocks - it's buying healthy pullbacks in risin
 3. **Exit strategy**:
    - Stop loss: Entry - (2 × ATR)
    - Take profit: Entry + (3 × ATR)
-   - Risk/reward: 1:1.5
 
 4. **Position sizing**: Based on ATR volatility, risking $50 per trade.
 
@@ -140,7 +139,6 @@ This is a swing trading system focused on "balanced lows." Here's exactly what t
 **3. Exit Strategy**
 - **Stop loss**: Entry - (2 × ATR)
 - **Take profit**: Entry + (3 × ATR)
-- **Risk/reward**: 1:1.5
 
 **4. Position Sizing**
 - Based on ATR volatility
@@ -221,7 +219,6 @@ One click: **APPROVE** or **REJECT**. You're always in control.
 Approved trades execute with bracket orders designed for swing trading:
 - **Stop loss**: Entry - (2 × ATR) — protects your capital during the swing hold
 - **Take profit**: Entry + (3 × ATR) — captures the swing move upside
-- **Risk/Reward**: 1:1.5 ratio — disciplined swing trading
 - **Hold Period**: Days to weeks — positions held until stop loss or take profit hit (swing trading time horizon)
 
 
@@ -1085,7 +1082,6 @@ pipeline = [
 **Exit Strategy**: Swing trading exits:
 - Stop loss: Entry - (2 × ATR) — protects capital during swing hold
 - Take profit: Entry + (3 × ATR) — captures swing move upside
-- Risk/reward: 1:1.5 — disciplined swing trading
 
 **Position Sizing**: Based on ATR volatility, risking $50 per trade.
 
@@ -1136,12 +1132,10 @@ pipeline = [
 **Stop Loss** (swing trading protection):
 - **Distance**: Entry - (2 × ATR)
 - **Purpose**: Limit downside risk during swing hold (days to weeks)
-- **Risk/Reward**: 1:1.5 ratio
 
 **Take Profit** (swing trading target):
 - **Distance**: Entry + (3 × ATR)
 - **Purpose**: Capture swing move upside (multi-day to multi-week move)
-- **Risk/Reward**: 1:1.5 ratio
 
 **Manual Exit**:
 - User can close swing positions at any time via UI
@@ -1161,11 +1155,6 @@ pipeline = [
 - Never risk more than configured max capital
 - Position size capped by available buying power
 - Multiple swing positions allowed (up to max capital)
-
-**Risk/Reward Ratio** (swing trading):
-- **Stop Loss**: 2× ATR below entry — protects during swing hold (days to weeks)
-- **Take Profit**: 3× ATR above entry — captures swing move upside
-- **Ratio**: 1:1.5 (risk $1 to make $1.50) — disciplined swing trading
 
 **Hold Period**: Positions held for days to weeks until stop loss or take profit hit — this is swing trading, not day trading.
 
