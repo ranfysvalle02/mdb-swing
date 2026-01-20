@@ -1,0 +1,212 @@
+{# AI Analysis Progress Indicator - Compact step-by-step progress #}
+<div class="animate-fade-in" id="ai-analysis-progress-{{ symbol|lower }}">
+    <div class="glass-strong rounded-lg p-3 border-l-4 border-purple-500/60 bg-purple-500/10">
+        <div class="flex items-center gap-2.5 mb-2.5">
+            <div class="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center border border-purple-500/30 flex-shrink-0">
+                <i data-lucide="sparkles" class="w-4 h-4 text-purple-300 lucide-spin"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-bold text-white">{{ symbol }} Analysis</h3>
+                <p class="text-xs text-gray-300">Analyzing market data...</p>
+            </div>
+            <div class="w-6 h-6 border-2 border-purple-400 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+        </div>
+        
+        {# Progress Steps - Compact #}
+        <div class="space-y-1">
+            {# Step 1: Fetching Market Data #}
+            <div class="flex items-center gap-2 px-2 py-1.5 rounded bg-blue-500/10 border border-blue-500/30" id="step-1-market-data">
+                <div class="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="database" class="w-3 h-3 text-blue-400"></i>
+                </div>
+                <div class="flex-1 min-w-0 text-xs text-white">Fetching data...</div>
+                <div class="flex-shrink-0" x-data="{ status: 'loading' }">
+                    <div x-show="status === 'loading'" class="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                    <div x-show="status === 'complete'" class="w-3 h-3 rounded-full bg-green-400"></div>
+                    <div x-show="status === 'pending'" class="w-3 h-3 rounded-full bg-gray-600"></div>
+                </div>
+            </div>
+            
+            {# Step 2: Web Search #}
+            <div class="flex items-center gap-2 px-2 py-1.5 rounded bg-gray-800/20 opacity-60 transition-all duration-300" id="step-2-web-search">
+                <div class="w-5 h-5 rounded-full bg-gray-700/30 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="search" class="w-3 h-3 text-gray-500"></i>
+                </div>
+                <div class="flex-1 min-w-0 text-xs text-gray-500">Searching news...</div>
+                <div class="flex-shrink-0" x-data="{ status: 'pending' }">
+                    <div x-show="status === 'loading'" class="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                    <div x-show="status === 'complete'" class="w-3 h-3 rounded-full bg-green-400"></div>
+                    <div x-show="status === 'pending'" class="w-3 h-3 rounded-full bg-gray-600"></div>
+                </div>
+            </div>
+            
+            {# Step 3: Technical Analysis #}
+            <div class="flex items-center gap-2 px-2 py-1.5 rounded bg-gray-800/20 opacity-60 transition-all duration-300" id="step-3-technical">
+                <div class="w-5 h-5 rounded-full bg-gray-700/30 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="activity" class="w-3 h-3 text-gray-500"></i>
+                </div>
+                <div class="flex-1 min-w-0 text-xs text-gray-500">Analyzing technicals...</div>
+                <div class="flex-shrink-0" x-data="{ status: 'pending' }">
+                    <div x-show="status === 'loading'" class="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                    <div x-show="status === 'complete'" class="w-3 h-3 rounded-full bg-green-400"></div>
+                    <div x-show="status === 'pending'" class="w-3 h-3 rounded-full bg-gray-600"></div>
+                </div>
+            </div>
+            
+            {# Step 4: AI Processing #}
+            <div class="flex items-center gap-2 px-2 py-1.5 rounded bg-gray-800/20 opacity-60 transition-all duration-300" id="step-4-ai">
+                <div class="w-5 h-5 rounded-full bg-gray-700/30 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="brain" class="w-3 h-3 text-gray-500"></i>
+                </div>
+                <div class="flex-1 min-w-0 text-xs text-gray-500">AI processing...</div>
+                <div class="flex-shrink-0" x-data="{ status: 'pending' }">
+                    <div x-show="status === 'loading'" class="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                    <div x-show="status === 'complete'" class="w-3 h-3 rounded-full bg-green-400"></div>
+                    <div x-show="status === 'pending'" class="w-3 h-3 rounded-full bg-gray-600"></div>
+                </div>
+            </div>
+            
+            {# Step 5: Finalizing #}
+            <div class="flex items-center gap-2 px-2 py-1.5 rounded bg-gray-800/20 opacity-60 transition-all duration-300" id="step-5-finalize">
+                <div class="w-5 h-5 rounded-full bg-gray-700/30 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="check-circle" class="w-3 h-3 text-gray-500"></i>
+                </div>
+                <div class="flex-1 min-w-0 text-xs text-gray-500">Finalizing...</div>
+                <div class="flex-shrink-0" x-data="{ status: 'pending' }">
+                    <div x-show="status === 'loading'" class="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                    <div x-show="status === 'complete'" class="w-3 h-3 rounded-full bg-green-400"></div>
+                    <div x-show="status === 'pending'" class="w-3 h-3 rounded-full bg-gray-600"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% include "scripts/lucide_init.html" %}
+<script>
+    // Progress animation script with minimum display time for polished UX
+    (function() {
+        const symbol = '{{ symbol|lower }}';
+        const progressContainer = document.getElementById('ai-analysis-progress-' + symbol);
+        if (!progressContainer) return;
+        
+        const MIN_DISPLAY_TIME = 800; // Minimum 800ms to feel polished
+        const startTime = Date.now();
+        
+        // Animate steps sequentially for visual feedback
+        const steps = [
+            { id: 'step-1-market-data', delay: 0 },
+            { id: 'step-2-web-search', delay: 200 },
+            { id: 'step-3-technical', delay: 400 },
+            { id: 'step-4-ai', delay: 600 },
+            { id: 'step-5-finalize', delay: 800 }
+        ];
+        
+        steps.forEach((stepInfo, index) => {
+            setTimeout(() => {
+                const step = document.getElementById(stepInfo.id);
+                if (!step) return;
+                
+                // Animate step activation
+                step.style.transition = 'all 0.3s ease-out';
+                step.classList.remove('opacity-60');
+                step.classList.add('opacity-100');
+                
+                // Update first step to active state immediately
+                if (index === 0) {
+                    step.classList.remove('bg-gray-800/20', 'opacity-60');
+                    step.classList.add('bg-blue-500/10', 'border-blue-500/30', 'opacity-100');
+                    
+                    const icon = step.querySelector('div.flex-shrink-0 > div');
+                    const statusIcon = step.querySelector('div.flex-shrink-0:last-child');
+                    const text = step.querySelector('.text-xs');
+                    
+                    if (icon) {
+                        icon.classList.remove('bg-gray-700/30');
+                        icon.classList.add('bg-blue-500/20');
+                        const iconEl = icon.querySelector('i');
+                        if (iconEl) {
+                            iconEl.classList.remove('text-gray-500');
+                            iconEl.classList.add('text-blue-400');
+                        }
+                    }
+                    
+                    if (text) {
+                        text.classList.remove('text-gray-500');
+                        text.classList.add('text-white');
+                    }
+                    
+                    // HTMX Gold Standard: Update Alpine.js state instead of innerHTML
+                    if (statusIcon && statusIcon.__x) {
+                        statusIcon.__x.$data.status = 'loading';
+                    }
+                }
+            }, stepInfo.delay);
+        });
+        
+        // Step update function for server-side progress updates
+        function updateStep(stepNum, status) {
+            const stepMap = {
+                1: 'market-data',
+                2: 'web-search',
+                3: 'technical',
+                4: 'ai',
+                5: 'finalize'
+            };
+            
+            const step = document.getElementById('step-' + stepNum + '-' + stepMap[stepNum]);
+            if (!step) return;
+            
+            const icon = step.querySelector('div.flex-shrink-0 > div');
+            const statusIcon = step.querySelector('div.flex-shrink-0:last-child');
+            const text = step.querySelector('.text-xs');
+            
+            if (status === 'active') {
+                step.classList.remove('opacity-60', 'bg-gray-800/20');
+                step.classList.add('opacity-100', 'bg-blue-500/10', 'border-blue-500/30');
+                if (icon) {
+                    icon.classList.remove('bg-gray-700/30');
+                    icon.classList.add('bg-blue-500/20');
+                    const iconEl = icon.querySelector('i');
+                    if (iconEl) {
+                        iconEl.classList.remove('text-gray-500');
+                        iconEl.classList.add('text-blue-400');
+                    }
+                }
+                if (text) {
+                    text.classList.remove('text-gray-500');
+                    text.classList.add('text-white');
+                }
+                // HTMX Gold Standard: Update Alpine.js state instead of innerHTML
+                if (statusIcon && statusIcon.__x) {
+                    statusIcon.__x.$data.status = 'loading';
+                }
+            } else if (status === 'complete') {
+                step.classList.remove('opacity-60', 'bg-gray-800/20', 'bg-blue-500/10', 'border-blue-500/30');
+                step.classList.add('opacity-100', 'bg-green-500/10', 'border-green-500/30');
+                if (icon) {
+                    icon.classList.remove('bg-gray-700/30', 'bg-blue-500/20');
+                    icon.classList.add('bg-green-500/20');
+                    const iconEl = icon.querySelector('i');
+                    if (iconEl) {
+                        iconEl.classList.remove('text-gray-500', 'text-blue-400');
+                        iconEl.classList.add('text-green-400');
+                    }
+                }
+                if (text) {
+                    text.classList.remove('text-gray-500', 'text-white');
+                    text.classList.add('text-green-300');
+                }
+                // HTMX Gold Standard: Update Alpine.js state instead of innerHTML
+                if (statusIcon && statusIcon.__x) {
+                    statusIcon.__x.$data.status = 'complete';
+                }
+            }
+        }
+        
+        // Store update function globally for potential server-side updates
+        window['updateAnalysisProgress_' + symbol] = updateStep;
+        
+        // Track minimum display time - HTMX will replace this, but we ensure it shows for at least MIN_DISPLAY_TIME
+        // This is handled by the server-side delay if needed
+    })();
+</script>

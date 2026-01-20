@@ -1,0 +1,99 @@
+<script>
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    
+    // Clear input after successful watchlist add
+    document.body.addEventListener('htmx:afterRequest', function(event) {
+        if (event.detail.target && event.detail.target.id === 'watch-list' && event.detail.successful) {
+            const input = document.getElementById('add-ticker-input');
+            if (input) {
+                input.value = '';
+            }
+        }
+    });
+    
+    // Watchlist horizontal scroll navigation
+    (function() {
+        function initWatchlistScroll() {
+            const container = document.getElementById('ticker-cards-container');
+            const leftBtn = document.getElementById('watchlist-scroll-left');
+            const rightBtn = document.getElementById('watchlist-scroll-right');
+            
+            if (!container || !leftBtn || !rightBtn) return;
+            
+            function updateButtonStates() {
+                const scrollLeft = container.scrollLeft;
+                const scrollWidth = container.scrollWidth;
+                const clientWidth = container.clientWidth;
+                const maxScroll = scrollWidth - clientWidth;
+                
+                // Enable/disable buttons based on scroll position
+                leftBtn.disabled = scrollLeft <= 5; // Small threshold for smooth UX
+                rightBtn.disabled = scrollLeft >= maxScroll - 5;
+            }
+            
+            // Scroll left
+            leftBtn.addEventListener('click', function() {
+                const scrollAmount = container.clientWidth * 0.8;
+                container.scrollBy({
+                    left: -scrollAmount,
+                    behavior: 'smooth'
+                });
+            });
+            
+            // Scroll right
+            rightBtn.addEventListener('click', function() {
+                const scrollAmount = container.clientWidth * 0.8;
+                container.scrollBy({
+                    left: scrollAmount,
+                    behavior: 'smooth'
+                });
+            });
+            
+            // Update button states on scroll
+            container.addEventListener('scroll', updateButtonStates);
+            
+            // Update button states on resize
+            window.addEventListener('resize', updateButtonStates);
+            
+            // Initial state update
+            updateButtonStates();
+            
+            // Initialize Lucide icons for navigation buttons
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons(leftBtn);
+                lucide.createIcons(rightBtn);
+            }
+            
+            // Update after HTMX swaps (when watchlist is refreshed)
+            document.addEventListener('htmx:afterSwap', function(event) {
+                if (event.detail.target && event.detail.target.id === 'watch-list') {
+                    setTimeout(function() {
+                        updateButtonStates();
+                        if (typeof lucide !== 'undefined') {
+                            lucide.createIcons();
+                        }
+                    }, 100);
+                }
+            });
+        }
+        
+        // Initialize on DOM ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initWatchlistScroll);
+        } else {
+            initWatchlistScroll();
+        }
+        
+        // Re-initialize after HTMX swaps
+        document.addEventListener('htmx:afterSwap', function(event) {
+            if (event.detail.target && (event.detail.target.id === 'watch-list' || event.detail.target.closest('#watch-list'))) {
+                setTimeout(function() {
+                    initWatchlistScroll();
+                    if (typeof lucide !== 'undefined') {
+                        lucide.createIcons();
+                    }
+                }, 50);
+            }
+        });
+    })();
+</script>

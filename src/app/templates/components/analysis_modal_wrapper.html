@@ -1,0 +1,24 @@
+{# Clean HTMX Modal Pattern
+   Uses native <dialog> element with CSS3 animations
+   No Alpine.js, no Hyperscript - just pure CSS3 + HTMX magic
+#}
+<dialog id="analysis-modal-{{ symbol|lower }}" 
+        class="htmx-modal"
+        data-modal-symbol="{{ symbol|lower }}">
+    <div class="htmx-modal-content">
+        <div class="htmx-modal-header">
+            <h2 class="htmx-modal-title">
+                <i data-lucide="eye" class="text-yellow-400 w-5 h-5"></i>
+                <span>{{ title|e }}</span>
+            </h2>
+            <button class="htmx-modal-close" 
+                    aria-label="Close modal"
+                    type="button">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <div class="htmx-modal-body">
+            {{ content|safe }}
+        </div>
+    </div>
+</dialog>

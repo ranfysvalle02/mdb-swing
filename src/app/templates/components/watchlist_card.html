@@ -1,0 +1,374 @@
+{% if price is not none or rsi is not none %}
+{# CANDIDATE CARD - Meets Criteria #}
+{% if meets_criteria %}
+<div class="ticker-card watchlist-card watchlist-card-candidate glass-panel rounded-xl p-2 border-2 border-green-500/60 bg-gradient-to-br from-green-500/25 via-green-500/15 to-green-500/10 shadow-lg shadow-green-500/40 group transition-all relative cursor-pointer hover:scale-[1.02] hover:shadow-2xl hover:shadow-green-500/50 hover:border-green-400 hover:bg-gradient-to-br hover:from-green-500/30 hover:via-green-500/20 hover:to-green-500/15 focus-within:ring-2 focus-within:ring-green-500/70 active:scale-[0.99] min-w-[320px]" 
+     data-symbol="{{ symbol|e }}"
+     data-meets-criteria="true"
+     data-price="{{ price if price else '' }}"
+     data-rsi="{{ rsi if rsi is not none else '' }}"
+     data-trend="{{ trend if trend else '' }}"
+     role="button"
+     tabindex="0"
+     aria-label="Analyze {{ symbol|e }} candidate - Ready to buy"
+     hx-post="/api/analyze-preview"
+     hx-vals='{{ {"ticker": symbol} | tojson }}'
+     hx-target="#modal-container"
+     hx-swap="innerHTML"
+     hx-indicator="#modal-container"
+     hx-trigger="click[!event.target.closest('.remove-ticker-btn, .analyze-btn')], keydown[key=='Enter'||key==' ']">
+    
+    <!-- Header: Symbol, Price, Actions -->
+    <div class="mb-1">
+        <div class="flex items-start justify-between gap-2 mb-0.5">
+            <div class="flex items-baseline gap-2 flex-1 min-w-0">
+                <span class="text-4xl font-mono font-bold text-green-200 leading-none">{{ symbol|e }}</span>
+                {% if price %}
+                <span class="text-3xl font-bold text-white leading-none">${{ "%.2f"|format(price) }}</span>
+                {% endif %}
+            </div>
+            
+            <!-- Header Actions: Ready Badge + Remove Button -->
+            <div class="flex items-center gap-1.5 flex-shrink-0">
+                <!-- Candidate Badge -->
+                <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-500/90 backdrop-blur-sm border border-green-400/50 shadow-lg shadow-green-500/50 animate-pulse">
+                    <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-green-100"></i>
+                    <span class="text-xs font-bold text-green-100 uppercase tracking-wider">Ready</span>
+                </div>
+                
+                <!-- Remove Button -->
+                <button 
+                    hx-post="/api/watch-list"
+                    hx-vals='{{ {"action": "remove", "symbol": symbol} | tojson }}'
+                    hx-confirm="Remove {{ symbol|e }} from watch list?"
+                    hx-target="#watch-list"
+                    hx-swap="innerHTML"
+                    hx-indicator="#watch-list"
+                    hx-on:click="event.stopPropagation()"
+                    class="remove-ticker-btn flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/80 hover:bg-red-500 text-white border border-red-400/50 shadow-md hover:shadow-lg transition-all focus:ring-2 focus:ring-red-500/50 focus:outline-none group/remove"
+                    title="Remove {{ symbol|e }} from watch list"
+                    aria-label="Remove {{ symbol|e }} from watch list">
+                    <i data-lucide="x" class="w-4 h-4 group-hover/remove:scale-110 transition-transform" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+        {% if sma_200 %}
+        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-green-500/30 border border-green-400/50">
+            <i data-lucide="target" class="w-3.5 h-3.5 text-green-300"></i>
+            <span class="text-sm text-green-300/80 uppercase font-semibold">Entry Point:</span>
+            <span class="text-lg font-mono font-bold text-green-200">${{ "%.2f"|format(sma_200) }}</span>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Key Metrics Grid (2x2) -->
+    <div class="grid grid-cols-2 gap-1 mb-1">
+        {% if rsi is not none %}
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-500/20 border border-green-400/30">
+            <i data-lucide="activity" class="w-4 h-4 text-green-400"></i>
+            <div>
+                <div class="text-xs text-green-300/70 uppercase font-semibold">RSI</div>
+                <div class="text-sm text-green-200 font-bold">{{ rsi|int }}</div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if trend %}
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-500/20 border border-green-400/30">
+            <i data-lucide="{{ trend_icon }}" class="w-4 h-4 {{ trend_color }}"></i>
+            <div>
+                <div class="text-xs text-green-300/70 uppercase font-semibold">Trend</div>
+                <div class="text-sm {{ trend_color }} font-bold">{{ trend }}</div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if atr %}
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-500/20 border border-green-400/30">
+            <i data-lucide="trending-up" class="w-4 h-4 text-green-400"></i>
+            <div>
+                <div class="text-xs text-green-300/70 uppercase font-semibold">ATR</div>
+                <div class="text-sm text-green-200 font-bold">${{ "%.2f"|format(atr) }}</div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if volume %}
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-500/20 border border-green-400/30">
+            <i data-lucide="bar-chart-3" class="w-4 h-4 text-green-400"></i>
+            <div>
+                <div class="text-xs text-green-300/70 uppercase font-semibold">Volume</div>
+                <div class="text-sm text-green-200 font-bold">
+                    {% if volume >= 1_000_000 %}
+                        {{ "%.1f"|format(volume / 1_000_000) }}M
+                    {% elif volume >= 1_000 %}
+                        {{ "%.1f"|format(volume / 1_000) }}K
+                    {% else %}
+                        {{ "%.0f"|format(volume) }}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Additional Stats Grid -->
+    <div class="grid grid-cols-2 gap-1 mb-1">
+        {% if pe_ratio %}
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-500/20 border border-green-400/30">
+            <i data-lucide="dollar-sign" class="w-3.5 h-3.5 text-green-400"></i>
+            <div class="flex-1 min-w-0">
+                <div class="text-xs text-green-300/70 uppercase font-semibold">P/E</div>
+                <div class="text-sm text-green-200 font-bold">{{ "%.1f"|format(pe_ratio) }}</div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if market_cap %}
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-500/20 border border-green-400/30">
+            <i data-lucide="building-2" class="w-3.5 h-3.5 text-green-400"></i>
+            <div class="flex-1 min-w-0">
+                <div class="text-xs text-green-300/70 uppercase font-semibold">Market Cap</div>
+                <div class="text-sm text-green-200 font-bold">
+                    {% if market_cap >= 1_000_000_000 %}
+                        ${{ "%.1f"|format(market_cap / 1_000_000_000) }}B
+                    {% elif market_cap >= 1_000_000 %}
+                        ${{ "%.0f"|format(market_cap / 1_000_000) }}M
+                    {% else %}
+                        ${{ "%.0f"|format(market_cap / 1_000) }}K
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if earnings_in_days is not none %}
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-md {% if earnings_in_days < 7 %}bg-yellow-500/20 border-yellow-400/30{% else %}bg-green-500/20 border-green-400/30{% endif %}">
+            <i data-lucide="calendar" class="w-3.5 h-3.5 {% if earnings_in_days < 7 %}text-yellow-400{% else %}text-green-400{% endif %}"></i>
+            <div class="flex-1 min-w-0">
+                <div class="text-xs {% if earnings_in_days < 7 %}text-yellow-300/70{% else %}text-green-300/70{% endif %} uppercase font-semibold">Earnings</div>
+                <div class="text-sm {% if earnings_in_days < 7 %}text-yellow-200{% else %}text-green-200{% endif %} font-bold">
+                    {% if earnings_in_days == 0 %}Today{% elif earnings_in_days == 1 %}Tomorrow{% else %}{{ earnings_in_days }}d{% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Footer: Click indicator + Rejection reason (if applicable) -->
+    <div class="mt-1 pt-1 border-t border-green-400/20 flex items-center justify-between gap-2">
+        {% if rejection_reason %}
+        <div class="flex items-start gap-1.5 flex-1 min-w-0 group/reason relative">
+            <i data-lucide="alert-circle" class="w-3 h-3 text-green-300/60 mt-0.5 flex-shrink-0"></i>
+            <span class="text-xs text-green-300/70 leading-tight line-clamp-2">{{ rejection_reason[:100] }}{% if rejection_reason|length > 100 %}...{% endif %}</span>
+            {% if rejection_reason|length > 100 %}
+            <div class="absolute bottom-full left-0 mb-2 w-72 p-2 rounded-lg bg-gray-900/95 backdrop-blur-sm border border-gray-700/50 shadow-xl text-sm text-gray-300 opacity-0 invisible group-hover/reason:opacity-100 group-hover/reason:visible transition-all z-50 pointer-events-none">
+                <div class="font-semibold text-gray-400 mb-1">Why not ready:</div>
+                <div>{{ rejection_reason|e }}</div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        <div class="flex items-center gap-1 text-green-300/40 group-hover:text-green-300/80 transition-all flex-shrink-0">
+            <i data-lucide="chevron-right" class="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200"></i>
+        </div>
+    </div>
+</div>
+
+{# NON-CANDIDATE CARD - Doesn't Meet Criteria #}
+{% else %}
+<div class="ticker-card watchlist-card watchlist-card-non-candidate glass-panel rounded-xl p-2 border border-gray-600/40 bg-gradient-to-br from-gray-800/30 to-gray-900/30 group transition-all relative cursor-pointer hover:scale-[1.02] hover:border-gray-500/60 hover:shadow-lg hover:bg-gradient-to-br hover:from-gray-800/40 hover:to-gray-900/40 focus-within:ring-2 focus-within:ring-gray-500/50 active:scale-[0.99] min-w-[320px]" 
+     data-symbol="{{ symbol|e }}"
+     data-meets-criteria="false"
+     data-price="{{ price if price else '' }}"
+     data-rsi="{{ rsi if rsi is not none else '' }}"
+     data-trend="{{ trend if trend else '' }}"
+     data-rejection-reason="{{ (rejection_reason|e if rejection_reason else '') if not meets_criteria else '' }}"
+     role="button"
+     tabindex="0"
+     aria-label="View details for {{ symbol|e }}"
+     hx-post="/api/analyze-preview"
+     hx-vals='{{ {"ticker": symbol} | tojson }}'
+     hx-target="#modal-container"
+     hx-swap="innerHTML"
+     hx-indicator="#modal-container"
+     hx-trigger="click[!event.target.closest('.remove-ticker-btn')], keydown[key=='Enter'||key==' ']">
+    
+    <!-- Header: Symbol, Price, Actions -->
+    <div class="mb-1">
+        <div class="flex items-start justify-between gap-2 mb-0.5">
+            <div class="flex items-baseline gap-2 flex-1 min-w-0">
+                <span class="text-4xl font-mono font-bold text-gray-300 leading-none">{{ symbol|e }}</span>
+                {% if price %}
+                <span class="text-3xl font-bold text-white leading-none">${{ "%.2f"|format(price) }}</span>
+                {% endif %}
+            </div>
+            
+            <!-- Remove Button -->
+            <button 
+                hx-post="/api/watch-list"
+                hx-vals='{{ {"action": "remove", "symbol": symbol} | tojson }}'
+                hx-confirm="Remove {{ symbol|e }} from watch list?"
+                hx-target="#watch-list"
+                hx-swap="innerHTML"
+                hx-indicator="#watch-list"
+                hx-on:click="event.stopPropagation()"
+                class="remove-ticker-btn flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/80 hover:bg-red-500 text-white border border-red-400/50 shadow-md hover:shadow-lg transition-all focus:ring-2 focus:ring-red-500/50 focus:outline-none group/remove flex-shrink-0"
+                title="Remove {{ symbol|e }} from watch list"
+                aria-label="Remove {{ symbol|e }} from watch list">
+                <i data-lucide="x" class="w-4 h-4 group-hover/remove:scale-110 transition-transform" aria-hidden="true"></i>
+            </button>
+        </div>
+        {% if sma_200 %}
+        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gray-700/40 border border-gray-600/50">
+            <i data-lucide="target" class="w-3.5 h-3.5 text-gray-400"></i>
+            <span class="text-sm text-gray-400 uppercase font-semibold">Entry Point:</span>
+            <span class="text-lg font-mono font-bold text-gray-300">${{ "%.2f"|format(sma_200) }}</span>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Key Metrics Grid (2x2) -->
+    <div class="grid grid-cols-2 gap-1 mb-1">
+        {% if rsi is not none %}
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-md {% if rsi < rsi_threshold|default(35) %}bg-yellow-500/20 border-yellow-400/30{% else %}bg-gray-800/40 border-gray-700/50{% endif %}">
+            <i data-lucide="activity" class="w-4 h-4 {% if rsi < rsi_threshold|default(35) %}text-yellow-400{% else %}text-gray-400{% endif %}"></i>
+            <div>
+                <div class="text-xs {% if rsi < rsi_threshold|default(35) %}text-yellow-300/70{% else %}text-gray-500{% endif %} uppercase font-semibold">RSI</div>
+                <div class="text-sm {% if rsi < rsi_threshold|default(35) %}text-yellow-200{% else %}text-gray-300{% endif %} font-bold">{{ rsi|int }}</div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if trend %}
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-800/40 border border-gray-700/50">
+            <i data-lucide="{{ trend_icon }}" class="w-4 h-4 {{ trend_color }}"></i>
+            <div>
+                <div class="text-xs text-gray-500 uppercase font-semibold">Trend</div>
+                <div class="text-sm {{ trend_color }} font-bold">{{ trend }}</div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if atr %}
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-800/40 border border-gray-700/50">
+            <i data-lucide="trending-up" class="w-4 h-4 text-gray-400"></i>
+            <div>
+                <div class="text-xs text-gray-500 uppercase font-semibold">ATR</div>
+                <div class="text-sm text-gray-300 font-bold">${{ "%.2f"|format(atr) }}</div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if volume %}
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-800/40 border border-gray-700/50">
+            <i data-lucide="bar-chart-3" class="w-4 h-4 text-gray-400"></i>
+            <div>
+                <div class="text-xs text-gray-500 uppercase font-semibold">Volume</div>
+                <div class="text-sm text-gray-300 font-bold">
+                    {% if volume >= 1_000_000 %}
+                        {{ "%.1f"|format(volume / 1_000_000) }}M
+                    {% elif volume >= 1_000 %}
+                        {{ "%.1f"|format(volume / 1_000) }}K
+                    {% else %}
+                        {{ "%.0f"|format(volume) }}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Additional Stats Grid -->
+    <div class="grid grid-cols-2 gap-1 mb-1">
+        {% if pe_ratio %}
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-800/40 border border-gray-700/50">
+            <i data-lucide="dollar-sign" class="w-3.5 h-3.5 text-gray-400"></i>
+            <div class="flex-1 min-w-0">
+                <div class="text-xs text-gray-500 uppercase font-semibold">P/E</div>
+                <div class="text-sm text-gray-300 font-bold">{{ "%.1f"|format(pe_ratio) }}</div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if market_cap %}
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-800/40 border border-gray-700/50">
+            <i data-lucide="building-2" class="w-3.5 h-3.5 text-gray-400"></i>
+            <div class="flex-1 min-w-0">
+                <div class="text-xs text-gray-500 uppercase font-semibold">Market Cap</div>
+                <div class="text-sm text-gray-300 font-bold">
+                    {% if market_cap >= 1_000_000_000 %}
+                        ${{ "%.1f"|format(market_cap / 1_000_000_000) }}B
+                    {% elif market_cap >= 1_000_000 %}
+                        ${{ "%.0f"|format(market_cap / 1_000_000) }}M
+                    {% else %}
+                        ${{ "%.0f"|format(market_cap / 1_000) }}K
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if earnings_in_days is not none %}
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-md {% if earnings_in_days < 7 %}bg-yellow-500/20 border-yellow-400/30{% else %}bg-gray-800/40 border-gray-700/50{% endif %}">
+            <i data-lucide="calendar" class="w-3.5 h-3.5 {% if earnings_in_days < 7 %}text-yellow-400{% else %}text-gray-400{% endif %}"></i>
+            <div class="flex-1 min-w-0">
+                <div class="text-xs {% if earnings_in_days < 7 %}text-yellow-300/70{% else %}text-gray-500{% endif %} uppercase font-semibold">Earnings</div>
+                <div class="text-sm {% if earnings_in_days < 7 %}text-yellow-200{% else %}text-gray-300{% endif %} font-bold">
+                    {% if earnings_in_days == 0 %}Today{% elif earnings_in_days == 1 %}Tomorrow{% else %}{{ earnings_in_days }}d{% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Footer: Rejection reason + Click indicator -->
+    <div class="mt-1 pt-1 border-t border-gray-700/30 flex items-center justify-between gap-2">
+        {% if rejection_reason %}
+        <div class="flex items-start gap-1.5 flex-1 min-w-0 group/reason relative">
+            <i data-lucide="alert-circle" class="w-3 h-3 text-gray-400/70 mt-0.5 flex-shrink-0"></i>
+            <span class="text-xs text-gray-400/80 leading-tight line-clamp-2">{{ rejection_reason[:100] }}{% if rejection_reason|length > 100 %}...{% endif %}</span>
+            {% if rejection_reason|length > 100 %}
+            <div class="absolute bottom-full left-0 mb-2 w-72 p-2 rounded-lg bg-gray-900/95 backdrop-blur-sm border border-gray-700/50 shadow-xl text-sm text-gray-300 opacity-0 invisible group-hover/reason:opacity-100 group-hover/reason:visible transition-all z-50 pointer-events-none">
+                <div class="font-semibold text-gray-400 mb-1">Why not ready:</div>
+                <div>{{ rejection_reason|e }}</div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        <div class="flex items-center gap-1 text-gray-500 group-hover:text-gray-300 transition-all flex-shrink-0">
+            <i data-lucide="chevron-right" class="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200"></i>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# LOADING/NO DATA CARD #}
+{% else %}
+<div class="ticker-card watchlist-card watchlist-card-loading glass-panel rounded-lg p-3 border border-blue-500/30 flex items-center justify-between group hover:border-blue-500/50 transition-all relative cursor-default min-w-[320px]" 
+     data-symbol="{{ symbol|e }}"
+     data-meets-criteria="false"
+     role="listitem"
+     aria-label="Ticker {{ symbol|e }} - preview data unavailable">
+    <div class="flex items-center justify-between gap-2 flex-1 min-w-0">
+        <span class="text-lg font-mono font-bold text-white truncate">{{ symbol|e }}</span>
+        
+        <div class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-sm text-gray-500">Loading...</span>
+            
+            <!-- Remove Button -->
+            <button 
+                hx-post="/api/watch-list"
+                hx-vals='{{ {"action": "remove", "symbol": symbol} | tojson | e }}'
+                hx-confirm="Remove {{ symbol|e }} from watch list?"
+                hx-target="#watch-list"
+                hx-swap="innerHTML"
+                hx-indicator="#watch-list"
+                class="remove-ticker-btn flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/80 hover:bg-red-500 text-white border border-red-400/50 shadow-md hover:shadow-lg transition-all focus:ring-2 focus:ring-red-500/50 focus:outline-none group/remove"
+                title="Remove {{ symbol|e }} from watch list"
+                aria-label="Remove {{ symbol|e }} from watch list">
+                <i data-lucide="x" class="w-4 h-4 group-hover/remove:scale-110 transition-transform" aria-hidden="true"></i>
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}

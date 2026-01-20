@@ -11,18 +11,36 @@ Configuration Priority:
 2. Environment variables - loaded at module import
 3. Default values - hardcoded fallbacks
 
-MDB-Engine Pattern: Configuration values are used throughout the app via imports.
+MDB-Engine Integration:
+- Logging: Uses `get_logger(__name__)` from mdb_engine.observability for structured logging
+- Configuration values are used throughout the app via imports
 """
 import os
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 from mdb_engine.observability import get_logger
 
 logger = get_logger(__name__)
 
+# Timezone handling for 6pm ET final scan cutoff
+try:
+    from zoneinfo import ZoneInfo
+    HAS_ZONEINFO = True
+except ImportError:
+    # Python < 3.9 fallback
+    try:
+        import pytz
+        ZoneInfo = pytz.timezone
+        HAS_ZONEINFO = True
+    except ImportError:
+        logger.warning("No timezone library available - using UTC for final scan time")
+        ZoneInfo = None
+        HAS_ZONEINFO = False
+
 # Environment Variables
-SYMBOLS_ENV = os.getenv("TARGET_SYMBOLS", "NVDA,AMD,MSFT,GOOGL,AMZN,TSLA,COIN,AAPL")
-SYMBOLS: List[str] = [s.strip() for s in SYMBOLS_ENV.split(',')]
-MAX_CAPITAL_DEPLOYED = float(os.getenv("MAX_CAPITAL_DEPLOYED", "5000.00"))
+# TARGET_SYMBOLS: Up to 5 tickers, comma-separated (e.g., "NVDA,AMD,MSFT,GOOGL,AMZN")
+SYMBOLS_ENV = os.getenv("TARGET_SYMBOLS", "NVDA,AMD,MSFT,GOOGL,AMZN")
+SYMBOLS: List[str] = [s.strip().upper() for s in SYMBOLS_ENV.split(',') if s.strip()][:5]  # Limit to 5 tickers
 
 # Strategy Selection
 # PRIMARY STRATEGY: Balanced Low (ONLY active strategy)
@@ -30,24 +48,23 @@ MAX_CAPITAL_DEPLOYED = float(os.getenv("MAX_CAPITAL_DEPLOYED", "5000.00"))
 # Convention: Set via environment variable, defaults to Balanced Low
 CURRENT_STRATEGY = os.getenv("CURRENT_STRATEGY", "balanced_low")
 
-# Strategy Configuration (legacy - strategies now define their own configs)
-# Kept for backward compatibility and default values
-# NOTE: Balanced Low is the PRIMARY and ONLY active strategy
-STRATEGY_CONFIGS: Dict[str, Dict[str, Any]] = {
-    "balanced_low": {
-        "name": "Balanced Low",
-        "description": "Buy stocks when they reach a balanced 'low' - oversold but in uptrend with upside potential",
-        "rsi_threshold": 35,  # Oversold but not extreme (balanced)
-        "ai_score_required": 7,  # Good opportunity, not perfect
-        "risk_per_trade": 50.0,  # $50 risk per trade
-        "max_capital": 5000.0,  # Max capital deployed
-        "color": "green"  # Green for "buy" opportunities
-    }
+# Strategy Configuration - Default values
+# Actual config loaded from MongoDB via get_strategy_config() or get_strategy_from_db()
+STRATEGY_CONFIG: Dict[str, Any] = {
+    "name": "Balanced Low",
+    "description": "High probability bounce-back opportunities - find stocks that are low but ready to ride the wave back up (buy low, sell high)",
+    "goal": "Buy low, sell high - find oversold stocks ready to bounce back up",
+    "rsi_threshold": 35,  # Maximum oversold level
+    "rsi_min": 20,  # Minimum RSI - avoid extreme oversold (sweet spot: 20-35)
+    "sma_proximity_pct": 3.0,  # Maximum percentage above SMA-200 for entry (0-5%, default 3%)
+    "ai_score_required": 7,
+    "risk_per_trade": 50.0,
+    "max_capital": 5000.0,
+    "color": "green",
+    "pe_ratio_max": float(os.getenv("PE_RATIO_MAX", "50.0")),  # Reject if P/E > this
+    "market_cap_min": float(os.getenv("MARKET_CAP_MIN", "300000000")),  # Reject if market cap < this (in USD)
+    "earnings_days_min": int(os.getenv("EARNINGS_DAYS_MIN", "3")),  # Reject if earnings within this many days
 }
-
-# Current strategy config (for backward compatibility and easy access)
-# PRIMARY STRATEGY: Balanced Low (only active strategy)
-STRATEGY_CONFIG = STRATEGY_CONFIGS.get(CURRENT_STRATEGY, STRATEGY_CONFIGS["balanced_low"])
 
 
 async def get_strategy_from_db(db) -> Optional[Dict[str, Any]]:
@@ -65,13 +82,16 @@ async def get_strategy_from_db(db) -> Optional[Dict[str, Any]]:
             # Remove MongoDB-specific fields and convert to dict
             config = {
                 "rsi_threshold": active_config.get("rsi_threshold", 35),
+                "rsi_min": active_config.get("rsi_min", 20),
+                "sma_proximity_pct": active_config.get("sma_proximity_pct", 3.0),
                 "ai_score_required": active_config.get("ai_score_required", 7),
                 "risk_per_trade": active_config.get("risk_per_trade", 50.0),
                 "max_capital": active_config.get("max_capital", 5000.0),
                 "name": active_config.get("name", "Balanced Low"),
-                "description": active_config.get("description", "Buy stocks at balanced lows"),
+                "description": active_config.get("description", "High probability bounce-back opportunities - buy low, sell high"),
+                "goal": active_config.get("goal", "Buy low, sell high - find oversold stocks ready to bounce back up"),
                 "color": active_config.get("color", "green"),
-                "preset": active_config.get("preset", "Custom")
+                "preset": active_config.get("preset", "Custom"),
             }
             return config
         return None
@@ -79,28 +99,59 @@ async def get_strategy_from_db(db) -> Optional[Dict[str, Any]]:
         logger.warning(f"Could not load strategy from database: {e}")
         return None
 
-def get_strategy_instance(db=None, strategy_name: Optional[str] = None):
-    """Get the current strategy instance.
+async def get_strategy_config(db=None, budget: Optional[float] = None) -> Dict[str, Any]:
+    """Get current strategy configuration.
+    
+    Architecture: Loads config from MongoDB or env vars.
+    Can auto-adjust based on user's budget for simple UX.
     
     Args:
-        db: Optional MongoDB database instance (not used in sync context)
-        strategy_name: Optional strategy name override (defaults to CURRENT_STRATEGY env var)
+        db: Optional MongoDB database instance
+        budget: Optional budget amount - if provided, uses preset based on budget
     
     Returns:
-        Strategy instance based on CURRENT_STRATEGY setting or provided name
+        Strategy configuration dictionary
     """
-    # Original behavior - direct import (most reliable, no registry dependency)
-    from ..strategies import BalancedLowStrategy
+    # If budget provided, use preset (simple UX)
+    if budget:
+        from ..strategies.balanced_low import get_budget_preset
+        return get_budget_preset(budget)
     
-    # In sync context, always use env vars/defaults
-    # DB config is loaded in async routes via get_strategy_from_db()
-    if CURRENT_STRATEGY == "balanced_low" or not strategy_name:
-        config = STRATEGY_CONFIGS.get("balanced_low", {})
-    else:
-        logger.warning(f"Unknown strategy '{strategy_name or CURRENT_STRATEGY}', defaulting to 'balanced_low'")
-        config = STRATEGY_CONFIGS.get("balanced_low", {})
+    # Try MongoDB first (if available)
+    if db:
+        try:
+            db_config = await get_strategy_from_db(db)
+            if db_config:
+                return {
+                    "rsi_threshold": db_config.get("rsi_threshold", 35),
+                    "rsi_min": db_config.get("rsi_min", 20),
+                    "sma_proximity_pct": db_config.get("sma_proximity_pct", 3.0),
+                    "ai_min_score": db_config.get("ai_score_required", 7),
+                    "ai_score_required": db_config.get("ai_score_required", 7),  # Alias for compatibility
+                    "risk_per_trade": db_config.get("risk_per_trade", 50.0),
+                    "max_capital": db_config.get("max_capital", 5000.0),
+                    "name": db_config.get("name", "Balanced Low"),
+                    "description": db_config.get("description", "High probability bounce-back opportunities - buy low, sell high"),
+                    "goal": db_config.get("goal", STRATEGY_CONFIG.get("goal", "Buy low, sell high - find oversold stocks ready to bounce back up")),
+                    "color": db_config.get("color", "green")
+                }
+        except Exception as e:
+            logger.debug(f"Could not load config from DB: {e}")
     
-    return BalancedLowStrategy(config=config)
+    # Fallback to env vars/defaults
+    return {
+        "rsi_threshold": STRATEGY_CONFIG.get("rsi_threshold", 35),
+        "rsi_min": STRATEGY_CONFIG.get("rsi_min", 20),
+        "sma_proximity_pct": STRATEGY_CONFIG.get("sma_proximity_pct", 3.0),
+        "ai_min_score": STRATEGY_CONFIG.get("ai_score_required", 7),
+        "ai_score_required": STRATEGY_CONFIG.get("ai_score_required", 7),  # Alias for compatibility
+        "risk_per_trade": STRATEGY_CONFIG.get("risk_per_trade", 50.0),
+        "max_capital": STRATEGY_CONFIG.get("max_capital", 5000.0),
+        "name": STRATEGY_CONFIG.get("name", "Balanced Low"),
+        "description": STRATEGY_CONFIG.get("description", "High probability bounce-back opportunities - buy low, sell high"),
+        "goal": STRATEGY_CONFIG.get("goal", "Buy low, sell high - find oversold stocks ready to bounce back up"),
+        "color": STRATEGY_CONFIG.get("color", "green")
+    }
 
 # Alpaca Configuration
 ALPACA_KEY = os.getenv("ALPACA_API_KEY")
@@ -132,4 +183,57 @@ AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
 AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o")
 AZURE_OPENAI_MODEL_NAME = os.getenv("AZURE_OPENAI_MODEL_NAME", "gpt-4o")
 
-# Firecrawl removed - using headlines only for balanced low strategy
+
+# Firecrawl Configuration for deep symbol discovery (kept for discovery only)
+FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
+# Search query template - use {symbol} as placeholder for stock symbol
+# Default: More specific query for better news quality
+FIRECRAWL_SEARCH_QUERY_TEMPLATE = os.getenv(
+    "FIRECRAWL_SEARCH_QUERY_TEMPLATE",
+    "{symbol} stock news earnings financial analysis market"
+)
+
+
+def is_after_final_scan_time() -> bool:
+    """Check if current time is >= 6pm ET (final scan cutoff time).
+    
+    Returns:
+        True if current time is 6pm ET or later, False otherwise
+    """
+    try:
+        if HAS_ZONEINFO and ZoneInfo:
+            # Use zoneinfo (Python 3.9+) or pytz
+            et_tz = ZoneInfo("America/New_York")
+            et_now = datetime.now(et_tz)
+        else:
+            # Fallback: Use UTC and approximate (not ideal but works)
+            et_now = datetime.utcnow()
+            # EST is UTC-5, EDT is UTC-4, approximate with UTC-4.5
+            from datetime import timedelta
+            et_now = et_now - timedelta(hours=4, minutes=30)
+        
+        # Check if time is >= 6pm (18:00)
+        return et_now.hour >= 18
+    except Exception as e:
+        logger.warning(f"Error checking final scan time: {e}, defaulting to False")
+        return False
+
+
+def get_today_date_et() -> str:
+    """Get today's date in YYYY-MM-DD format in ET timezone.
+    
+    Returns:
+        Date string in YYYY-MM-DD format
+    """
+    try:
+        if HAS_ZONEINFO and ZoneInfo:
+            et_tz = ZoneInfo("America/New_York")
+            et_now = datetime.now(et_tz)
+        else:
+            # Fallback: Use UTC
+            et_now = datetime.utcnow()
+        
+        return et_now.strftime("%Y-%m-%d")
+    except Exception as e:
+        logger.warning(f"Error getting today's date in ET: {e}, using UTC")
+        return datetime.utcnow().strftime("%Y-%m-%d")

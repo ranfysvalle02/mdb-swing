@@ -1,0 +1,18 @@
+<script>
+    if (typeof TradingView !== 'undefined') {
+        new TradingView.widget({
+            "autosize": true, 
+            "symbol": {{ symbol|tojson }},
+            "interval": "D", 
+            "timezone": "Etc/UTC", 
+            "theme": "dark", 
+            "style": "1",
+            "container_id": {{ container_id|tojson }},
+            "locale": "en"
+        });
+    }
+    // Refresh Lucide icons after content loads
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+</script>

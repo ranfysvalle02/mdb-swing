@@ -1,12 +1,17 @@
-"""Trading execution services."""
+"""Trading execution services.
+
+MDB-Engine Integration:
+- Logging: Uses `get_logger(__name__)` from mdb_engine.observability for structured logging
+- Database: Uses scoped database via mdb-engine for trade history (when needed)
+"""
 import math
 from datetime import datetime
 from typing import Optional, Dict, Any, Tuple
 import pandas as pd
 from alpaca_trade_api.rest import TimeFrame
-from .indicators import rsi, sma, atr
+# Indicators now computed via analyze_technicals() using vectorbt
 from mdb_engine.observability import get_logger
-from ..core.config import ALPACA_KEY, ALPACA_SECRET, ALPACA_URL, MAX_CAPITAL_DEPLOYED, STRATEGY_CONFIG
+from ..core.config import ALPACA_KEY, ALPACA_SECRET, ALPACA_URL, STRATEGY_CONFIG
 from .analysis import api, get_market_data, analyze_technicals
 
 logger = get_logger(__name__)
@@ -38,8 +43,8 @@ def calculate_position_size(price: float, atr: float, risk_per_trade_dollars: fl
         except Exception as e:
             logger.warning(f"Could not get account info: {e}, using default buying power")
     
-    # Use strategy preset max capital
-    max_capital = min(STRATEGY_CONFIG['max_capital'], MAX_CAPITAL_DEPLOYED)
+    # Use strategy config max capital
+    max_capital = STRATEGY_CONFIG['max_capital']
     max_shares_budget = math.floor(min(buying_power, max_capital) / price)
     
     return int(min(shares_risk, max_shares_budget))
@@ -66,7 +71,7 @@ async def place_order(symbol: str, side: str, reason: str, score: int, db, qty: 
     
     # Get market data
     try:
-        df, headlines, _ = get_market_data(symbol)
+        df, headlines, _, _ = await get_market_data(symbol)
         if df is None or df.empty:
             logger.error(f"Cannot place order for {symbol}: No market data returned")
             return None
@@ -242,5 +247,3 @@ async def update_trade_outcome(symbol: str, entry_price: float, exit_price: floa
     except Exception as e:
         logger.error(f"Error updating trade outcome for {symbol}: {e}", exc_info=True)
         return False
-
-# Backtest functionality removed - keeping focus on live trading with Balanced Lows strategy

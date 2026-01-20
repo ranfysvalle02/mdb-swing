@@ -1,7 +1,7 @@
 {
   "schema_version": "2.0",
-  "slug": "sauron_eye",
-  "name": "Sauron's Eye - AI-Augmented Swing Trading Bot",
+  "slug": "flux",
+  "name": "FLUX - Swing Trading Evolved",
   "status": "active",
   "cors": {
     "enabled": true,
@@ -78,6 +78,67 @@
         "name": "active_idx",
         "unique": true,
         "partialFilterExpression": {"active": true}
+      }
+    ],
+    "strategies": [
+      {
+        "type": "regular",
+        "keys": {"active": 1},
+        "name": "active_idx",
+        "unique": true,
+        "partialFilterExpression": {"active": true}
+      }
+    ],
+    "signals": [
+      {
+        "type": "regular",
+        "keys": {"symbol": 1, "date": -1, "strategy": 1},
+        "name": "symbol_date_strategy_idx"
+      },
+      {
+        "type": "regular",
+        "keys": {"date": -1},
+        "name": "date_idx"
+      },
+      {
+        "type": "regular",
+        "keys": {"decision": 1, "timestamp": -1},
+        "name": "decision_time_idx"
+      }
+    ],
+    "trades": [
+      {
+        "type": "regular",
+        "keys": {"trade_id": 1},
+        "name": "trade_id_idx",
+        "unique": true
+      },
+      {
+        "type": "regular",
+        "keys": {"symbol": 1, "status": 1},
+        "name": "symbol_status_idx"
+      },
+      {
+        "type": "regular",
+        "keys": {"status": 1, "opened_at": -1},
+        "name": "status_time_idx"
+      }
+    ],
+    "daily_scans": [
+      {
+        "type": "regular",
+        "keys": {"date": 1, "timestamp": -1},
+        "name": "date_time_idx"
+      },
+      {
+        "type": "regular",
+        "keys": {"date": 1, "is_final": 1},
+        "name": "date_final_idx"
+      },
+      {
+        "type": "regular",
+        "keys": {"timestamp": -1},
+        "name": "latest_idx"
       }
     ]
   }

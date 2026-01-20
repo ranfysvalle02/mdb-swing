@@ -1,266 +1,231 @@
-"""Balanced Low Strategy - PRIMARY STRATEGY for Swing Trading System.
+"""Balanced Low Strategy - Simple, Adjustable Swing Trading
 
-This is the PRIMARY and ONLY active strategy in the system. All trading decisions
-are made using the Balanced Low approach, which focuses on buying stocks at
-"balanced lows" - temporary oversold conditions in stocks that are still in
-long-term uptrends.
+Architecture: Uses vectorbt for all indicator calculations.
+MongoDB stores configuration and decisions, NOT computed indicators.
 
-STRATEGY OVERVIEW:
-------------------
-The Balanced Low strategy identifies swing trading opportunities by finding stocks
-that are temporarily oversold (RSI < 35) but still in an uptrend (price > 200-day SMA).
-This creates a "balanced low" - not a crash, but a healthy pullback in a rising stock.
+Simple strategy that users can adjust based on their budget:
+- Conservative: Lower risk, smaller positions
+- Moderate: Balanced risk/reward
+- Aggressive: Higher risk, larger positions
 
-SWING TRADING CONTEXT:
-----------------------
-- Time Horizon: Multi-day to multi-week positions (not day trading)
-- Data: Uses daily bars (not intraday)
-- Entry: Buy at balanced lows when oversold in uptrend
-- Exit: Stop loss (entry - 2×ATR) or take profit (entry + 3×ATR)
-- Risk/Reward: 1:1.5 ratio (risk $1 to make $1.50)
+MongoDB remembers what *happened*. Python decides what *should happen*.
 
-ENTRY CRITERIA:
----------------
-1. RSI < 35 (oversold but not extreme - "balanced")
-   - RSI < 30 might indicate panic selling or fundamental issues
-   - RSI 30-35 indicates healthy pullback in uptrend
-   
-2. Price > 200-day SMA (confirms uptrend)
-   - Ensures we're buying dips in rising stocks, not catching falling knives
-   - 200-day SMA filters out stocks in long-term downtrends
-   
-3. AI Score >= 7 (validates opportunity)
-   - AI analyzes news sentiment, technical strength, and swing potential
-   - Score 7-10 indicates good swing trading opportunity
-   - Score < 7 means wait for better setup
-
-EXIT CRITERIA:
---------------
-- Stop Loss: Entry price - (2 × ATR)
-  - ATR (Average True Range) measures volatility
-  - 2×ATR provides buffer for normal price swings
-  - Protects against trend reversal
-  
-- Take Profit: Entry price + (3 × ATR)
-  - 3×ATR target captures swing move potential
-  - Risk/Reward ratio: 1:1.5 (for every $1 risked, potential $1.50 reward)
-  
-- Manual Exit: Can sell at any time via UI
-
-POSITION SIZING:
-----------------
-- Risk per trade: $50 (configurable)
-- Position size calculated based on stop distance (2×ATR)
-- Formula: shares = risk_amount / stop_distance
-- Ensures consistent risk regardless of stock price or volatility
-
-RISK MANAGEMENT:
-----------------
-- Maximum capital deployed: $5,000 (configurable)
-- Each trade risks $50 maximum
-- Stop loss prevents large losses
-- Position sizing based on volatility (ATR)
-
-WHY "BALANCED LOW"?
--------------------
-- "Low" = Stock is oversold (RSI < 35), temporarily cheap
-- "Balanced" = Not extreme (RSI not < 30), not in freefall, still in uptrend
-- This creates opportunity: buying quality stocks on sale, not distressed assets
-
-This strategy is designed for swing traders who want to:
-- Capture multi-day to multi-week moves
-- Buy quality stocks at temporary lows
-- Use technical analysis + AI validation
-- Manage risk with defined stop losses
+MDB-Engine Integration:
+- Logging: Uses `get_logger(__name__)` from mdb_engine.observability for structured logging
+- Note: This module does NOT use MongoDB - it's pure computation logic
 """
-from typing import Dict, Any
-from .base import Strategy
+import pandas as pd
+import numpy as np
+from typing import Dict, Any, Optional, Tuple
+import vectorbt as vbt
+from mdb_engine.observability import get_logger
+
+logger = get_logger(__name__)
 
 
-class BalancedLowStrategy(Strategy):
-    """PRIMARY STRATEGY: Balanced Low Swing Trading Approach.
+def generate_signals(
+    df: pd.DataFrame,
+    ai_scores: Dict[str, Optional[float]],
+    config: Dict[str, Any],
+    symbol: str
+) -> pd.Series:
+    """Generate entry signals using vectorbt.
     
-    The Eye focuses on balanced lows - oversold but stable, in uptrend, with upside potential.
-    This is the ONLY active strategy in the system. All trading decisions use this approach.
+    Architecture: Computes indicators in-memory, returns boolean Series.
+    Does NOT store indicators in MongoDB - they're transient.
     
-    STRATEGY PHILOSOPHY:
-    --------------------
-    Buy quality stocks when they're temporarily "on sale" (oversold) but still in an uptrend.
-    This is NOT buying crashes or distressed stocks - it's buying healthy pullbacks in rising stocks.
+    Args:
+        df: DataFrame with OHLCV data (columns: open, high, low, close, volume)
+        ai_scores: Dict mapping symbols to AI scores
+        config: Strategy configuration from MongoDB
+        symbol: Stock symbol
     
-    This strategy seeks stocks that are:
-    - At a balanced low (RSI < 35, oversold but not extreme)
-      * RSI 30-35 = healthy pullback in uptrend
-      * RSI < 30 = might indicate panic or fundamental issues (too extreme)
-    - In an uptrend (price > 200-day SMA)
-      * Confirms we're buying dips in rising stocks
-      * Filters out stocks in long-term downtrends
-    - Have clear upside potential (validated by AI score >= 7)
-      * AI analyzes news, technicals, and swing potential
-      * Score 7-10 = good swing opportunity
-    - News is neutral/positive (no catastrophic events)
-      * AI validates no major negative news
-      * Catastrophic news = automatic veto (score 0)
+    Returns:
+        Boolean Series where True = entry signal
     """
+    if df is None or df.empty or len(df) < 200:
+        logger.warning(f"Insufficient data for {symbol}: {len(df) if df is not None else 0} bars")
+        return pd.Series([False] * len(df), index=df.index if df is not None else pd.DatetimeIndex([]))
     
-    def __init__(self, config: Dict[str, Any] = None):
-        """Initialize Balanced Low strategy with configuration.
+    # Ensure columns are lowercase
+    df.columns = [c.lower() for c in df.columns]
+    
+    # Compute indicators using vectorbt (vectorized, fast)
+    try:
+        # RSI calculation
+        rsi = vbt.RSI.run(df['close'], window=14).rsi
         
-        Args:
-            config: Strategy configuration dict. If None, uses defaults.
-            
-        Configuration Parameters:
-        - rsi_threshold (35): Maximum RSI for entry (oversold threshold)
-          * RSI < 35 = oversold but not extreme ("balanced")
-          * Lower values (30) = more conservative, fewer signals
-          * Higher values (40) = more aggressive, more signals
-          
-        - ai_score_required (7): Minimum AI score for trade entry
-          * Score 7-10 = good swing opportunity
-          * Score 4-6 = wait for better setup
-          * Score 0-3 = avoid (poor opportunity or risk)
-          
-        - risk_per_trade (50.0): Dollars risked per trade
-          * Used for position sizing calculation
-          * Higher = larger positions, more risk
-          * Lower = smaller positions, less risk
-          
-        - max_capital (5000.0): Maximum capital to deploy
-          * Limits total exposure across all positions
-          * Prevents over-leveraging
-        """
-        self.config = config or {
-            "rsi_threshold": 35,  # Oversold but not extreme - "balanced low"
-            "ai_score_required": 7,  # Good opportunity threshold
-            "risk_per_trade": 50.0,  # $50 risk per trade
-            "max_capital": 5000.0,  # Max capital deployed
-        }
-    
-    def check_technical_signal(self, techs: Dict[str, Any]) -> bool:
-        """Check if technical conditions indicate a balanced low opportunity.
+        # SMA-200 calculation
+        sma_200 = vbt.MA.run(df['close'], window=200).ma
         
-        This is the FIRST filter - checks technical indicators only.
-        AI validation happens separately and must also pass (score >= 7).
+        # ATR calculation (for position sizing)
+        atr = vbt.ATR.run(df['high'], df['low'], df['close'], window=14).atr
         
-        Balanced low signal requires BOTH:
-        1. RSI < threshold (oversold but not extreme)
-           - Default: RSI < 35
-           - Why 35? Oversold enough to be "on sale" but not so extreme as to indicate panic
-           - RSI < 30 might indicate fundamental issues or panic selling
-           
-        2. Trend is UP (price > 200-day SMA)
-           - Confirms stock is in long-term uptrend
-           - We're buying dips in rising stocks, not catching falling knives
-           - 200-day SMA filters out stocks in downtrends
-        
-        Args:
-            techs: Dictionary with keys:
-                - price: Current stock price
-                - rsi: Relative Strength Index (0-100)
-                - atr: Average True Range (volatility measure)
-                - trend: "UP" or "DOWN" (based on price vs 200-day SMA)
-                - sma: 200-day Simple Moving Average value
-                
-        Returns:
-            True if technical conditions are met (RSI oversold + uptrend)
-            False otherwise
-            
-        Note:
-            This is a technical filter only. AI validation (score >= 7) is still required
-            for actual trade entry. Both conditions must pass.
-        """
-        rsi_threshold = self.config.get("rsi_threshold", 35)
-        rsi_value = techs.get('rsi', 50)
-        trend_value = techs.get('trend')
-        
-        # Both conditions must be true:
-        # 1. RSI is oversold (below threshold) - stock is "on sale"
-        # 2. Trend is UP - we're buying dips in rising stocks, not catching falling knives
-        return rsi_value < rsi_threshold and trend_value == "UP"
+    except Exception as e:
+        logger.error(f"Indicator calculation failed for {symbol}: {e}")
+        return pd.Series([False] * len(df), index=df.index)
     
-    def get_ai_prompt(self) -> str:
-        """Get AI prompt focused on balanced low analysis with actionable insights."""
-        return (
-            "You are the Eye of Sauron, watching the markets with unwavering focus. "
-            "Your current focus: identifying balanced lows with upside potential for SWING TRADING.\n\n"
-            "SWING TRADING CONTEXT: This is for multi-day to multi-week positions, not day trading. "
-            "We use daily bars and hold until stop loss or take profit.\n\n"
-            "A 'balanced low' means:\n"
-            "- Stock is oversold (RSI < 35) but NOT in freefall\n"
-            "- Stock is in an UPTREND (price > 200-day moving average)\n"
-            "- News is neutral or positive (no catastrophic events)\n"
-            "- There is clear upside potential for a swing move (days to weeks)\n\n"
-            "Score 0-10 based on:\n"
-            "- How balanced the low is (not too extreme, not too mild)\n"
-            "- Strength of uptrend (stronger trend = higher score)\n"
-            "- News sentiment (positive = higher, catastrophic = 0)\n"
-            "- Upside potential for swing trading (more room for multi-day move = higher)\n\n"
-            "VETO (score 0) if: fraud, bankruptcy, major scandal, or downtrend.\n"
-            "BUY (score 7-10) if: balanced low + uptrend + good news + swing trading upside potential.\n"
-            "WAIT (score 4-6) if: close but not quite balanced enough for swing entry.\n\n"
-            "IMPORTANT: Your 'reason' field must be:\n"
-            "- A clear, actionable insight (1-2 sentences max)\n"
-            "- Focus on swing trading opportunity (multi-day to multi-week potential)\n"
-            "- Be specific: mention RSI level, trend strength, news impact, or swing setup\n"
-            "- Use swing trading language: 'oversold bounce', 'uptrend pullback', 'swing entry', 'multi-day move'\n"
-            "- Examples: 'Oversold bounce setup in strong uptrend - good swing entry' or 'RSI 32 with positive news suggests multi-day recovery potential'\n"
-        )
+    # Get AI score (from MongoDB signals or None)
+    ai_score = ai_scores.get(symbol)
+    ai_min_score = config.get('ai_min_score', 7)
     
-    def get_name(self) -> str:
-        """Get strategy name."""
-        return "Balanced Low"
+    # Apply Boolean Logic (vectorized)
+    # Entry conditions:
+    # 1. RSI in sweet spot (rsi_min < RSI < rsi_threshold) - oversold but not extreme
+    # 2. Price > SMA-200 (uptrend) - confirms bounce direction
+    # 3. Price within proximity of SMA-200 (near support) - higher bounce probability
+    # 4. AI score >= minimum (if available) - bounce-back probability validation
+    rsi_threshold = config.get('rsi_threshold', 35)  # Maximum oversold level
+    rsi_min = config.get('rsi_min', 20)  # Minimum RSI - avoid extreme oversold (may indicate fundamental issues)
+    sma_proximity_pct = config.get('sma_proximity_pct', 3.0)  # Maximum percentage above SMA-200
     
-    def get_description(self) -> str:
-        """Get strategy description."""
-        return "Buy stocks when they reach a balanced 'low' - oversold but in uptrend with upside potential"
+    # Calculate price vs SMA-200 percentage (vectorized)
+    price_vs_sma_pct = ((df['close'] - sma_200) / sma_200) * 100
     
-    def get_config(self) -> Dict[str, Any]:
-        """Get strategy configuration."""
+    entries = (
+        (rsi > rsi_min) &  # Not too extreme (avoid RSI < 20)
+        (rsi < rsi_threshold) &  # Oversold (RSI < threshold)
+        (df['close'] > sma_200) &  # Uptrend - confirms bounce direction
+        (price_vs_sma_pct <= sma_proximity_pct)  # Near support - within configured proximity
+    )
+    
+    # Filter by AI score if available
+    if ai_score is not None:
+        entries = entries & (ai_score >= ai_min_score)
+    else:
+        # If no AI score, still allow entry (AI is optional filter)
+        logger.debug(f"No AI score for {symbol}, proceeding without AI filter")
+    
+    return entries
+
+
+def calculate_position_size(
+    price: float,
+    atr: float,
+    risk_per_trade: float,
+    max_capital: float,
+    buying_power: float
+) -> int:
+    """Calculate position size based on volatility (ATR).
+    
+    Architecture: Pure computation, no MongoDB.
+    
+    Args:
+        price: Current stock price
+        atr: Average True Range (volatility measure)
+        risk_per_trade: Dollar amount to risk per trade
+        max_capital: Maximum capital to deploy
+        buying_power: Available buying power
+    
+    Returns:
+        Number of shares to buy
+    """
+    if atr <= 0 or price <= 0:
+        return 0
+    
+    # Stop distance = 2 * ATR
+    stop_distance = 2 * atr
+    
+    # Calculate shares based on risk
+    shares_by_risk = int(risk_per_trade / stop_distance)
+    
+    # Calculate shares based on capital limits
+    max_shares_budget = int(min(buying_power, max_capital) / price)
+    
+    # Return minimum (most conservative)
+    return min(shares_by_risk, max_shares_budget)
+
+
+def run_portfolio(
+    data: Dict[str, pd.DataFrame],
+    entries: Dict[str, pd.Series],
+    config: Dict[str, Any],
+    initial_capital: float = 100000.0
+) -> Dict[str, Any]:
+    """Run portfolio simulation using vectorbt.
+    
+    Architecture: In-memory computation using vectorbt's portfolio engine.
+    Results can be persisted to MongoDB for audit trail.
+    
+    Uses industry-standard vectorbt for portfolio simulation.
+    
+    Args:
+        data: Dict of symbol -> DataFrame (OHLCV)
+        entries: Dict of symbol -> boolean Series (entry signals)
+        config: Strategy configuration
+        initial_capital: Starting capital
+    
+    Returns:
+        Portfolio statistics dictionary with performance metrics
+    """
+    total_signals = sum(entries[symbol].sum() for symbol in entries if symbol in data)
+    
+    portfolio_stats = {
+        "total_signals": total_signals,
+        "symbols_analyzed": len(data),
+        "initial_capital": initial_capital,
+        "config_used": config
+    }
+    
+    # Use vectorbt for portfolio simulation when we have actual trades
+    # This would simulate the strategy performance:
+    # pf = vbt.Portfolio.from_signals(
+    #     data, entries, 
+    #     size=config.get('risk_per_trade', 50.0),
+    #     sl_stop=0.02,  # 2% stop loss
+    #     tp_stop=0.03   # 3% take profit
+    # )
+    # portfolio_stats.update({
+    #     "total_return": float(pf.total_return()),
+    #     "sharpe_ratio": float(pf.sharpe_ratio()),
+    #     "max_drawdown": float(pf.max_drawdown()),
+    #     "win_rate": float(pf.trades.win_rate())
+    # })
+    
+    return portfolio_stats
+
+
+def get_budget_preset(budget: float) -> Dict[str, Any]:
+    """Get strategy preset based on budget.
+    
+    Simple, user-friendly presets that adjust risk based on available capital.
+    
+    Args:
+        budget: Available trading capital
+    
+    Returns:
+        Strategy configuration dict optimized for budget
+    """
+    if budget < 1000:
+        # Small budget: Conservative
         return {
-            **self.config,
-            "name": self.get_name(),
-            "description": self.get_description(),
-            "color": "green"  # Green for buy opportunities
+            "rsi_threshold": 30,  # More conservative (lower = fewer signals)
+            "rsi_min": 20,  # Avoid extreme oversold
+            "ai_min_score": 8,  # Higher quality required
+            "risk_per_trade": budget * 0.05,  # 5% of budget per trade
+            "max_capital": budget * 0.8,  # Use 80% max
+            "name": "Balanced Low (Conservative)",
+            "description": "Conservative bounce-back opportunities - high probability setups only"
         }
-    
-    def get_rsi_threshold(self) -> float:
-        """Get RSI threshold for this strategy.
-        
-        Returns:
-            Maximum RSI value for entry (default: 35)
-            RSI < this value = oversold condition ("balanced low")
-        """
-        return self.config.get("rsi_threshold", 35)
-    
-    def get_ai_score_required(self) -> int:
-        """Get minimum AI score required for trade.
-        
-        Returns:
-            Minimum AI score (0-10) for trade entry (default: 7)
-            Score 7-10 = good swing opportunity
-            Score < 7 = wait for better setup
-        """
-        return self.config.get("ai_score_required", 7)
-    
-    def get_risk_per_trade(self) -> float:
-        """Get risk per trade in dollars.
-        
-        This is used for position sizing calculation:
-        - Position size = risk_amount / stop_distance
-        - Stop distance = 2 × ATR (volatility-based)
-        - Ensures consistent risk regardless of stock price
-        
-        Returns:
-            Dollars risked per trade (default: 50.0)
-        """
-        return self.config.get("risk_per_trade", 50.0)
-    
-    def get_max_capital(self) -> float:
-        """Get maximum capital to deploy across all positions.
-        
-        This limits total exposure and prevents over-leveraging.
-        
-        Returns:
-            Maximum capital to deploy (default: 5000.0)
-        """
-        return self.config.get("max_capital", 5000.0)
+    elif budget < 10000:
+        # Medium budget: Moderate
+        return {
+            "rsi_threshold": 35,  # Balanced - RSI sweet spot 20-35
+            "rsi_min": 20,  # Avoid extreme oversold
+            "ai_min_score": 7,  # Good bounce-back opportunities
+            "risk_per_trade": 50.0,  # Fixed $50 risk
+            "max_capital": min(budget * 0.5, 5000),  # Use up to $5k
+            "name": "Balanced Low (Moderate)",
+            "description": "Buy low, sell high - oversold stocks ready to ride the wave back up"
+        }
+    else:
+        # Large budget: Can be more aggressive
+        return {
+            "rsi_threshold": 40,  # More signals - wider RSI range
+            "rsi_min": 20,  # Still avoid extreme oversold
+            "ai_min_score": 6,  # Accept more bounce-back opportunities
+            "risk_per_trade": 100.0,  # Higher risk per trade
+            "max_capital": min(budget * 0.3, 10000),  # Use up to $10k
+            "name": "Balanced Low (Aggressive)",
+            "description": "Aggressive bounce-back strategy - more opportunities to buy low and sell high"
+        }

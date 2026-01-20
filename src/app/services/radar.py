@@ -454,3 +454,161 @@ class RadarService:
                 "similar_count": 0,
                 "reason": f"Error: {str(e)[:50]}"
             }
+    
+    async def save_daily_scan(
+        self, 
+        stocks: List[Dict[str, Any]], 
+        strategy_id: str,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """Save daily scan results to MongoDB.
+        
+        MDB-Engine Pattern: Uses scoped database from constructor.
+        Follows existing cache_analysis() pattern for consistency.
+        
+        Args:
+            stocks: List of stock analysis results
+            strategy_id: Strategy identifier
+            metadata: Optional metadata (duration, cache hits/misses, symbols_scanned)
+            
+        Returns:
+            True if saved successfully, False otherwise
+        """
+        try:
+            from ..core.config import is_after_final_scan_time, get_today_date_et
+            
+            scan_timestamp = datetime.now()
+            scan_date = get_today_date_et()
+            is_final = is_after_final_scan_time()
+            
+            # Build scan document
+            scan_doc = {
+                "date": scan_date,
+                "timestamp": scan_timestamp,
+                "is_final": is_final,
+                "strategy_id": strategy_id,
+                "stocks": stocks,
+                "metadata": metadata or {
+                    "symbols_scanned": len(stocks),
+                    "duration_seconds": 0.0,
+                    "cache_hits": 0,
+                    "cache_misses": 0
+                }
+            }
+            
+            # If this is a final scan and one already exists for today, update it
+            # Otherwise, insert new document
+            if is_final:
+                # Update existing final scan for today if it exists
+                result = await self.db.daily_scans.update_one(
+                    {"date": scan_date, "is_final": True},
+                    {"$set": scan_doc},
+                    upsert=True
+                )
+                logger.info(f"Saved {'final' if is_final else 'regular'} scan for {scan_date}: {len(stocks)} stocks")
+            else:
+                # Insert new scan (multiple allowed per day before 6pm)
+                await self.db.daily_scans.insert_one(scan_doc)
+                logger.info(f"Saved scan for {scan_date}: {len(stocks)} stocks")
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error saving daily scan: {e}", exc_info=True)
+            return False
+    
+    async def get_latest_scan(self, date: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Get latest scan for a given date (or today if not specified).
+        
+        MDB-Engine Pattern: Uses scoped database from constructor.
+        
+        Logic:
+        - If time < 6pm ET: return latest scan for date
+        - If time >= 6pm ET: return final scan for date (or latest if no final exists)
+        - If date not specified: use today's date
+        
+        Args:
+            date: Optional date string (YYYY-MM-DD). If None, uses today.
+            
+        Returns:
+            Scan document or None if not found
+        """
+        try:
+            from ..core.config import is_after_final_scan_time, get_today_date_et
+            
+            if date is None:
+                date = get_today_date_et()
+            
+            is_after_6pm = is_after_final_scan_time()
+            
+            # If after 6pm, prefer final scan
+            if is_after_6pm:
+                # Try to get final scan first
+                final_scan = await self.db.daily_scans.find_one(
+                    {"date": date, "is_final": True},
+                    sort=[("timestamp", -1)]
+                )
+                if final_scan:
+                    logger.debug(f"Found final scan for {date}")
+                    return final_scan
+                
+                # Fallback to latest scan if no final exists
+                latest_scan = await self.db.daily_scans.find_one(
+                    {"date": date},
+                    sort=[("timestamp", -1)]
+                )
+                if latest_scan:
+                    logger.debug(f"Found latest scan for {date} (no final scan)")
+                    return latest_scan
+            else:
+                # Before 6pm: get latest scan
+                latest_scan = await self.db.daily_scans.find_one(
+                    {"date": date},
+                    sort=[("timestamp", -1)]
+                )
+                if latest_scan:
+                    logger.debug(f"Found latest scan for {date}")
+                    return latest_scan
+            
+            # If no scan found for date, try to get latest overall
+            latest_overall = await self.db.daily_scans.find_one(
+                {},
+                sort=[("timestamp", -1)]
+            )
+            if latest_overall:
+                logger.debug(f"Found latest scan overall (date: {latest_overall.get('date')})")
+                return latest_overall
+            
+            return None
+        except Exception as e:
+            logger.error(f"Error getting latest scan: {e}", exc_info=True)
+            return None
+    
+    async def get_scan_by_date(self, date: str) -> Optional[Dict[str, Any]]:
+        """Get scan for a specific date.
+        
+        MDB-Engine Pattern: Uses scoped database from constructor.
+        
+        Args:
+            date: Date string (YYYY-MM-DD)
+            
+        Returns:
+            Scan document or None if not found
+        """
+        try:
+            # Prefer final scan if available, otherwise latest
+            final_scan = await self.db.daily_scans.find_one(
+                {"date": date, "is_final": True},
+                sort=[("timestamp", -1)]
+            )
+            if final_scan:
+                return final_scan
+            
+            # Fallback to latest scan for that date
+            latest_scan = await self.db.daily_scans.find_one(
+                {"date": date},
+                sort=[("timestamp", -1)]
+            )
+            return latest_scan
+        except Exception as e:
+            logger.error(f"Error getting scan for date {date}: {e}", exc_info=True)
+            return None

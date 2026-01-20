@@ -1,0 +1,134 @@
+<div class="glass-strong rounded-xl p-4 border border-red-500/20 animate-fade-in" role="article" aria-label="Analysis results for {{ symbol|e }}">
+    {# Compact Header with Symbol, Score, and Status #}
+    <div class="flex justify-between items-center mb-3 pb-3 border-b border-gray-700/50">
+        <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-red-500/20 to-orange-500/20 flex items-center justify-center flex-shrink-0">
+                <span class="font-bold text-white text-lg">{{ symbol|e }}</span>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-400 flex items-center gap-1">
+                        <i data-lucide="dollar-sign" class="w-3 h-3"></i>
+                        ${{ techs.price|round(2) }}
+                    </span>
+                    <span class="badge {{ risk_badge }} text-[10px] px-1.5 py-0.5">{{ verdict.risk_level|upper }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <div class="text-right">
+                <div class="text-2xl font-bold {{ color }}" aria-label="AI Score: {{ verdict.score }} out of 10">{{ verdict.score }}/10</div>
+                <div class="text-[10px] text-gray-500">AI Score</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="grid grid-cols-3 gap-2 mb-3" role="list" aria-label="Technical indicators">
+        <div class="glass rounded-lg p-2.5 text-center" role="listitem">
+            <div class="text-[10px] text-gray-400 mb-0.5 flex items-center justify-center gap-1">
+                <i data-lucide="activity" class="w-2.5 h-2.5"></i>
+                <span>RSI</span>
+            </div>
+            <div class="text-base font-bold text-white" aria-label="RSI: {{ techs.rsi|round(1) }}">{{ techs.rsi|round(1) }}</div>
+            <div class="text-[10px] text-gray-500 mt-0.5">
+                {% if techs.rsi < 30 %}Oversold{% elif techs.rsi > 70 %}Overbought{% else %}Neutral{% endif %}
+            </div>
+        </div>
+        <div class="glass rounded-lg p-2.5 text-center" role="listitem">
+            <div class="text-[10px] text-gray-400 mb-0.5 flex items-center justify-center gap-1">
+                <i data-lucide="trending-up" class="w-2.5 h-2.5"></i>
+                <span>Trend</span>
+            </div>
+            <div class="text-base font-bold {% if techs.trend == 'UP' %}text-green-400{% else %}text-red-400{% endif %}" aria-label="Trend: {{ techs.trend }}">{{ techs.trend }}</div>
+            <div class="text-[10px] text-gray-500 mt-0.5">vs SMA-200</div>
+        </div>
+        <div class="glass rounded-lg p-2.5 text-center" role="listitem">
+            <div class="text-[10px] text-gray-400 mb-0.5 flex items-center justify-center gap-1">
+                <i data-lucide="waves" class="w-2.5 h-2.5"></i>
+                <span>ATR</span>
+            </div>
+            <div class="text-base font-bold text-white" aria-label="ATR: ${{ techs.atr|round(2) }}">${{ techs.atr|round(2) }}</div>
+            <div class="text-[10px] text-gray-500 mt-0.5">Volatility</div>
+        </div>
+    </div>
+    
+    <div class="glass rounded-lg p-3 mb-3 border-l-4 border-red-500/50" role="region" aria-label="Trading recommendation">
+        <div class="flex items-center justify-between mb-1.5">
+            <div class="text-[10px] text-gray-400 flex items-center gap-1">
+                <i data-lucide="lightbulb" class="w-3 h-3"></i>
+                <span>Recommendation</span>
+            </div>
+            <span class="font-bold text-base {{ action_color }} uppercase" aria-label="Action: {{ verdict.action }}">
+                {% if verdict.action == "AVOID" %}
+                    AVOID
+                {% elif verdict.action == "SELL_NOW" %}
+                    SELL NOW
+                {% else %}
+                    {{ verdict.action }}
+                {% endif %}
+            </span>
+        </div>
+        <p class="text-xs text-gray-200 italic mb-2" role="note">"{{ verdict.reason|e }}"</p>
+        <div class="text-[10px] text-gray-500 border-t border-gray-700/50 pt-1.5 mt-1.5">
+            <div class="flex items-center gap-3 flex-wrap">
+                <span class="flex items-center gap-1">
+                    <i data-lucide="info" class="w-2.5 h-2.5"></i>
+                    <span>{{ strategy_config.name|e }} | RSI &lt; {{ strategy_config.rsi_threshold }} | Score ≥ {{ strategy_config.ai_score_required }}</span>
+                </span>
+            </div>
+            {% if headlines_count is defined and bars_count is defined %}
+            <div class="flex items-center gap-3 flex-wrap text-gray-600 mt-1">
+                <span class="flex items-center gap-1">
+                    <i data-lucide="database" class="w-2.5 h-2.5"></i>
+                    <span>{{ bars_count }}d</span>
+                </span>
+                <span class="flex items-center gap-1">
+                    <i data-lucide="search" class="w-2.5 h-2.5"></i>
+                    <span>{{ headlines_count }} news</span>
+                </span>
+                <span class="flex items-center gap-1">
+                    <i data-lucide="brain" class="w-2.5 h-2.5"></i>
+                    <span>GPT-4o</span>
+                </span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div id="{{ tradingview_id }}" class="w-full rounded-lg overflow-hidden" style="height: 350px;"></div>
+</div>
+<script>
+    // Defer TradingView widget initialization to prevent HTMX insertBefore errors
+    (function() {
+        const containerId = {{ tradingview_id|tojson }};
+        const symbol = {{ symbol|tojson }};
+        
+        // Wait for DOM to be ready and HTMX swap to complete
+        setTimeout(function() {
+            const container = document.getElementById(containerId);
+            if (container && typeof TradingView !== 'undefined') {
+                try {
+                    new TradingView.widget({
+                        "autosize": true,
+                        "symbol": symbol,
+                        "interval": "D",
+                        "timezone": "Etc/UTC",
+                        "theme": "dark",
+                        "style": "1",
+                        "container_id": containerId,
+                        "locale": "en"
+                    });
+                } catch (e) {
+                    console.warn('TradingView widget initialization error:', e);
+                }
+            }
+        }, 100);
+        
+        // Initialize Lucide icons
+        if (typeof lucide !== 'undefined') {
+            setTimeout(function() {
+                lucide.createIcons();
+            }, 50);
+        }
+    })();
+</script>

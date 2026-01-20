@@ -1,4 +1,4 @@
-# Docker Compose setup for Sauron's Eye - AI-Augmented Swing Trading Bot
+# Docker Compose setup for FLUX - Swing Trading Evolved
 #
 # Quick Start:
 #   1. Copy env.example to .env and fill in your API keys:
@@ -75,10 +75,10 @@ services:
       
       # Firecrawl Configuration
       - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-}
+      - FIRECRAWL_SEARCH_QUERY_TEMPLATE=${FIRECRAWL_SEARCH_QUERY_TEMPLATE:-{symbol} stock news earnings financial analysis market}
       
       # Trading Configuration
       - TARGET_SYMBOLS=${TARGET_SYMBOLS:-NVDA,AMD,MSFT,GOOGL,AMZN,TSLA,COIN,AAPL}
-      - MAX_CAPITAL_DEPLOYED=${MAX_CAPITAL_DEPLOYED:-5000.00}
       
       # Python Configuration
       - PYTHONUNBUFFERED=1

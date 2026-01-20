@@ -1,0 +1,15 @@
+{% for element_id, content_data in updates.items() %}
+{% if element_id == "toast-container" %}
+{{ content_data.content|safe }}
+{% else %}
+{% if content_data.swap_strategy == "outerHTML" %}
+{# Content already has hx-swap-oob attribute added in Python code #}
+{{ content_data.content|safe }}
+{% else %}
+<div id="{{ element_id }}" hx-swap-oob="{{ content_data.swap_strategy }}">
+{{ content_data.content|safe }}
+</div>
+{% endif %}
+{% endif %}
+{% endfor %}
+{# HTMX Security Best Practice: Triggers should be set via HX-Trigger response headers, not inline scripts #}

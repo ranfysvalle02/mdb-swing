@@ -1,0 +1,64 @@
+<!-- SVG Hero Illustration Component -->
+<!-- Use this for empty states, hero sections, and loading states -->
+<svg class="main-svg anim-float" viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#00f0ff;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#7000ff;stop-opacity:1" />
+        </linearGradient>
+        <filter id="glow">
+            <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+            <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+        </filter>
+    </defs>
+
+    <!-- Background Ring -->
+    <circle cx="250" cy="250" r="200" stroke="#ffffff" stroke-width="1" stroke-opacity="0.1" stroke-dasharray="10 10" class="anim-spin-slow"/>
+    
+    <!-- Middle Orbit Rings -->
+    <g class="anim-spin-reverse">
+        <path d="M250,50 A200,200 0 0,1 450,250" stroke="url(#grad1)" stroke-width="2" stroke-linecap="round"/>
+        <path d="M250,450 A200,200 0 0,1 50,250" stroke="url(#grad1)" stroke-width="2" stroke-linecap="round"/>
+    </g>
+
+    <!-- Floating Elements -->
+    <g class="anim-float">
+        <!-- Hexagon card representation -->
+        <path d="M250 150 L336 200 L336 300 L250 350 L164 300 L164 200 Z" 
+              fill="rgba(255,255,255,0.02)" 
+              stroke="rgba(255,255,255,0.2)" 
+              stroke-width="1"
+              backdrop-filter="blur(5px)"/>
+        
+        <!-- Inner details -->
+        <circle cx="250" cy="250" r="40" fill="url(#grad1)" filter="url(#glow)" class="anim-pulse"/>
+        
+        <!-- Connecting lines -->
+        <line x1="250" y1="210" x2="250" y2="150" stroke="white" stroke-opacity="0.2"/>
+        <line x1="215" y1="270" x2="164" y2="300" stroke="white" stroke-opacity="0.2"/>
+        <line x1="285" y1="270" x2="336" y2="300" stroke="white" stroke-opacity="0.2"/>
+    </g>
+
+    <!-- Decorative Data Points -->
+    <circle cx="450" cy="250" r="4" fill="#00f0ff"/>
+    <circle cx="50" cy="250" r="4" fill="#ff0055"/>
+    <circle cx="250" cy="50" r="4" fill="#7000ff"/>
+</svg>
+
+<style>
+    .main-svg {
+        width: 100%;
+        max-width: 600px;
+        height: auto;
+        filter: drop-shadow(0 0 40px rgba(112, 0, 255, 0.2));
+    }
+    
+    @media (max-width: 768px) {
+        .main-svg {
+            width: 80%;
+        }
+    }
+</style>

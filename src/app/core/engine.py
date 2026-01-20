@@ -31,10 +31,10 @@ def get_manifest_path() -> Path:
     return Path(__file__).parent.parent.parent.parent / "config" / "manifest.json"
 
 # App slug constant - used throughout the application
-APP_SLUG = "sauron_eye"
+APP_SLUG = "flux"
 
 async def get_scoped_db():
-    """Get scoped database for Sauron's Eye app using mdb-engine.
+    """Get scoped database for FLUX app using mdb-engine.
     
     MDB-Engine Pattern: Dependency Injection for Database Access
     

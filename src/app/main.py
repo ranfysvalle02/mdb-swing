@@ -27,9 +27,11 @@ from typing import Dict, Any
 from mdb_engine.observability import get_logger
 from mdb_engine.routing.websockets import register_message_handler
 
+from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from .core.engine import engine, get_manifest_path, APP_SLUG
-from .core.config import get_strategy_instance
 from .api import routes
 
 # MDB-Engine Pattern: Structured logging via get_logger()
@@ -60,17 +62,36 @@ async def on_startup(app, engine, manifest):
     
     This callback runs after engine is fully initialized and routes are registered.
     """
+    # Clean up old conflicting indexes
+    try:
+        db = engine.get_scoped_db(APP_SLUG)
+        # Drop old conflicting index if it exists
+        try:
+            await db.strategy_config.drop_index("flux_active_idx")
+            logger.info("✅ Dropped old conflicting index: flux_active_idx")
+        except Exception as e:
+            # Index doesn't exist or already dropped - that's fine
+            logger.debug(f"Old index cleanup: {e}")
+        
+        try:
+            await db.strategies.drop_index("flux_active_idx")
+            logger.info("✅ Dropped old conflicting index from strategies: flux_active_idx")
+        except Exception as e:
+            # Index doesn't exist or already dropped - that's fine
+            logger.debug(f"Old strategies index cleanup: {e}")
+    except Exception as e:
+        logger.warning(f"Index cleanup warning (non-fatal): {e}")
+    
     # Register WebSocket message handlers (for incoming messages if needed)
     register_websocket_message_handlers()
     
     logger.info("✅ Startup complete - WebSocket handler registered")
     
     # Log startup information
-    strategy = get_strategy_instance()
-    logger.info("👁️ SAURON'S EYE IS WATCHING...")
-    logger.info(f"👉 Focus: {strategy.get_name()} - {strategy.get_description()}")
+    logger.info("⚡ FLUX IS ACTIVE...")
+    logger.info("👉 Focus: Balanced Low - Buy stocks at balanced lows")
     logger.info("👉 UI: http://localhost:5000")
-    logger.info("👉 The Eye scans on-demand via UI")
+    logger.info("👉 FLUX scans on-demand via UI")
 
 
 async def on_shutdown(app, engine, manifest=None):
@@ -79,7 +100,7 @@ async def on_shutdown(app, engine, manifest=None):
     MDB-Engine Pattern: Shutdown callback signature matches mdb-engine's expectations.
     The manifest parameter is optional but may be passed by mdb-engine.
     """
-    logger.info("👁️ The Eye closes... watching ceases...")
+    logger.info("⚡ FLUX shutting down...")
 
 
 # MDB-Engine Pattern: Automatic FastAPI App Creation
@@ -94,19 +115,77 @@ async def on_shutdown(app, engine, manifest=None):
 app = engine.create_app(
     slug=APP_SLUG,
     manifest=get_manifest_path(),  # Declarative config: indexes, WebSockets, CORS
-    title="Sauron's Eye - Market Watcher",
+    title="FLUX - Swing Trading Evolved",
     description="AI-Augmented Swing Trading Bot - Balanced Low Buy System",
     version="1.0.0",
     on_startup=on_startup,      # Custom startup logic
     on_shutdown=on_shutdown,    # Custom cleanup logic
 )
 
+# HTMX Gold Standard: Security Middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+from .core.security import CSRFMiddleware, get_csrf_token_for_template
+# Import templates early to ensure filters are registered
+from .core.templates import templates
+
+# Add CSRF protection middleware
+app.add_middleware(CSRFMiddleware)
+
+# Security headers middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add security headers to all responses.
+    
+    HTMX Best Practice: Security headers protect against common attacks.
+    """
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        
+        # Content Security Policy - allow HTMX, Alpine.js, and required external resources
+        # HTMX Gold Standard: Balance security with functionality
+        csp = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' "
+            "https://cdn.tailwindcss.com https://unpkg.com https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' "
+            "https://cdn.tailwindcss.com https://fonts.googleapis.com; "
+            "font-src 'self' data: https://fonts.gstatic.com; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self' ws: wss: https://unpkg.com https://cdn.jsdelivr.net; "
+            "frame-src 'self' https://*.tradingview.com;"
+        )
+        
+        response.headers["Content-Security-Policy"] = csp
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Update template context processor to include CSRF token per-request
+@app.middleware("http")
+async def add_csrf_to_context(request: Request, call_next):
+    """Add CSRF token to template context for each request.
+    
+    HTMX Gold Standard: CSRF tokens available in all templates via csrf_token variable.
+    """
+    # Store CSRF token in request state for template access
+    request.state.csrf_token = get_csrf_token_for_template(request)
+    
+    # Make CSRF token available to templates via request state
+    # Templates can access it via request.state.csrf_token in context processors
+    response = await call_next(request)
+    return response
+
 # MDB-Engine Pattern: Custom WebSocket Handler
 # WebSocket configuration is declared in manifest.json, but we can override
 # the handler for custom streaming logic (real-time stock analysis)
 from fastapi import WebSocket
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket, symbols: str = None):
     """WebSocket endpoint for real-time stock analysis updates.
     
     MDB-Engine Pattern: Custom WebSocket handler with scoped database access.
@@ -114,20 +193,32 @@ async def websocket_endpoint(websocket: WebSocket):
     - Uses engine.get_scoped_db() for database access
     - Connection lifecycle managed automatically
     
+    Args:
+        symbols: Optional comma-separated list of symbols to analyze
+                 If not provided, uses intelligent discovery
+    
     This handler streams stock analysis data to connected clients.
     We register this here to override mdb-engine's default handler.
     """
-    logger.info("🔌 [MAIN] Custom WebSocket handler called for /ws")
+    logger.info(f"🔌 [MAIN] Custom WebSocket handler called for /ws (symbols: {symbols or 'auto'})")
     try:
         # MDB-Engine: Get scoped database - connection managed automatically
         db = engine.get_scoped_db(APP_SLUG)
-        await routes._get_trending_stocks_with_analysis_streaming(websocket, db)
+        custom_symbols = None
+        if symbols:
+            custom_symbols = [s.strip().upper() for s in symbols.split(',') if s.strip()]
+        await routes._get_trending_stocks_with_analysis_streaming(websocket, db, custom_symbols=custom_symbols)
     except Exception as e:
         logger.error(f"❌ [MAIN] WebSocket handler error: {e}", exc_info=True)
         raise
 
 logger.info("✅ Custom WebSocket handler registered for /ws (registered after app creation)")
 
+# Mount static files
+frontend_static_path = Path(__file__).parent.parent.parent / "frontend" / "static"
+if frontend_static_path.exists():
+    app.mount("/static", StaticFiles(directory=str(frontend_static_path)), name="static")
+    logger.info(f"✅ Static files mounted from {frontend_static_path}")
 
 # Register routes
 @app.get("/", response_class=HTMLResponse)
@@ -136,26 +227,36 @@ async def root():
     frontend_path = Path(__file__).parent.parent.parent / "frontend" / "index.html"
     if frontend_path.exists():
         return frontend_path.read_text()
-    return "<h1>👁️ Sauron's Eye - Market Watcher</h1><p>Frontend not found</p>"
+    return "<h1>⚡ FLUX - Swing Trading Evolved</h1><p>Frontend not found</p>"
 
 # Core routes for Balanced Low Buy System
 app.get("/api/balance", response_class=HTMLResponse)(routes.get_balance)
 app.post("/api/analyze", response_class=HTMLResponse)(routes.analyze_symbol)
-# Backtest route removed - keeping UI focused
+app.post("/api/analyze-preview", response_class=HTMLResponse)(routes.analyze_preview)
+app.post("/api/analyze-rejection", response_class=HTMLResponse)(routes.analyze_rejection)
 app.post("/api/trade", response_class=HTMLResponse)(routes.execute_trade)
 app.post("/api/panic", response_class=HTMLResponse)(routes.panic_close)
 app.get("/api/positions", response_class=HTMLResponse)(routes.get_positions)
 app.post("/api/quick-buy", response_class=HTMLResponse)(routes.quick_buy)
 app.post("/api/quick-sell", response_class=HTMLResponse)(routes.quick_sell)
 app.post("/api/cancel-order", response_class=HTMLResponse)(routes.cancel_order)
-app.get("/api/logs", response_class=HTMLResponse)(routes.get_trade_logs)
-app.get("/api/strategy-config", response_class=HTMLResponse)(routes.get_strategy_config)
+app.get("/api/strategy-config", response_class=HTMLResponse)(routes.get_strategy_config_html)
+app.get("/api/strategy-config-modal", response_class=HTMLResponse)(routes.get_strategy_config_modal)
+app.get("/api/strategy-display", response_class=HTMLResponse)(routes.get_strategy_display_html)
 app.get("/api/strategy")(routes.get_strategy_api)
 app.post("/api/strategy")(routes.update_strategy_api)
+app.post("/api/strategy/generate-params")(routes.generate_strategy_params_api)
 app.get("/api/strategy/presets")(routes.get_strategy_presets)
-app.get("/api/discover-stocks", response_class=HTMLResponse)(routes.discover_stocks)
+app.get("/api/firecrawl-query")(routes.get_firecrawl_query)
+app.get("/api/timeout-error", response_class=HTMLResponse)(routes.get_timeout_error)
+app.post("/api/firecrawl-query")(routes.update_firecrawl_query)
+app.get("/api/watch-list", response_class=HTMLResponse)(routes.get_watch_list)
+app.post("/api/watch-list")(routes.update_watch_list)
+app.get("/api/tickers/search")(routes.search_tickers)
+app.get("/api/logo/{ticker}", response_class=HTMLResponse)(routes.get_logo)
 app.post("/api/explanation")(routes.get_explanation)
-# Position chart endpoint removed - keeping UI focused
+app.get("/api/latest-scan")(routes.get_latest_scan)
+app.get("/api/analysis-preview")(routes.get_analysis_preview)
 
 # MDB-Engine Pattern: Built-in Observability Endpoints
 # These endpoints are automatically available via mdb-engine:

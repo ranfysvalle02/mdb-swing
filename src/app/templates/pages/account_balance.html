@@ -1,0 +1,9 @@
+<div class="text-3xl font-bold {{ pl_color }} mb-1">${{ equity|round(2)|string }}</div>
+<div class="flex items-center gap-2 text-xs">
+    <div class="flex items-center gap-1 {{ pl_color }}">
+        <i class="fas {{ pl_icon }}"></i>
+        <span>${{ pl_abs|round(2)|string }}</span>
+    </div>
+    <span class="text-gray-500">•</span>
+    <span class="text-gray-400">BP: ${{ buying_power|round(2)|string }}</span>
+</div>

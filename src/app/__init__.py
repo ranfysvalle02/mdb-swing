@@ -1,3 +1,3 @@
-"""Sauron's Eye - Market Watcher Application."""
+"""FLUX - Swing Trading Evolved Application."""
 
 __version__ = "1.0.0"

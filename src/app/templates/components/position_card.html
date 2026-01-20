@@ -1,0 +1,124 @@
+{% set color = "text-green-400" if metrics.unrealized_pl > 0 else "text-red-400" %}
+<div class="glass-panel rounded-xl p-4 mb-2 card-hover border border-white/8">
+    <div class="flex justify-between items-center mb-2">
+        <div class="flex items-center gap-3">
+            {# Logo Component - Position Style #}
+            {% set size_class = "w-10 h-10" %}
+            {% set bg_class = "bg-gradient-to-br from-purple-500/30 to-blue-500/30" %}
+            {% set border_class = "border border-purple-500/30" %}
+            {% set text_color = "text-purple-200" %}
+            {% set text_size = "lg" %}
+            {% include "components/logo.html" with context %}
+            <div>
+                <div class="font-bold text-white">{{ symbol }}</div>
+                <div class="text-xs text-green-400 font-semibold">Bought @ ${{ "%.2f"|format(metrics.entry_price) }} (Low Buy)</div>
+                <div class="text-xs text-gray-400">{{ metrics.qty }} shares • Now: ${{ "%.2f"|format(metrics.current_price) }}</div>
+            </div>
+        </div>
+        <div class="text-right">
+            <div class="font-bold {{ color }}">${{ "%.2f"|format(metrics.unrealized_pl) }}</div>
+            <div class="text-xs {{ color }}">{{ "%+.2f"|format(metrics.pl_pct) }}%</div>
+        </div>
+    </div>
+    {% if metrics.take_profit and metrics.stop_loss and metrics.bar_position %}
+    {% set bar = metrics.bar_position %}
+    {% set profit_at_tp = (metrics.take_profit - metrics.entry_price) * metrics.qty %}
+    {% set loss_at_stop = (metrics.stop_loss - metrics.entry_price) * metrics.qty %}
+    {% set profit_at_tp_pct = ((metrics.take_profit - metrics.entry_price) / metrics.entry_price) * 100 %}
+    {% set loss_at_stop_pct = ((metrics.stop_loss - metrics.entry_price) / metrics.entry_price) * 100 %}
+    {% set is_at_loss = metrics.unrealized_pl < 0 %}
+    {% set current_vs_entry = metrics.current_price - metrics.entry_price %}
+    {% set closer_to_stop = current_vs_entry < 0 %}
+    {% set distance_to_stop = metrics.current_price - metrics.stop_loss %}
+    {% set distance_to_profit = metrics.take_profit - metrics.current_price %}
+    {% set distance_to_stop_pct = ((metrics.current_price - metrics.stop_loss) / (metrics.entry_price - metrics.stop_loss)) * 100 if (metrics.entry_price - metrics.stop_loss) > 0 else 0 %}
+    {% set distance_to_profit_pct = ((metrics.current_price - metrics.entry_price) / (metrics.take_profit - metrics.entry_price)) * 100 if (metrics.take_profit - metrics.entry_price) > 0 else 0 %}
+    <div class="mb-3 pt-3 border-t border-gray-700/30">
+        <!-- LARGE CLEAR STATUS INDICATOR -->
+        <div class="mb-3 flex items-center justify-between p-2 rounded-lg {{ "bg-red-500/20 border-2 border-red-500/60" if closer_to_stop else "bg-green-500/20 border-2 border-green-500/60" }}">
+            <div class="flex items-center gap-3">
+                {% if closer_to_stop %}
+                <div class="w-12 h-12 rounded-full bg-red-500/30 flex items-center justify-center border-2 border-red-500/60">
+                    <i data-lucide="alert-triangle" class="text-red-400 w-6 h-6"></i>
+                </div>
+                <div>
+                    <div class="text-sm font-bold text-red-400 uppercase tracking-wide">⚠️ Near Stop Loss</div>
+                    <div class="text-xs text-red-300">${{ "%.2f"|format(distance_to_stop) }} away from stop</div>
+                </div>
+                {% else %}
+                <div class="w-12 h-12 rounded-full bg-green-500/30 flex items-center justify-center border-2 border-green-500/60">
+                    <i data-lucide="trending-up" class="text-green-400 w-6 h-6"></i>
+                </div>
+                <div>
+                    <div class="text-sm font-bold text-green-400 uppercase tracking-wide">📈 Moving to Profit</div>
+                    <div class="text-xs text-green-300">${{ "%.2f"|format(distance_to_profit) }} to target</div>
+                </div>
+                {% endif %}
+            </div>
+            <div class="text-right">
+                {% if closer_to_stop %}
+                <div class="text-lg font-bold text-red-400">-${{ "%.2f"|format(-loss_at_stop) }}</div>
+                <div class="text-xs text-red-300 font-semibold">{{ "%.1f"|format(loss_at_stop_pct) }}% if stopped</div>
+                {% else %}
+                <div class="text-lg font-bold text-green-400">+${{ "%.2f"|format(profit_at_tp) }}</div>
+                <div class="text-xs text-green-300 font-semibold">+{{ "%.1f"|format(profit_at_tp_pct) }}% at target</div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Enhanced Double-ended progress bar -->
+        <div class="relative w-full h-6 glass rounded-full overflow-hidden border-2 {{ "border-red-500/60" if closer_to_stop else "border-green-500/60" }}">
+            <!-- Red zone (stop loss side) -->
+            <div class="absolute left-0 top-0 h-full bg-gradient-to-r from-red-600/90 to-red-500/70" style="width: {{ bar.entry_pct }}%"></div>
+            <!-- Green zone (take profit side) -->
+            <div class="absolute right-0 top-0 h-full bg-gradient-to-l from-green-600/90 to-green-500/70" style="width: {{ bar.profit_width }}%"></div>
+            <!-- Entry price marker (thicker) -->
+            <div class="absolute top-0 h-full w-1 bg-yellow-400 z-10 shadow-lg" style="left: calc({{ bar.entry_pct }}% - 2px)"></div>
+            <!-- Current price indicator (much thicker and more visible) -->
+            <div class="absolute top-0 h-full w-1.5 {{ "bg-red-500" if closer_to_stop else "bg-green-500" }} z-30 shadow-2xl {{ "animate-pulse" if closer_to_stop else "" }}" style="left: calc({{ bar.current_pct }}% - 3px)"></div>
+            <!-- Current price label (larger and more prominent) -->
+            <div class="absolute top-0 transform -translate-x-1/2 -translate-y-full mb-1 text-xs font-bold {{ "text-red-400" if closer_to_stop else "text-green-400" }} whitespace-nowrap drop-shadow-lg" style="left: {{ bar.current_pct }}%">
+                ${{ "%.2f"|format(metrics.current_price) }}
+            </div>
+        </div>
+        <!-- Price labels (larger and clearer) -->
+        <div class="flex justify-between items-center mt-2 text-xs font-semibold">
+            <span class="text-red-400 flex items-center gap-1">
+                <i data-lucide="shield-off" class="w-3 h-3"></i>
+                Stop: ${{ "%.2f"|format(metrics.stop_loss) }}
+            </span>
+            <span class="text-yellow-400 flex items-center gap-1">
+                <i data-lucide="circle" class="w-3 h-3"></i>
+                Entry: ${{ "%.2f"|format(metrics.entry_price) }}
+            </span>
+            <span class="text-green-400 flex items-center gap-1">
+                <i data-lucide="target" class="w-3 h-3"></i>
+                Target: ${{ "%.2f"|format(metrics.take_profit) }}
+            </span>
+        </div>
+    </div>
+    {% endif %}
+    {% if sell_signal %}
+    {% set signal_color = "bg-yellow-500/20 border-yellow-500/50" if sell_signal.signal_type in ["near_target", "consider_sell"] else "bg-green-500/20 border-green-500/50" %}
+    {% set signal_icon = "alert-triangle" if sell_signal.signal_type == "overbought" else "trending-up" if sell_signal.signal_type in ["near_target", "consider_sell"] else "check-circle-2" %}
+    {% set signal_text = "🎯 SELL HIGH" if sell_signal.signal_type == "profit_target" else "⚠️ Consider Selling" if sell_signal.signal_type in ["near_target", "consider_sell"] else "📈 Overbought" %}
+    <div class="mb-2 p-1.5 rounded {{ signal_color }} border flex items-center gap-1.5">
+        <i data-lucide="{{ signal_icon }}" class="text-yellow-400 w-3.5 h-3.5"></i>
+        <div class="flex-1">
+            <div class="text-xs font-bold text-yellow-300">{{ signal_text }}</div>
+            <div class="text-[10px] text-gray-300">{{ sell_signal.reason|e }}</div>
+        </div>
+    </div>
+    {% endif %}
+    <div class="flex gap-2 pt-2 border-t border-white/8">
+        <button 
+            hx-post="/api/quick-sell"
+            hx-vals='{{ {"symbol": symbol} | tojson }}'
+            hx-swap="none"
+            hx-confirm="Sell position for {{ symbol|e }}?"
+            class="flex-1 btn-glass py-1.5 rounded-lg text-xs font-bold text-white hover:bg-red-600/30 transition-all bg-red-500/30 flex items-center justify-center gap-1 border border-red-500/50">
+            <i data-lucide="arrow-down" class="text-xs w-3 h-3"></i>
+            <span>SELL</span>
+        </button>
+    </div>
+</div>

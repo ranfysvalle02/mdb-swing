@@ -1,0 +1,55 @@
+<div class="glass rounded-xl p-4 border border-purple-500/20">
+    <div class="flex items-start justify-between mb-3">
+        <div>
+            <h3 class="text-sm font-bold text-white mb-1 flex items-center gap-2">
+                <i data-lucide="search" class="text-purple-400 w-4 h-4"></i>
+                News Search Query
+            </h3>
+            <p class="text-xs text-gray-400">Customize how the AI searches for news articles about stocks</p>
+        </div>
+    </div>
+    
+    <div class="space-y-3">
+        <div>
+            <label for="firecrawl-query-input" class="block text-xs text-gray-300 mb-2 font-semibold">
+                Search Query Template
+                <span class="text-gray-500 font-normal ml-1">(use {symbol} as placeholder)</span>
+            </label>
+            <form 
+                hx-post="/api/firecrawl-query"
+                hx-target="#firecrawl-query-section"
+                hx-swap="innerHTML"
+                hx-indicator="#firecrawl-query-section"
+                class="flex gap-2">
+                <input 
+                    type="text" 
+                    id="firecrawl-query-input" 
+                    name="query_template"
+                    value="{{ query_template|e }}"
+                    placeholder="{symbol} stock news earnings financial analysis market"
+                    required
+                    class="flex-1 glass-strong px-3 py-2 rounded-lg text-sm text-white bg-gray-700/50 border border-gray-600/50 focus:border-purple-500/50 focus:outline-none transition-all"
+                    aria-label="Search query template"
+                />
+                <button 
+                    type="submit"
+                    class="glass-strong px-4 py-2 rounded-lg text-xs font-semibold text-white bg-purple-500/20 hover:bg-purple-500/30 active:scale-95 transition-all border border-purple-500/40 flex items-center gap-2"
+                    aria-label="Save search query template">
+                    <i data-lucide="save" class="w-4 h-4 htmx-indicator-hidden"></i>
+                    <i data-lucide="loader-2" class="w-4 h-4 lucide-spin htmx-indicator"></i>
+                    <span>Save</span>
+                </button>
+            </form>
+        </div>
+        
+        <div class="glass rounded-lg p-3 bg-purple-500/5 border border-purple-500/20">
+            <div class="text-xs text-gray-300 space-y-1">
+                <p class="font-semibold text-purple-300 mb-1">💡 How it works:</p>
+                <p>• The {symbol} placeholder gets replaced with the actual stock symbol (e.g., "NVDA")</p>
+                <p>• Example: <code class="text-purple-300">{symbol} stock news earnings</code> becomes <code class="text-purple-300">NVDA stock news earnings</code></p>
+                <p>• More specific queries = better quality news results</p>
+                <p>• Changes take effect on the next market scan</p>
+            </div>
+        </div>
+    </div>
+</div>

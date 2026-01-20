@@ -1,0 +1,275 @@
+{# Enhanced Analysis Result with Detailed AI Insights #}
+<div class="space-y-4 animate-fade-in" id="analysis-result-{{ symbol|lower }}">
+    {# Quick Summary Card - Always Visible #}
+    <div class="glass-strong rounded-xl p-5 border-l-4 {% if verdict.score >= 7 %}border-green-500/60{% elif verdict.score >= 5 %}border-yellow-500/60{% else %}border-red-500/60{% endif %}" role="article" aria-label="Analysis summary for {{ symbol|e }}">
+        {# Header Row #}
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-lg bg-gradient-to-br {% if verdict.score >= 7 %}from-green-500/20 to-emerald-500/20{% elif verdict.score >= 5 %}from-yellow-500/20 to-orange-500/20{% else %}from-red-500/20 to-pink-500/20{% endif %} flex items-center justify-center border {% if verdict.score >= 7 %}border-green-500/30{% elif verdict.score >= 5 %}border-yellow-500/30{% else %}border-red-500/30{% endif %}">
+                    <span class="font-bold text-white text-lg">{{ symbol|e }}</span>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-white">{{ symbol|e }} Analysis</h3>
+                    <p class="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5">
+                        <i data-lucide="clock" class="w-3 h-3"></i>
+                        <span>Just completed</span>
+                    </p>
+                </div>
+            </div>
+            <div class="text-right">
+                <div class="text-3xl font-bold {% if verdict.score >= 7 %}text-green-400{% elif verdict.score >= 5 %}text-yellow-400{% else %}text-red-400{% endif %}" aria-label="AI Score: {{ verdict.score }} out of 10">
+                    {{ verdict.score }}/10
+                </div>
+                <div class="text-xs text-gray-500 mt-0.5">AI Score</div>
+            </div>
+        </div>
+        
+        {# Key Metrics Grid - Compact #}
+        <div class="grid grid-cols-4 gap-2 mb-4">
+            <div class="glass rounded-lg p-2.5 text-center border border-gray-700/50">
+                <div class="text-[10px] text-gray-400 mb-0.5">Price</div>
+                <div class="text-sm font-bold text-white">${{ techs.price|round(2) }}</div>
+            </div>
+            <div class="glass rounded-lg p-2.5 text-center border {% if techs.rsi < 30 %}border-green-500/30{% elif techs.rsi > 70 %}border-red-500/30{% else %}border-gray-700/50{% endif %}">
+                <div class="text-[10px] text-gray-400 mb-0.5">RSI</div>
+                <div class="text-sm font-bold {% if techs.rsi < 30 %}text-green-400{% elif techs.rsi > 70 %}text-red-400{% else %}text-white{% endif %}">{{ techs.rsi|round(1) }}</div>
+            </div>
+            <div class="glass rounded-lg p-2.5 text-center border {% if techs.trend == 'UP' %}border-green-500/30{% elif techs.trend == 'DOWN' %}border-red-500/30{% else %}border-gray-700/50{% endif %}">
+                <div class="text-[10px] text-gray-400 mb-0.5">Trend</div>
+                <div class="text-sm font-bold {% if techs.trend == 'UP' %}text-green-400{% elif techs.trend == 'DOWN' %}text-red-400{% else %}text-gray-400{% endif %}">{{ techs.trend }}</div>
+            </div>
+            <div class="glass rounded-lg p-2.5 text-center border border-gray-700/50">
+                <div class="text-[10px] text-gray-400 mb-0.5">Risk</div>
+                <div class="text-xs font-semibold {% if verdict.risk_level.upper() == 'LOW' %}text-green-400{% elif verdict.risk_level.upper() == 'MEDIUM' %}text-yellow-400{% else %}text-red-400{% endif %}">{{ verdict.risk_level|upper }}</div>
+            </div>
+        </div>
+        
+        {# Enhanced Recommendation Section #}
+        <div class="mb-4 space-y-3">
+            {# Primary Recommendation #}
+            <div class="flex items-start justify-between p-4 rounded-lg bg-gradient-to-r {% if verdict.action == 'BUY' %}from-green-500/20 to-emerald-500/10{% elif verdict.action in ['WAIT', 'AVOID'] %}from-yellow-500/20 to-orange-500/10{% else %}from-red-500/20 to-pink-500/10{% endif %} border {% if verdict.action == 'BUY' %}border-green-500/40{% elif verdict.action in ['WAIT', 'AVOID'] %}border-yellow-500/40{% else %}border-red-500/40{% endif %}">
+                <div class="flex items-start gap-3 flex-1">
+                    <div class="w-10 h-10 rounded-lg {% if verdict.action == 'BUY' %}bg-green-500/20{% elif verdict.action in ['WAIT', 'AVOID'] %}bg-yellow-500/20{% else %}bg-red-500/20{% endif %} flex items-center justify-center flex-shrink-0 border {% if verdict.action == 'BUY' %}border-green-500/40{% elif verdict.action in ['WAIT', 'AVOID'] %}border-yellow-500/40{% else %}border-red-500/40{% endif %}">
+                        <i data-lucide="{% if verdict.action == 'BUY' %}trending-up{% elif verdict.action in ['WAIT', 'AVOID'] %}pause-circle{% else %}trending-down{% endif %}" class="w-5 h-5 {% if verdict.action == 'BUY' %}text-green-400{% elif verdict.action in ['WAIT', 'AVOID'] %}text-yellow-400{% else %}text-red-400{% endif %}"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1.5">
+                            <span class="text-xs text-gray-400 uppercase tracking-wider">Recommendation</span>
+                            <span class="text-sm font-bold {% if verdict.action == 'BUY' %}text-green-400{% elif verdict.action in ['WAIT', 'AVOID'] %}text-yellow-400{% else %}text-red-400{% endif %}">
+                                {% if verdict.action == "AVOID" %}
+                                    AVOID
+                                {% elif verdict.action == "SELL_NOW" %}
+                                    SELL NOW
+                                {% else %}
+                                    {{ verdict.action }}
+                                {% endif %}
+                            </span>
+                        </div>
+                        <p class="text-sm text-gray-200 leading-relaxed">"{{ verdict.reason|e }}"</p>
+                    </div>
+                </div>
+            </div>
+            
+            {# Primary Catalyst - Prominent Display #}
+            {% if verdict.catalyst %}
+            <div class="glass rounded-lg p-3 border border-blue-500/40 bg-blue-500/10">
+                <div class="flex items-start gap-2.5">
+                    <i data-lucide="zap" class="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5"></i>
+                    <div class="flex-1">
+                        <div class="text-xs text-blue-400 font-semibold mb-1 uppercase tracking-wider">Primary Catalyst</div>
+                        <p class="text-sm text-white leading-relaxed">{{ verdict.catalyst|e }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        {# AI Insights Grid - Key Factors, Risks, Opportunities #}
+        {% if verdict.key_factors or verdict.risks or verdict.opportunities %}
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            {# Key Factors #}
+            {% if verdict.key_factors %}
+            <div class="glass rounded-lg p-3 border border-green-500/30 bg-green-500/5">
+                <div class="flex items-center gap-2 mb-2.5">
+                    <i data-lucide="check-circle" class="w-4 h-4 text-green-400"></i>
+                    <h4 class="text-xs font-bold text-green-400 uppercase tracking-wider">Key Factors</h4>
+                </div>
+                <ul class="space-y-2">
+                    {% for factor in verdict.key_factors %}
+                    <li class="flex items-start gap-2 text-xs text-gray-300 leading-relaxed">
+                        <span class="text-green-400 mt-0.5 flex-shrink-0">•</span>
+                        <span>{{ factor|e }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            
+            {# Risks #}
+            {% if verdict.risks %}
+            <div class="glass rounded-lg p-3 border border-yellow-500/30 bg-yellow-500/5">
+                <div class="flex items-center gap-2 mb-2.5">
+                    <i data-lucide="alert-triangle" class="w-4 h-4 text-yellow-400"></i>
+                    <h4 class="text-xs font-bold text-yellow-400 uppercase tracking-wider">Risks to Watch</h4>
+                </div>
+                <ul class="space-y-2">
+                    {% for risk in verdict.risks %}
+                    <li class="flex items-start gap-2 text-xs text-gray-300 leading-relaxed">
+                        <span class="text-yellow-400 mt-0.5 flex-shrink-0">⚠</span>
+                        <span>{{ risk|e }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            
+            {# Opportunities #}
+            {% if verdict.opportunities %}
+            <div class="glass rounded-lg p-3 border border-blue-500/30 bg-blue-500/5">
+                <div class="flex items-center gap-2 mb-2.5">
+                    <i data-lucide="target" class="w-4 h-4 text-blue-400"></i>
+                    <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wider">Opportunities</h4>
+                </div>
+                <ul class="space-y-2">
+                    {% for opportunity in verdict.opportunities %}
+                    <li class="flex items-start gap-2 text-xs text-gray-300 leading-relaxed">
+                        <span class="text-blue-400 mt-0.5 flex-shrink-0">→</span>
+                        <span>{{ opportunity|e }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        {# View Details Button #}
+        {# Toggle button with Alpine.js - HTMX Gold Standard: No onclick handlers #}
+        <div x-data="{ expanded: false }" class="w-full">
+            <button 
+                type="button"
+                class="w-full mt-3 glass-strong py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-purple-600/30 transition-all bg-purple-500/20 flex items-center justify-center gap-2 border border-purple-500/40 group"
+                id="toggle-details-{{ symbol|lower }}"
+                @click="expanded = !expanded"
+                :aria-expanded="expanded"
+                aria-controls="analysis-details-{{ symbol|lower }}">
+                <span class="inline-flex transition-transform duration-300"
+                      :class="{ 'rotate-180': expanded }">
+                    <i data-lucide="chevron-down" 
+                       class="w-4 h-4"
+                       id="chevron-{{ symbol|lower }}"></i>
+                </span>
+                <span x-text="expanded ? 'Hide Full Analysis' : 'View Full Analysis'"></span>
+            </button>
+            {# Details section controlled by same Alpine.js state #}
+            <div 
+                id="analysis-details-{{ symbol|lower }}"
+                x-show="expanded"
+                x-transition:enter="transition ease-out duration-500"
+                x-transition:enter-start="opacity-0 max-h-0"
+                x-transition:enter-end="opacity-100 max-h-screen"
+                x-transition:leave="transition ease-in duration-500"
+                x-transition:leave-start="opacity-100 max-h-screen"
+                x-transition:leave-end="opacity-0 max-h-0"
+                class="overflow-hidden"
+                :aria-hidden="!expanded"
+                x-init="
+                    $watch('expanded', value => {
+                        if (value) {
+                            // Initialize TradingView widget when expanded
+                            setTimeout(() => {
+                                const containerId = {{ tradingview_id|tojson }};
+                                const symbolName = {{ symbol|tojson }};
+                                const container = document.getElementById(containerId);
+                                if (container && typeof TradingView !== 'undefined') {
+                                    try {
+                                        new TradingView.widget({
+                                            'autosize': true,
+                                            'symbol': symbolName,
+                                            'interval': 'D',
+                                            'timezone': 'Etc/UTC',
+                                            'theme': 'dark',
+                                            'style': '1',
+                                            'container_id': containerId,
+                                            'locale': 'en'
+                                        });
+                                    } catch (e) {
+                                        console.warn('TradingView widget initialization error:', e);
+                                    }
+                                }
+                            }, 300);
+                        }
+                    });
+                ">
+        <div class="space-y-4 pt-2">
+            {# Full Technical Indicators #}
+            <div class="glass rounded-xl p-4 border border-gray-700/50">
+                <h4 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                    <i data-lucide="activity" class="w-4 h-4 text-blue-400"></i>
+                    <span>Technical Indicators</span>
+                </h4>
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="glass rounded-lg p-3 text-center border border-gray-700/50">
+                        <div class="text-[10px] text-gray-400 mb-1 flex items-center justify-center gap-1">
+                            <i data-lucide="activity" class="w-2.5 h-2.5"></i>
+                            <span>RSI</span>
+                        </div>
+                        <div class="text-base font-bold text-white" aria-label="RSI: {{ techs.rsi|round(1) }}">{{ techs.rsi|round(1) }}</div>
+                        <div class="text-[10px] text-gray-500 mt-0.5">
+                            {% if techs.rsi < 30 %}Oversold{% elif techs.rsi > 70 %}Overbought{% else %}Neutral{% endif %}
+                        </div>
+                    </div>
+                    <div class="glass rounded-lg p-3 text-center border border-gray-700/50">
+                        <div class="text-[10px] text-gray-400 mb-1 flex items-center justify-center gap-1">
+                            <i data-lucide="trending-up" class="w-2.5 h-2.5"></i>
+                            <span>Trend</span>
+                        </div>
+                        <div class="text-base font-bold {% if techs.trend == 'UP' %}text-green-400{% else %}text-red-400{% endif %}" aria-label="Trend: {{ techs.trend }}">{{ techs.trend }}</div>
+                        <div class="text-[10px] text-gray-500 mt-0.5">vs SMA-200</div>
+                    </div>
+                    <div class="glass rounded-lg p-3 text-center border border-gray-700/50">
+                        <div class="text-[10px] text-gray-400 mb-1 flex items-center justify-center gap-1">
+                            <i data-lucide="waves" class="w-2.5 h-2.5"></i>
+                            <span>ATR</span>
+                        </div>
+                        <div class="text-base font-bold text-white" aria-label="ATR: ${{ techs.atr|round(2) }}">${{ techs.atr|round(2) }}</div>
+                        <div class="text-[10px] text-gray-500 mt-0.5">Volatility</div>
+                    </div>
+                </div>
+            </div>
+            
+            {# Strategy Context #}
+            <div class="glass rounded-lg p-3 border border-gray-700/50">
+                <div class="text-[10px] text-gray-500 border-t border-gray-700/50 pt-2 mt-2">
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <span class="flex items-center gap-1">
+                            <i data-lucide="info" class="w-2.5 h-2.5"></i>
+                            <span>{{ strategy_config.name|e }} | RSI &lt; {{ strategy_config.rsi_threshold }} | Score ≥ {{ strategy_config.ai_score_required }}</span>
+                        </span>
+                    </div>
+                    {% if headlines_count is defined and bars_count is defined %}
+                    <div class="flex items-center gap-3 flex-wrap text-gray-600 mt-1">
+                        <span class="flex items-center gap-1">
+                            <i data-lucide="database" class="w-2.5 h-2.5"></i>
+                            <span>{{ bars_count }}d</span>
+                        </span>
+                        <span class="flex items-center gap-1">
+                            <i data-lucide="search" class="w-2.5 h-2.5"></i>
+                            <span>{{ headlines_count }} news</span>
+                        </span>
+                        <span class="flex items-center gap-1">
+                            <i data-lucide="brain" class="w-2.5 h-2.5"></i>
+                            <span>GPT-4o</span>
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            {# TradingView Chart #}
+            <div id="{{ tradingview_id }}" class="w-full rounded-lg overflow-hidden border border-gray-700/50" style="height: 350px;"></div>
+        </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,26 @@
+{# Generic HTMX Modal Pattern
+   Uses native <dialog> element with CSS3 animations
+   No Alpine.js, no Hyperscript - just pure CSS3 + HTMX magic
+#}
+<dialog id="{{ modal_id }}" 
+        class="htmx-modal"
+        data-modal-id="{{ modal_id }}">
+    <div class="htmx-modal-content" {% if max_width %}style="max-width: {{ max_width }};"{% endif %}>
+        <div class="htmx-modal-header">
+            <h2 class="htmx-modal-title">
+                {% if icon %}
+                <i data-lucide="{{ icon }}" class="{{ icon_color|default('text-purple-400') }} w-5 h-5"></i>
+                {% endif %}
+                <span>{{ title|e }}</span>
+            </h2>
+            <button class="htmx-modal-close" 
+                    aria-label="Close modal"
+                    type="button">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <div class="htmx-modal-body">
+            {{ content|safe }}
+        </div>
+    </div>
+</dialog>

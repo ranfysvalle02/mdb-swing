@@ -1,0 +1,9 @@
+<div class="glass rounded-xl p-4 border border-green-500/20 animate-fade-in">
+    <div class="flex items-center gap-2 mb-3">
+        <i data-lucide="check-circle" class="text-green-400 w-5 h-5"></i>
+        <p class="text-sm font-semibold text-green-400">{{ message|e }}</p>
+    </div>
+    {% if details %}
+    <p class="text-xs text-gray-300">{{ details|e }}</p>
+    {% endif %}
+</div>

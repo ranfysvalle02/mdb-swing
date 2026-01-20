@@ -1,0 +1,17 @@
+<div class="glass rounded-xl p-4 border border-yellow-500/30 fade-in">
+    <div class="flex items-center gap-3 mb-3">
+        <i class="fas fa-exclamation-circle text-yellow-500 text-xl"></i>
+        <span class="font-bold text-yellow-400">Insufficient Data</span>
+    </div>
+    <div class="text-sm text-gray-300 mb-3">Only {{ days_available }} day{% if days_available != 1 %}s{% endif %} available for {{ symbol|e }}.</div>
+    <div class="text-xs text-gray-400 mb-2 font-semibold uppercase tracking-wider">Possible reasons:</div>
+    <ul class="text-xs text-gray-400 list-disc list-inside space-y-1 ml-4">
+        <li>API rate limit or access issue</li>
+        <li>Symbol not available in paper trading</li>
+        <li>Market data subscription required</li>
+    </ul>
+    <div class="text-xs mt-3 text-gray-500 flex items-center gap-1">
+        <i class="fas fa-info-circle"></i>
+        <span>Check application logs for detailed error information.</span>
+    </div>
+</div>

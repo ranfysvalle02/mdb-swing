@@ -1,0 +1,14 @@
+<script>
+    (function() {
+        // Refresh lucide icons for tooltips and buttons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+        // Re-initialize icons after a short delay to ensure DOM is ready
+        setTimeout(() => {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        }, 100);
+    })();
+</script>

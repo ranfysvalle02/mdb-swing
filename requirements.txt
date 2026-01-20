@@ -11,3 +11,7 @@ mdb-engine>=0.2.3
 pymongo>=4.6.0
 python-multipart>=0.0.6
 pydantic>=2.0.0
+jinja2>=3.1.0
+firecrawl-py>=0.0.16
+vectorbt>=0.25.0
+pyarrow>=14.0.0

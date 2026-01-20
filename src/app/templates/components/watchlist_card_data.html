@@ -1,0 +1,56 @@
+{# Pre-calculate card styling data to reduce template complexity #}
+{% macro card_styling(card) %}
+    {% set symbol = card.symbol %}
+    {% set price = card.get('price') %}
+    {% set rsi = card.get('rsi') %}
+    {% set trend = card.get('trend') %}
+    {% set meets_criteria = card.get('meets_criteria', false) %}
+    
+    {# RSI Color Logic #}
+    {% set rsi_color = "text-gray-400" %}
+    {% if rsi is not none %}
+        {% if rsi < 35 %}
+            {% set rsi_color = "text-green-400" %}
+        {% elif rsi < 50 %}
+            {% set rsi_color = "text-yellow-400" %}
+        {% else %}
+            {% set rsi_color = "text-red-400" %}
+        {% endif %}
+    {% endif %}
+    
+    {# Trend Icon & Color Logic #}
+    {% set trend_icon = "minus" %}
+    {% set trend_color = "text-gray-400" %}
+    {% if trend == "UP" %}
+        {% set trend_icon = "trending-up" %}
+        {% set trend_color = "text-green-400" %}
+    {% elif trend == "DOWN" %}
+        {% set trend_icon = "trending-down" %}
+        {% set trend_color = "text-red-400" %}
+    {% endif %}
+    
+    {# Border & Background Logic #}
+    {% set border_class = "border-blue-500/30" %}
+    {% set bg_class = "bg-blue-500/5" %}
+    {% if meets_criteria %}
+        {% set border_class = "border-green-500/40" %}
+        {% set bg_class = "bg-green-500/10" %}
+    {% elif price is none %}
+        {% set border_class = "border-gray-500/20" %}
+        {% set bg_class = "bg-gray-500/5" %}
+    {% endif %}
+    
+    {# Return computed values #}
+    {{ {
+        'symbol': symbol,
+        'price': price,
+        'rsi': rsi,
+        'trend': trend,
+        'meets_criteria': meets_criteria,
+        'rsi_color': rsi_color,
+        'trend_icon': trend_icon,
+        'trend_color': trend_color,
+        'border_class': border_class,
+        'bg_class': bg_class
+    } }}
+{% endmacro %}

@@ -1,0 +1,1021 @@
+/* ============================================
+   FLUX Design System - Glassmorphism UI/UX
+   ============================================ */
+
+/* --- 1. CSS VARIABLES & DESIGN TOKENS --- */
+:root {
+    /* Colors */
+    --bg-dark: #050507;
+    --bg-darker: #000000;
+    --bg-gradient-start: #111115;
+    --bg-gradient-end: #000000;
+    
+    /* Glassmorphism */
+    --glass-bg: rgba(255, 255, 255, 0.03);
+    --glass-bg-strong: rgba(255, 255, 255, 0.06);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-border-strong: rgba(255, 255, 255, 0.15);
+    --glass-highlight: rgba(255, 255, 255, 0.1);
+    
+    /* Brand Colors */
+    --primary: #00f0ff;
+    --primary-dark: #00c4d1;
+    --secondary: #7000ff;
+    --secondary-dark: #5a00cc;
+    --accent: #ff0055;
+    --accent-dark: #cc0044;
+    
+    /* Semantic Colors */
+    --color-success: #22c55e;
+    --color-success-dark: #16a34a;
+    --color-warning: #eab308;
+    --color-warning-dark: #ca8a04;
+    --color-danger: #ef4444;
+    --color-danger-dark: #dc2626;
+    --color-info: #3b82f6;
+    --color-info-dark: #2563eb;
+    
+    /* Text Colors */
+    --text-main: #ffffff;
+    --text-muted: #9ca3af;
+    --text-subtle: #6b7280;
+    
+    /* Typography */
+    --font-heading: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    
+    /* Spacing */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-2xl: 3rem;
+    
+    /* Border Radius */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+    --radius-full: 9999px;
+    
+    /* Shadows */
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
+    --shadow-glow-primary: 0 0 25px rgba(0, 240, 255, 0.3);
+    --shadow-glow-secondary: 0 0 25px rgba(112, 0, 255, 0.3);
+    --shadow-glow-accent: 0 0 25px rgba(255, 0, 85, 0.3);
+    
+    /* Transitions */
+    --transition-fast: 150ms ease;
+    --transition-base: 300ms ease;
+    --transition-slow: 500ms ease;
+}
+
+/* --- 2. RESET & BASE STYLES --- */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    font-family: var(--font-body);
+    overflow-x: hidden;
+    min-height: 100vh;
+    position: relative;
+}
+
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* --- 3. AMBIENT BACKGROUND SYSTEM --- */
+.ambient-wrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    overflow: hidden;
+    background: radial-gradient(circle at center, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+    pointer-events: none;
+}
+
+.orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.5;
+    animation: float 20s infinite ease-in-out alternate;
+    will-change: transform;
+}
+
+.orb-1 {
+    width: 60vw;
+    height: 60vw;
+    background: radial-gradient(circle, var(--secondary), transparent 60%);
+    top: -20%;
+    left: -10%;
+    animation-duration: 25s;
+}
+
+.orb-2 {
+    width: 50vw;
+    height: 50vw;
+    background: radial-gradient(circle, var(--primary), transparent 60%);
+    bottom: -10%;
+    right: -10%;
+    animation-delay: -5s;
+    animation-duration: 20s;
+}
+
+.orb-3 {
+    width: 30vw;
+    height: 30vw;
+    background: radial-gradient(circle, var(--accent), transparent 60%);
+    top: 40%;
+    left: 40%;
+    animation-duration: 18s;
+    opacity: 0.3;
+}
+
+@keyframes float {
+    0% { 
+        transform: translate(0, 0) scale(1); 
+    }
+    100% { 
+        transform: translate(50px, -50px) scale(1.1); 
+    }
+}
+
+/* --- 4. GLASSMORPHISM UTILITIES --- */
+.glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    border-top: 1px solid var(--glass-highlight);
+    box-shadow: var(--shadow-lg);
+    border-radius: var(--radius-xl);
+}
+
+.glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    border-top: 1px solid var(--glass-highlight);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+    border-radius: var(--radius-xl);
+    transition: all var(--transition-base);
+}
+
+.glass-panel:hover {
+    background: var(--glass-bg-strong);
+    border-color: var(--glass-border-strong);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+}
+
+.glass-strong {
+    background: var(--glass-bg-strong);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--glass-border-strong);
+    box-shadow: var(--shadow-lg);
+    border-radius: var(--radius-lg);
+}
+
+/* --- 5. TYPOGRAPHY --- */
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text-main);
+}
+
+h1 {
+    font-size: 3rem;
+    line-height: 1.1;
+}
+
+h2 {
+    font-size: 2.25rem;
+    line-height: 1.2;
+}
+
+h3 {
+    font-size: 1.5rem;
+    line-height: 1.3;
+}
+
+p, span, div, label, li, td, th {
+    font-family: var(--font-body);
+    color: inherit;
+}
+
+/* Gradient text utility */
+.gradient-text {
+    background: linear-gradient(135deg, var(--text-main) 0%, var(--text-muted) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.gradient-text-primary {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* --- 6. BUTTONS --- */
+.btn-primary {
+    padding: 16px 32px;
+    background: linear-gradient(90deg, var(--secondary), var(--accent));
+    color: var(--text-main);
+    text-decoration: none;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    font-size: 1.1rem;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-body);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(112, 0, 255, 0.4);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+.btn-glass {
+    padding: 16px 32px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-main);
+    text-decoration: none;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    font-size: 1.1rem;
+    transition: background var(--transition-base);
+    cursor: pointer;
+    font-family: var(--font-body);
+}
+
+.btn-glass:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.btn-glow {
+    padding: 10px 24px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--primary);
+    color: var(--primary);
+    border-radius: var(--radius-full);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all var(--transition-base);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.1);
+    cursor: pointer;
+    font-family: var(--font-body);
+}
+
+.btn-glow:hover {
+    background: var(--primary);
+    color: var(--bg-dark);
+    box-shadow: 0 0 25px rgba(0, 240, 255, 0.6);
+}
+
+/* --- 7. ANIMATIONS --- */
+@keyframes spin {
+    100% { 
+        transform: rotate(360deg); 
+    }
+}
+
+@keyframes pulse {
+    0%, 100% { 
+        transform: scale(1); 
+        opacity: 0.8; 
+    }
+    50% { 
+        transform: scale(1.05); 
+        opacity: 0.4; 
+    }
+}
+
+@keyframes draw {
+    0% { 
+        stroke-dashoffset: 1000; 
+    }
+    100% { 
+        stroke-dashoffset: 0; 
+    }
+}
+
+@keyframes float-element {
+    0% { 
+        transform: translateY(0px); 
+    }
+    50% { 
+        transform: translateY(-20px); 
+    }
+    100% { 
+        transform: translateY(0px); 
+    }
+}
+
+@keyframes fadeIn {
+    from { 
+        opacity: 0; 
+        transform: translateY(10px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+}
+
+@keyframes slideInRight {
+    from { 
+        opacity: 0; 
+        transform: translateX(20px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateX(0); 
+    }
+}
+
+@keyframes scaleIn {
+    from { 
+        opacity: 0; 
+        transform: scale(0.95); 
+    }
+    to { 
+        opacity: 1; 
+        transform: scale(1); 
+    }
+}
+
+/* Animation utility classes */
+.anim-spin-slow {
+    transform-origin: center;
+    animation: spin 30s linear infinite;
+}
+
+.anim-spin-reverse {
+    transform-origin: center;
+    animation: spin 20s linear reverse infinite;
+}
+
+.anim-pulse {
+    transform-origin: center;
+    animation: pulse 4s ease-in-out infinite;
+}
+
+.anim-float {
+    animation: float-element 6s ease-in-out infinite;
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.5s ease-out;
+}
+
+.slide-in-right {
+    animation: slideInRight 0.4s ease-out;
+}
+
+.scale-in {
+    animation: scaleIn 0.3s ease-out;
+}
+
+/* --- 8. CARD ENHANCEMENTS --- */
+.card-hover {
+    transition: all var(--transition-base);
+}
+
+.card-hover:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* --- 9. GLOW EFFECTS --- */
+.glow-primary {
+    box-shadow: var(--shadow-glow-primary);
+}
+
+.glow-secondary {
+    box-shadow: var(--shadow-glow-secondary);
+}
+
+.glow-accent {
+    box-shadow: var(--shadow-glow-accent);
+}
+
+.glow-success {
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
+}
+
+.glow-danger {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+}
+
+/* --- 10. SEMANTIC COLOR UTILITIES --- */
+.text-success {
+    color: var(--color-success);
+}
+
+.text-warning {
+    color: var(--color-warning);
+}
+
+.text-danger {
+    color: var(--color-danger);
+}
+
+.text-info {
+    color: var(--color-info);
+}
+
+.text-primary {
+    color: var(--primary);
+}
+
+.text-secondary {
+    color: var(--secondary);
+}
+
+.text-accent {
+    color: var(--accent);
+}
+
+.text-muted {
+    color: var(--text-muted);
+}
+
+.text-subtle {
+    color: var(--text-subtle);
+}
+
+/* --- 11. RESPONSIVE UTILITIES --- */
+/* Dashboard Layout Utilities */
+.dashboard-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    width: 100%;
+}
+
+@media (min-width: 1280px) {
+    .dashboard-container {
+        flex-direction: row;
+    }
+}
+
+.dashboard-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+@media (min-width: 1280px) {
+    .dashboard-main {
+        flex: 2;
+    }
+}
+
+.dashboard-sidebar {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    max-width: 100%;
+}
+
+/* Ensure proper flex behavior */
+.dashboard-main > *,
+.dashboard-sidebar > * {
+    min-width: 0;
+}
+
+/* Fix overflow issues */
+.dashboard-main,
+.dashboard-sidebar {
+    overflow: hidden;
+}
+
+@media (max-width: 1024px) {
+    h1 {
+        font-size: 2.5rem;
+    }
+    
+    h2 {
+        font-size: 2rem;
+    }
+    
+    .orb-1 {
+        width: 50vw;
+        height: 50vw;
+    }
+    
+    .orb-2 {
+        width: 40vw;
+        height: 40vw;
+    }
+}
+
+@media (max-width: 768px) {
+    h1 {
+        font-size: 2rem;
+    }
+    
+    h2 {
+        font-size: 1.75rem;
+    }
+    
+    .orb-1,
+    .orb-2,
+    .orb-3 {
+        opacity: 0.2;
+    }
+    
+    .btn-primary,
+    .btn-glass {
+        padding: 12px 24px;
+        font-size: 1rem;
+    }
+    
+    /* Mobile: Stack everything vertically */
+    .dashboard-container {
+        flex-direction: column;
+    }
+}
+
+/* --- 11. ACCESSIBILITY --- */
+:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    :root {
+        --glass-bg: rgba(255, 255, 255, 0.1);
+        --glass-border: rgba(255, 255, 255, 0.3);
+    }
+}
+
+/* --- 12. FORM INPUTS --- */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+textarea,
+select {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-md);
+    color: var(--text-main);
+    padding: 0.75rem 1rem;
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    transition: all var(--transition-base);
+    width: 100%;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.1), 0 0 15px rgba(0, 240, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+input[type="text"]::placeholder,
+input[type="number"]::placeholder,
+textarea::placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
+/* --- 13. SCROLLBAR STYLING --- */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.5);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 240, 255, 0.5);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 240, 255, 0.7);
+}
+
+/* --- 14. NAVIGATION BAR - EXPERT UX POSITIONING --- */
+nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    z-index: 100;
+    padding: 1rem clamp(1rem, 4vw, 1.5rem);
+    padding-top: max(1rem, env(safe-area-inset-top));
+    padding-bottom: max(1rem, env(safe-area-inset-top));
+    pointer-events: none;
+    transition: all var(--transition-base);
+}
+
+nav > * {
+    pointer-events: all;
+}
+
+/* Enhanced glass effect for nav */
+nav .glass-panel {
+    position: relative;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+        0 1px 0 rgba(255, 255, 255, 0.1) inset;
+    transition: all var(--transition-base);
+}
+
+/* Subtle glow on hover */
+nav .glass-panel:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 
+        0 12px 40px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+        0 1px 0 rgba(255, 255, 255, 0.15) inset;
+}
+
+/* Nav content container - optimal spacing */
+nav .glass-panel {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0.875rem clamp(1rem, 3vw, 2rem);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+/* Logo and branding - left aligned */
+nav a {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+    transition: transform var(--transition-fast);
+}
+
+nav a:hover {
+    transform: translateY(-1px);
+}
+
+nav a:active {
+    transform: translateY(0);
+}
+
+/* Nav right section - account info */
+nav > .glass-panel > div:last-child {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-shrink: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    nav {
+        padding: 0.75rem clamp(0.75rem, 3vw, 1rem);
+        padding-top: max(0.75rem, env(safe-area-inset-top));
+    }
+    
+    nav .glass-panel {
+        padding: 0.75rem 1rem;
+        gap: 1rem;
+    }
+    
+    nav a {
+        gap: 0.5rem;
+    }
+    
+    nav a svg {
+        width: 24px;
+        height: 24px;
+    }
+    
+    nav a {
+        font-size: 0.95rem;
+    }
+}
+
+/* Content spacing is handled by individual containers */
+
+/* Smooth scroll behavior */
+html {
+    scroll-behavior: smooth;
+    scroll-padding-top: calc(100px + env(safe-area-inset-top));
+}
+
+/* Nav visibility on scroll (optional enhancement) */
+@media (prefers-reduced-motion: no-preference) {
+    nav {
+        will-change: transform, opacity;
+    }
+}
+
+/* --- 15. ENHANCED MODAL ANIMATIONS --- */
+/* Advanced CSS3 animations for smooth modal transitions */
+
+/* Modal backdrop animation with blur transition */
+@keyframes modalBackdropFadeIn {
+    from {
+        opacity: 0;
+        backdrop-filter: blur(0px);
+        -webkit-backdrop-filter: blur(0px);
+    }
+    to {
+        opacity: 1;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+    }
+}
+
+@keyframes modalBackdropFadeOut {
+    from {
+        opacity: 1;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+    }
+    to {
+        opacity: 0;
+        backdrop-filter: blur(0px);
+        -webkit-backdrop-filter: blur(0px);
+    }
+}
+
+/* Enhanced modal content entrance animation */
+@keyframes modalContentEnter {
+    0% {
+        opacity: 0;
+        transform: scale(0.9) translateY(-20px) rotateX(5deg);
+        filter: blur(4px);
+    }
+    50% {
+        opacity: 0.8;
+        transform: scale(0.98) translateY(-5px) rotateX(2deg);
+        filter: blur(1px);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0) rotateX(0deg);
+        filter: blur(0px);
+    }
+}
+
+/* Smooth modal content exit animation */
+@keyframes modalContentExit {
+    0% {
+        opacity: 1;
+        transform: scale(1) translateY(0) rotateX(0deg);
+        filter: blur(0px);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px) rotateX(-3deg);
+        filter: blur(2px);
+    }
+}
+
+/* SVG loading spinner animation */
+@keyframes modalLoaderSpin {
+    0% {
+        transform: rotate(0deg);
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+    100% {
+        transform: rotate(360deg);
+        opacity: 1;
+    }
+}
+
+/* Pulse animation for loading state */
+@keyframes modalLoaderPulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.5;
+        transform: scale(1.1);
+    }
+}
+
+/* Watchlist horizontal scroll container */
+.watchlist-scroll-container {
+    position: relative;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 240, 255, 0.3) transparent;
+}
+
+.watchlist-scroll-container::-webkit-scrollbar {
+    height: 6px;
+}
+
+.watchlist-scroll-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.watchlist-scroll-container::-webkit-scrollbar-thumb {
+    background: rgba(0, 240, 255, 0.3);
+    border-radius: 3px;
+}
+
+.watchlist-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 240, 255, 0.5);
+}
+
+/* Watchlist card sizing for horizontal layout - compact design */
+.watchlist-card {
+    flex-shrink: 0;
+    min-width: 280px;
+    max-width: 320px;
+    height: auto;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+}
+
+/* Candidate card - prominent styling with pulsing glow */
+.watchlist-card-candidate {
+    position: relative;
+    animation: pulse-shadow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-shadow {
+    0%, 100% {
+        box-shadow: 0 10px 25px -5px rgba(34, 197, 94, 0.4), 0 0 0 2px rgba(34, 197, 94, 0.3);
+    }
+    50% {
+        box-shadow: 0 10px 30px -3px rgba(34, 197, 94, 0.6), 0 0 0 2px rgba(34, 197, 94, 0.5);
+    }
+}
+
+/* Non-candidate card - subdued styling */
+.watchlist-card-non-candidate {
+    opacity: 0.85;
+}
+
+.watchlist-card-non-candidate:hover {
+    opacity: 1;
+}
+
+/* Loading card */
+.watchlist-card-loading {
+    opacity: 0.7;
+}
+
+/* Watchlist navigation buttons */
+.watchlist-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: white;
+    opacity: 0.7;
+}
+
+.watchlist-nav-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+    opacity: 1;
+    transform: translateY(-50%) scale(1.1);
+}
+
+.watchlist-nav-btn:active:not(:disabled) {
+    transform: translateY(-50%) scale(0.95);
+}
+
+.watchlist-nav-btn:disabled {
+    opacity: 0.2;
+    cursor: not-allowed;
+}
+
+.watchlist-nav-btn-left {
+    left: 8px;
+}
+
+.watchlist-nav-btn-right {
+    right: 8px;
+}
+
+/* Company logo styling */
+.company-logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+}
+
+.company-logo:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.logo-initials {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.logo-container {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+}
+
+.logo-placeholder {
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+.logo-container img {
+    opacity: 0;
+    animation: logoFadeIn 0.3s ease forwards;
+}
+
+@keyframes logoFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}

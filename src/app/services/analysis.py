@@ -1,12 +1,17 @@
-"""Market data analysis services."""
+"""Market data analysis services.
+
+MDB-Engine Integration:
+- Logging: Uses `get_logger(__name__)` from mdb_engine.observability for structured logging
+"""
 import math
 import pandas as pd
+import time
 from typing import Tuple, Optional, Dict, Any
+import vectorbt as vbt
 from datetime import datetime, timedelta
 from alpaca_trade_api.rest import TimeFrame
 from mdb_engine.observability import get_logger
 from ..core.config import ALPACA_KEY, ALPACA_SECRET, ALPACA_URL
-from .indicators import rsi, sma, atr
 import alpaca_trade_api as tradeapi
 
 logger = get_logger(__name__)
@@ -21,17 +26,35 @@ else:
 
 api = tradeapi.REST(ALPACA_KEY, ALPACA_SECRET, ALPACA_URL, api_version='v2') if ALPACA_KEY and ALPACA_SECRET else None
 
-# Removed Firecrawl - focusing on headlines only for balanced low strategy
+# Firecrawl integration for historical news search
+try:
+    from firecrawl import Firecrawl
+    from ..core.config import FIRECRAWL_API_KEY
+    firecrawl_client = Firecrawl(api_key=FIRECRAWL_API_KEY) if FIRECRAWL_API_KEY else None
+except ImportError:
+    logger.warning("firecrawl-py not installed - historical news search will be limited")
+    firecrawl_client = None
+except Exception as e:
+    logger.warning(f"Firecrawl initialization failed: {e}")
+    firecrawl_client = None
 
-def get_market_data(symbol: str, days: int = 100) -> Tuple[Optional[pd.DataFrame], list, list]:
+async def get_market_data(symbol: str, days: int = 100, query_template: Optional[str] = None, db=None) -> Tuple[Optional[pd.DataFrame], list, list]:
     """Fetch market data and news for a symbol.
     
+    Args:
+        symbol: Stock ticker symbol
+        days: Number of days of historical data to fetch
+        query_template: Optional Firecrawl query template (legacy)
+        db: Optional MongoDB database instance for caching
+        
     Returns:
         Tuple of (bars DataFrame, headlines list, news_objects list)
         news_objects contains full news data with URLs for explanation feature
     """
     if not api:
-        logger.error("Alpaca API not initialized - cannot fetch market data")
+        logger.error("❌ Alpaca API not initialized - cannot fetch market data")
+        logger.error(f"ALPACA_KEY present: {bool(ALPACA_KEY)}, ALPACA_SECRET present: {bool(ALPACA_SECRET)}")
+        logger.error(f"ALPACA_URL: {ALPACA_URL}")
         return None, [], []
     
     try:
@@ -98,8 +121,8 @@ def get_market_data(symbol: str, days: int = 100) -> Tuple[Optional[pd.DataFrame
                 logger.debug(f"1-year range failed for {symbol}: {e}")
         
         if bars is None or bars.empty:
-            logger.error(f"No data returned for {symbol} after all attempts")
-            return None, []
+            logger.error(f"❌ No data returned for {symbol} after all attempts")
+            return None, [], []
         
         # Critical check: if we only have 1 row, something is very wrong
         if len(bars) == 1:
@@ -123,7 +146,7 @@ def get_market_data(symbol: str, days: int = 100) -> Tuple[Optional[pd.DataFrame
         missing_cols = [c for c in required_cols if c not in bars.columns]
         if missing_cols:
             logger.error(f"Missing required columns for {symbol}: {missing_cols}")
-            return None, []
+            return None, [], []
         
         # Handle timestamp column - it might be in index or as a column
         timestamp_col = None
@@ -152,39 +175,50 @@ def get_market_data(symbol: str, days: int = 100) -> Tuple[Optional[pd.DataFrame
         # Final check - ensure we have enough rows
         if len(bars) == 0:
             logger.error(f"After processing, no data rows remain for {symbol}")
-            return None, []
+            return None, [], []
         
         logger.debug(f"Fetched {len(bars)} days of data for {symbol}")
         if len(bars) < 14:
             logger.warning(f"Insufficient data for {symbol}: only {len(bars)} days (need 14+)")
         
-        news = api.get_news(symbol=symbol, limit=5)  # Get more headlines for better context
-        if not news:
-            return bars, []
-        
-        # Return full news objects with URLs for explanation feature
         news_items = []
         news_objects = []
-        for n in news:
-            headline_text = f"- {n.headline}"
-            news_items.append(headline_text)
-            # Extract URL and summary if available
-            news_obj = {
-                "headline": n.headline,
-                "url": getattr(n, 'url', None) or getattr(n, 'source_url', None),
-                "summary": getattr(n, 'summary', None) or getattr(n, 'content', None) or "",
-                "author": getattr(n, 'author', None) or "Unknown",
-                "created_at": getattr(n, 'created_at', None) or getattr(n, 'published_at', None)
-            }
-            news_objects.append(news_obj)
+        
+        try:
+            news = api.get_news(symbol=symbol, limit=5) if api else None
+            if news:
+                for n in news:
+                    headline_text = f"- {n.headline}"
+                    news_items.append(headline_text)
+                    news_obj = {
+                        "headline": n.headline,
+                        "url": getattr(n, 'url', None) or getattr(n, 'source_url', None),
+                        "summary": getattr(n, 'summary', None) or getattr(n, 'content', None) or "",
+                        "author": getattr(n, 'author', None) or "Unknown",
+                        "created_at": getattr(n, 'created_at', None) or getattr(n, 'published_at', None)
+                    }
+                    news_objects.append(news_obj)
+                logger.debug(f"Fetched {len(news_items)} news items from Alpaca for {symbol}")
+        except Exception as e:
+            logger.warning(f"Alpaca news fetch failed for {symbol}: {e}")
         
         return bars, news_items, news_objects
     except Exception as e:
         logger.error(f"Data fail {symbol}: {e}")
-        return None, [], []
+        return None, [], [], {}
 
 def analyze_technicals(df: pd.DataFrame) -> Dict[str, Any]:
-    """Calculate technical indicators: RSI, SMA, and ATR."""
+    """Calculate technical indicators using vectorbt.
+    
+    Architecture: Uses vectorbt for vectorized computation.
+    Indicators are computed on-the-fly, not stored in MongoDB.
+    
+    Args:
+        df: DataFrame with OHLCV data
+        
+    Returns:
+        Dict with technical indicators
+    """
     if df is None or df.empty:
         raise ValueError("DataFrame is empty or None")
     
@@ -201,36 +235,37 @@ def analyze_technicals(df: pd.DataFrame) -> Dict[str, Any]:
     if missing:
         raise ValueError(f"Missing required columns: {missing}. Available: {list(df.columns)}")
     
-    # Calculate RSI (needs at least 14 periods)
-    if len(df) >= 14:
-        df['rsi'] = rsi(df['close'], length=14)
-    else:
-        df['rsi'] = 50.0  # Default neutral RSI
+    # Calculate indicators using vectorbt (vectorized, fast)
+    try:
+        # RSI calculation
+        rsi_series = vbt.RSI.run(df['close'], window=14).rsi
+        
+        # SMA-200 calculation (use available data if less than 200)
+        sma_period = min(200, len(df))
+        sma_200_series = vbt.MA.run(df['close'], window=sma_period).ma
+        
+        # ATR calculation
+        atr_series = vbt.ATR.run(df['high'], df['low'], df['close'], window=14).atr
+        
+    except Exception as e:
+        logger.error(f"vectorbt indicator calculation failed: {e}")
+        raise
     
-    # Calculate SMA 200 (needs at least 200 periods, but use available data if less)
-    sma_period = min(200, len(df))
-    if len(df) >= sma_period:
-        df['sma_200'] = sma(df['close'], length=sma_period)
-    else:
-        # If not enough data for SMA, use simple average of available data
-        df['sma_200'] = df['close'].mean()
-    
-    # Calculate ATR (needs at least 14 periods)
-    if len(df) >= 14:
-        df['atr'] = atr(df['high'], df['low'], df['close'], length=14)
-    else:
-        # Use price range as proxy for ATR if insufficient data
-        df['atr'] = (df['high'] - df['low']).mean()
-    
+    # Get latest values
     current = df.iloc[-1]
+    rsi_val = float(rsi_series.iloc[-1]) if not pd.isna(rsi_series.iloc[-1]) else 50.0
+    sma_val = float(sma_200_series.iloc[-1]) if not pd.isna(sma_200_series.iloc[-1]) else float(current['close'])
+    atr_val = float(atr_series.iloc[-1]) if not pd.isna(atr_series.iloc[-1]) else 1.0
     
-    sma_val = current['sma_200'] if not math.isnan(current['sma_200']) else current['close']
     trend = "UP" if current['close'] > sma_val else "DOWN"
     
-    return {
+    techs = {
         "price": round(current['close'], 2),
-        "rsi": round(current['rsi'], 2) if not math.isnan(current['rsi']) else 50,
-        "atr": round(current['atr'], 2) if not math.isnan(current['atr']) else 1,
+        "rsi": round(rsi_val, 2),
+        "atr": round(atr_val, 2),
         "trend": trend,
-        "sma": round(sma_val, 2)
+        "sma": round(sma_val, 2),
+        "sma_200": round(sma_val, 2)  # Alias for compatibility
     }
+    
+    return techs
