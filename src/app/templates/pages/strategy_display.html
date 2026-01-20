@@ -1,146 +1,336 @@
-<div class="glass rounded-xl p-4 border {{ border_class }}" role="region" aria-label="Strategy configuration">
-    <div class="mb-3">
-        <div class="text-xs text-gray-400 mb-1 uppercase tracking-wider">Strategy</div>
-        <h3 class="text-lg font-bold text-white">{{ name|e }}</h3>
+<div id="strategy-display-content" 
+     x-data="{
+         rsi_threshold: {{ rsi_threshold }},
+         rsi_min: {{ rsi_min }},
+         sma_proximity_pct: {{ sma_proximity_pct }},
+         ai_score_required: {{ ai_score_required }},
+         original_rsi_threshold: {{ rsi_threshold }},
+         original_rsi_min: {{ rsi_min }},
+         original_sma_proximity_pct: {{ sma_proximity_pct }},
+         original_ai_score_required: {{ ai_score_required }},
+         get hasChanges() {
+             return this.rsi_threshold !== this.original_rsi_threshold ||
+                    this.rsi_min !== this.original_rsi_min ||
+                    Math.abs(this.sma_proximity_pct - this.original_sma_proximity_pct) > 0.01 ||
+                    this.ai_score_required !== this.original_ai_score_required;
+         },
+         adjust(param, delta) {
+             const limits = {
+                 rsi_threshold: { min: 20, max: 50 },
+                 rsi_min: { min: 10, max: 30 },
+                 sma_proximity_pct: { min: 0, max: 5 },
+                 ai_score_required: { min: 0, max: 10 }
+             };
+             const limit = limits[param];
+             if (!limit) return;
+             let val = this[param] + delta;
+             if (param === 'sma_proximity_pct') {
+                 val = Math.round(val * 10) / 10;
+             } else {
+                 val = Math.round(val);
+             }
+             this[param] = Math.max(limit.min, Math.min(limit.max, val));
+         }
+     }"
+     class="glass rounded-xl p-6 border {{ border_class }} relative transition-all duration-300" 
+     role="region" 
+     aria-label="Strategy configuration">
+    
+    <!-- HTMX Loading Indicator -->
+    <div id="strategy-loading-indicator" class="htmx-indicator absolute inset-0 bg-gray-900/90 backdrop-blur-md rounded-xl z-20 flex items-center justify-center">
+        <div class="text-center">
+            <div class="inline-block animate-spin mb-3">
+                <i data-lucide="loader-2" class="w-8 h-8 text-cyan-400"></i>
+            </div>
+            <div class="text-sm font-semibold text-white">Saving & Re-evaluating...</div>
+        </div>
     </div>
-    {% if goal %}
-    <div class="mb-3 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
-        <div class="text-xs text-purple-300 mb-1 font-semibold flex items-center gap-1.5">
-            <i data-lucide="target" class="w-3 h-3"></i>
-            Goal
+    
+    <!-- Content -->
+    <div class="htmx-request:opacity-50 htmx-request:pointer-events-none transition-opacity duration-200">
+        <!-- Save & Re-evaluate Button -->
+        <div x-show="hasChanges" 
+             x-cloak
+             x-transition
+             class="mb-6">
+            <!-- HTMX Form for Saving Strategy -->
+            <form 
+                hx-post="/api/strategy"
+                hx-target="#strategy-display"
+                hx-swap="innerHTML"
+                hx-indicator="#strategy-loading-indicator"
+                class="inline-block w-full">
+                <!-- Hidden inputs with current values -->
+                <input type="hidden" name="rsi_threshold" :value="rsi_threshold">
+                <input type="hidden" name="rsi_min" :value="rsi_min">
+                <input type="hidden" name="sma_proximity_pct" :value="sma_proximity_pct">
+                <input type="hidden" name="ai_score_required" :value="ai_score_required">
+                
+                <button 
+                    type="submit"
+                    class="w-full px-6 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30">
+                    <i data-lucide="save" class="w-4 h-4"></i>
+                    <span>Save & Re-evaluate Watchlist</span>
+                </button>
+            </form>
         </div>
-        <p class="text-sm text-white">{{ goal|e }}</p>
-    </div>
-    {% endif %}
-    <p class="text-xs text-gray-400 mb-3">Buy Low: Enter when stocks are oversold (RSI &lt; {{ rsi_threshold }}) with strong bounce-back signals.<br>Sell High: Exit at profit targets (entry + 3 ATR) or risk limits (entry - 2 ATR).</p>
-    <div class="grid grid-cols-2 gap-3 text-xs mb-3" role="list" aria-label="Strategy parameters">
-        <div class="glass rounded-lg p-2" role="listitem">
-            <div class="flex items-center gap-1 mb-1">
-                <div class="text-gray-400">RSI Threshold</div>
-                <div class="tooltip">
-                    <button type="button" aria-label="Learn about RSI threshold" class="focus:ring-2 focus:ring-blue-500/50 rounded">
-                        <i data-lucide="info" class="w-3 h-3 text-blue-400 cursor-help"></i>
-                    </button>
-                    <div class="tooltip-text">
-                        <strong>RSI Threshold</strong><br/>
-                        Maximum RSI value for entry signals. Only stocks with RSI below this are considered "oversold" and eligible to buy.<br/><br/>
-                        <strong>How it works:</strong> RSI &lt; {{ rsi_threshold }} means we only buy when stock is oversold (below {{ rsi_threshold }}).<br/><br/>
-                        <strong>Effect:</strong> Lower = fewer signals (more conservative), Higher = more signals (more aggressive)
+    
+        <!-- Parameters Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5" role="list" aria-label="Strategy parameters">
+            
+            <!-- RSI Threshold -->
+            <div class="glass rounded-lg p-5 transition-all duration-200 hover:border-cyan-500/30 group" role="listitem">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <div class="text-sm text-gray-300 font-medium">RSI Threshold</div>
+                        <div class="tooltip">
+                            <button type="button" aria-label="Learn about RSI threshold" class="focus:ring-2 focus:ring-cyan-500/50 rounded opacity-60 hover:opacity-100 transition-opacity">
+                                <i data-lucide="info" class="w-3.5 h-3.5 text-cyan-400 cursor-help"></i>
+                            </button>
+                            <div class="tooltip-text">
+                                <strong>RSI Threshold</strong><br/>
+                                Maximum RSI value for entry signals. Only stocks with RSI below this are considered "oversold" and eligible to buy.<br/><br/>
+                                <strong>How it works:</strong> RSI &lt; <span x-text="rsi_threshold"></span> means we only buy when stock is oversold (below <span x-text="rsi_threshold"></span>).<br/><br/>
+                                <strong>Effect:</strong> Lower = fewer signals (more conservative), Higher = more signals (more aggressive)
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="text-white font-bold" aria-label="RSI threshold: less than {{ rsi_threshold }}">&lt; {{ rsi_threshold }}</div>
-            <div class="text-gray-500 text-[10px] mt-1">On Sale (oversold)</div>
-        </div>
-        <div class="glass rounded-lg p-2" role="listitem">
-            <div class="flex items-center gap-1 mb-1">
-                <div class="text-gray-400">RSI Minimum</div>
-                <div class="tooltip">
-                    <button type="button" aria-label="Learn about RSI minimum" class="focus:ring-2 focus:ring-blue-500/50 rounded">
-                        <i data-lucide="info" class="w-3 h-3 text-blue-400 cursor-help"></i>
+                
+                <div class="flex items-baseline gap-2 mb-4">
+                    <span class="text-gray-500 text-lg">&lt;</span>
+                    <span class="text-3xl font-bold text-white transition-all duration-150" x-text="rsi_threshold"></span>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <button 
+                        type="button"
+                        @click="adjust('rsi_threshold', -1)"
+                        :disabled="rsi_threshold <= 20"
+                        class="w-10 h-10 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i data-lucide="minus" class="w-4 h-4 text-cyan-400"></i>
                     </button>
-                    <div class="tooltip-text">
-                        <strong>RSI Minimum</strong><br/>
-                        Minimum RSI value to avoid extreme oversold conditions. Filters out stocks that are too beaten down, which may indicate fundamental issues.<br/><br/>
-                        <strong>How it works:</strong> RSI &gt; {{ rsi_min }} means we avoid stocks that are extremely oversold (below {{ rsi_min }}).<br/><br/>
-                        <strong>Effect:</strong> Prevents buying stocks that are too beaten down (may have real problems)
+                    <div class="flex-1 px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700 text-white text-center font-semibold">
+                        <span x-text="rsi_threshold" class="text-lg"></span>
+                    </div>
+                    <button 
+                        type="button"
+                        @click="adjust('rsi_threshold', 1)"
+                        :disabled="rsi_threshold >= 50"
+                        class="w-10 h-10 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i data-lucide="plus" class="w-4 h-4 text-cyan-400"></i>
+                    </button>
+                </div>
+                <div class="flex items-center justify-between text-xs text-gray-500 mt-2">
+                    <span>20</span>
+                    <span>50</span>
+                </div>
+                <div class="text-gray-500 text-xs mt-2">On Sale (oversold)</div>
+            </div>
+            
+            <!-- RSI Minimum -->
+            <div class="glass rounded-lg p-5 transition-all duration-200 hover:border-cyan-500/30 group" role="listitem">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <div class="text-sm text-gray-300 font-medium">RSI Minimum</div>
+                        <div class="tooltip">
+                            <button type="button" aria-label="Learn about RSI minimum" class="focus:ring-2 focus:ring-cyan-500/50 rounded opacity-60 hover:opacity-100 transition-opacity">
+                                <i data-lucide="info" class="w-3.5 h-3.5 text-cyan-400 cursor-help"></i>
+                            </button>
+                            <div class="tooltip-text">
+                                <strong>RSI Minimum</strong><br/>
+                                Minimum RSI value to avoid extreme oversold conditions. Filters out stocks that are too beaten down, which may indicate fundamental issues.<br/><br/>
+                                <strong>How it works:</strong> RSI &gt; <span x-text="rsi_min"></span> means we avoid stocks that are extremely oversold (below <span x-text="rsi_min"></span>).<br/><br/>
+                                <strong>Effect:</strong> Prevents buying stocks that are too beaten down (may have real problems)
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="text-white font-bold" aria-label="RSI minimum: greater than {{ rsi_min }}">&gt; {{ rsi_min }}</div>
-            <div class="text-gray-500 text-[10px] mt-1">Avoid extreme oversold</div>
-        </div>
-        <div class="glass rounded-lg p-2" role="listitem">
-            <div class="flex items-center gap-1 mb-1">
-                <div class="text-gray-400">SMA-200 Proximity</div>
-                <div class="tooltip">
-                    <button type="button" aria-label="Learn about SMA-200 proximity" class="focus:ring-2 focus:ring-blue-500/50 rounded">
-                        <i data-lucide="info" class="w-3 h-3 text-blue-400 cursor-help"></i>
+                
+                <div class="flex items-baseline gap-2 mb-4">
+                    <span class="text-gray-500 text-lg">&gt;</span>
+                    <span class="text-3xl font-bold text-white transition-all duration-150" x-text="rsi_min"></span>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <button 
+                        type="button"
+                        @click="adjust('rsi_min', -1)"
+                        :disabled="rsi_min <= 10"
+                        class="w-10 h-10 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i data-lucide="minus" class="w-4 h-4 text-cyan-400"></i>
                     </button>
-                    <div class="tooltip-text">
-                        <strong>SMA-200 Proximity</strong><br/>
-                        Maximum percentage above SMA-200 for entry. Stocks must be near support (0-5%). Lower = closer to support (more conservative), Higher = further from support (more opportunities)<br/><br/>
-                        <strong>How it works:</strong> Price must be within {{ sma_proximity_pct }}% above the 200-day moving average. This ensures we're buying near support levels, which increases bounce-back probability.<br/><br/>
-                        <strong>Effect:</strong> Lower = closer to support (more conservative, fewer signals), Higher = further from support (more opportunities but less near support)
+                    <div class="flex-1 px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700 text-white text-center font-semibold">
+                        <span x-text="rsi_min" class="text-lg"></span>
+                    </div>
+                    <button 
+                        type="button"
+                        @click="adjust('rsi_min', 1)"
+                        :disabled="rsi_min >= 30"
+                        class="w-10 h-10 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i data-lucide="plus" class="w-4 h-4 text-cyan-400"></i>
+                    </button>
+                </div>
+                <div class="flex items-center justify-between text-xs text-gray-500 mt-2">
+                    <span>10</span>
+                    <span>30</span>
+                </div>
+                <div class="text-gray-500 text-xs mt-2">Avoid extreme oversold</div>
+            </div>
+            
+            <!-- SMA-200 Proximity -->
+            <div class="glass rounded-lg p-5 transition-all duration-200 hover:border-cyan-500/30 group" role="listitem">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <div class="text-sm text-gray-300 font-medium">SMA-200 Proximity</div>
+                        <div class="tooltip">
+                            <button type="button" aria-label="Learn about SMA-200 proximity" class="focus:ring-2 focus:ring-cyan-500/50 rounded opacity-60 hover:opacity-100 transition-opacity">
+                                <i data-lucide="info" class="w-3.5 h-3.5 text-cyan-400 cursor-help"></i>
+                            </button>
+                            <div class="tooltip-text">
+                                <strong>SMA-200 Proximity</strong><br/>
+                                Maximum percentage above SMA-200 for entry. Stocks must be near support (0-5%). Lower = closer to support (more conservative), Higher = further from support (more opportunities)<br/><br/>
+                                <strong>How it works:</strong> Price must be within <span x-text="sma_proximity_pct.toFixed(1)"></span>% above the 200-day moving average. This ensures we're buying near support levels, which increases bounce-back probability.<br/><br/>
+                                <strong>Effect:</strong> Lower = closer to support (more conservative, fewer signals), Higher = further from support (more opportunities but less near support)
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="text-white font-bold" aria-label="SMA-200 proximity: less than or equal to {{ sma_proximity_pct }}%">≤ {{ sma_proximity_pct }}%</div>
-            <div class="text-gray-500 text-[10px] mt-1">Near support level</div>
-        </div>
-        <div class="glass rounded-lg p-2" role="listitem">
-            <div class="flex items-center gap-1 mb-1">
-                <div class="text-gray-400">AI Score Required</div>
-                <div class="tooltip">
-                    <button type="button" aria-label="Learn about AI score requirement" class="focus:ring-2 focus:ring-blue-500/50 rounded">
-                        <i data-lucide="info" class="w-3 h-3 text-blue-400 cursor-help"></i>
+                
+                <div class="flex items-baseline gap-2 mb-4">
+                    <span class="text-gray-500 text-lg">≤</span>
+                    <span class="text-3xl font-bold text-white transition-all duration-150" x-text="sma_proximity_pct.toFixed(1)"></span>
+                    <span class="text-lg text-gray-500">%</span>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <button 
+                        type="button"
+                        @click="adjust('sma_proximity_pct', -0.1)"
+                        :disabled="sma_proximity_pct <= 0"
+                        class="w-10 h-10 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i data-lucide="minus" class="w-4 h-4 text-cyan-400"></i>
                     </button>
-                    <div class="tooltip-text">
-                        <strong>AI Score Required</strong><br/>
-                        Minimum AI confidence score (0-10) required for entry. AI analyzes news, technicals, and patterns to score bounce-back probability.<br/><br/>
-                        <strong>How it works:</strong> Score ≥ {{ ai_score_required }} means we only buy when AI is confident about bounce potential.<br/><br/>
-                        <strong>Effect:</strong> Higher = fewer but higher quality signals, Lower = more signals but lower confidence
+                    <div class="flex-1 px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700 text-white text-center font-semibold">
+                        <span x-text="sma_proximity_pct.toFixed(1)" class="text-lg"></span>
+                    </div>
+                    <button 
+                        type="button"
+                        @click="adjust('sma_proximity_pct', 0.1)"
+                        :disabled="sma_proximity_pct >= 5"
+                        class="w-10 h-10 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i data-lucide="plus" class="w-4 h-4 text-cyan-400"></i>
+                    </button>
+                </div>
+                <div class="flex items-center justify-between text-xs text-gray-500 mt-2">
+                    <span>0</span>
+                    <span>5%</span>
+                </div>
+                <div class="text-gray-500 text-xs mt-2">Near support level</div>
+            </div>
+            
+            <!-- AI Score Required -->
+            <div class="glass rounded-lg p-5 transition-all duration-200 hover:border-cyan-500/30 group" role="listitem">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <div class="text-sm text-gray-300 font-medium">AI Score Required</div>
+                        <div class="tooltip">
+                            <button type="button" aria-label="Learn about AI score requirement" class="focus:ring-2 focus:ring-cyan-500/50 rounded opacity-60 hover:opacity-100 transition-opacity">
+                                <i data-lucide="info" class="w-3.5 h-3.5 text-cyan-400 cursor-help"></i>
+                            </button>
+                            <div class="tooltip-text">
+                                <strong>AI Score Required</strong><br/>
+                                Minimum AI confidence score (0-10) required for entry. AI analyzes news, technicals, and patterns to score bounce-back probability.<br/><br/>
+                                <strong>How it works:</strong> Score ≥ <span x-text="ai_score_required"></span> means we only buy when AI is confident about bounce potential.<br/><br/>
+                                <strong>Effect:</strong> Higher = fewer but higher quality signals, Lower = more signals but lower confidence
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="text-white font-bold" aria-label="AI score required: greater than or equal to {{ ai_score_required }}">≥ {{ ai_score_required }}</div>
-            <div class="text-gray-500 text-[10px] mt-1">Bounce-back confidence</div>
-        </div>
-        <div class="glass rounded-lg p-2" role="listitem">
-            <div class="flex items-center gap-1 mb-1">
-                <div class="text-gray-400">Risk/Reward</div>
-                <div class="tooltip">
-                    <button type="button" aria-label="Learn about risk reward ratio" class="focus:ring-2 focus:ring-blue-500/50 rounded">
-                        <i data-lucide="info" class="w-3 h-3 text-blue-400 cursor-help"></i>
+                
+                <div class="flex items-baseline gap-2 mb-4">
+                    <span class="text-gray-500 text-lg">≥</span>
+                    <span class="text-3xl font-bold text-white transition-all duration-150" x-text="ai_score_required"></span>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <button 
+                        type="button"
+                        @click="adjust('ai_score_required', -1)"
+                        :disabled="ai_score_required <= 0"
+                        class="w-10 h-10 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i data-lucide="minus" class="w-4 h-4 text-cyan-400"></i>
                     </button>
-                    <div class="tooltip-text">
-                        <strong>Risk/Reward Ratio (3:1)</strong><br/>
-                        Informational ratio showing potential profit vs risk. This is <strong>not configurable</strong> - it's calculated from the strategy's stop loss and take profit rules.<br/><br/>
-                        <strong>How it works:</strong> Stop loss is 2×ATR below entry, take profit is 3×ATR above entry. This creates a 3:1 reward-to-risk ratio.<br/><br/>
-                        <strong>Example:</strong> Risk $1 to potentially make $1.50 (3:1 ratio)
+                    <div class="flex-1 px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700 text-white text-center font-semibold">
+                        <span x-text="ai_score_required" class="text-lg"></span>
+                    </div>
+                    <button 
+                        type="button"
+                        @click="adjust('ai_score_required', 1)"
+                        :disabled="ai_score_required >= 10"
+                        class="w-10 h-10 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i data-lucide="plus" class="w-4 h-4 text-cyan-400"></i>
+                    </button>
+                </div>
+                <div class="flex items-center justify-between text-xs text-gray-500 mt-2">
+                    <span>0</span>
+                    <span>10</span>
+                </div>
+                <div class="text-gray-500 text-xs mt-2">Bounce-back confidence</div>
+            </div>
+            
+            <!-- Risk/Reward (read-only) -->
+            <div class="glass rounded-lg p-5 transition-all duration-200 opacity-75" role="listitem">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <div class="text-sm text-gray-300 font-medium">Risk/Reward</div>
+                        <div class="tooltip">
+                            <button type="button" aria-label="Learn about risk reward ratio" class="focus:ring-2 focus:ring-cyan-500/50 rounded opacity-60 hover:opacity-100 transition-opacity">
+                                <i data-lucide="info" class="w-3.5 h-3.5 text-cyan-400 cursor-help"></i>
+                            </button>
+                            <div class="tooltip-text">
+                                <strong>Risk/Reward Ratio (3:1)</strong><br/>
+                                Informational ratio showing potential profit vs risk. This is <strong>not configurable</strong> - it's calculated from the strategy's stop loss and take profit rules.<br/><br/>
+                                <strong>How it works:</strong> Stop loss is 2×ATR below entry, take profit is 3×ATR above entry. This creates a 3:1 reward-to-risk ratio.<br/><br/>
+                                <strong>Example:</strong> Risk $1 to potentially make $1.50 (3:1 ratio)
+                            </div>
+                        </div>
                     </div>
                 </div>
+                <div class="text-3xl font-bold text-white mb-2" aria-label="Risk reward ratio: 3 to 1">3:1</div>
+                <div class="text-gray-500 text-xs">Reward-to-risk ratio (info only)</div>
             </div>
-            <div class="text-white font-bold" aria-label="Risk reward ratio: 3 to 1">3:1</div>
-            <div class="text-gray-500 text-[10px] mt-1">Reward-to-risk ratio (info only)</div>
-        </div>
-        <div class="glass rounded-lg p-2" role="listitem">
-            <div class="flex items-center gap-1 mb-1">
-                <div class="text-gray-400">Risk Per Trade</div>
-                <div class="tooltip">
-                    <button type="button" aria-label="Learn about risk per trade" class="focus:ring-2 focus:ring-blue-500/50 rounded">
-                        <i data-lucide="info" class="w-3 h-3 text-blue-400 cursor-help"></i>
-                    </button>
-                    <div class="tooltip-text">
-                        <strong>Risk Per Trade</strong><br/>
-                        Dollar amount you're willing to risk if stop loss is hit. This determines position size based on volatility.<br/><br/>
-                        <strong>How it works:</strong> Position size = risk_amount / (2 × ATR). The stop loss is set at 2×ATR below entry, so if it hits, you lose exactly this amount.<br/><br/>
-                        <strong>Example:</strong> $50 risk with $2 ATR = 25 shares. If stop loss hits, you lose $50.<br/><br/>
-                        <strong>Effect:</strong> Higher = larger positions, Lower = smaller positions
-                    </div>
-                </div>
-            </div>
-            <div class="text-white font-bold" aria-label="Risk per trade: ${{ risk_per_trade|round(0)|int }}">${{ risk_per_trade|round(0)|int }}</div>
-            <div class="text-gray-500 text-[10px] mt-1">Dollar risk if stop loss hits</div>
-        </div>
-        <div class="glass rounded-lg p-2" role="listitem">
-            <div class="flex items-center gap-1 mb-1">
-                <div class="text-gray-400">Max Capital</div>
-                <div class="tooltip">
-                    <button type="button" aria-label="Learn about max capital" class="focus:ring-2 focus:ring-blue-500/50 rounded">
-                        <i data-lucide="info" class="w-3 h-3 text-blue-400 cursor-help"></i>
-                    </button>
-                    <div class="tooltip-text">
-                        <strong>Max Capital</strong><br/>
-                        Maximum total capital to deploy across all positions. This caps position size to prevent over-allocation.<br/><br/>
-                        <strong>How it works:</strong> Max shares = min(buying_power, max_capital) / price. This limits total exposure across all positions.{% if max_capital_note %} {{ max_capital_note|e }}{% endif %}<br/><br/>
-                        <strong>Example:</strong> $5,000 max capital with $100 stock = max 50 shares per position.<br/><br/>
-                        <strong>Effect:</strong> Limits total exposure, prevents over-allocation
-                    </div>
-                </div>
-            </div>
-            <div class="text-white font-bold" aria-label="Max capital: ${{ max_capital|round(0)|int }}">${{ max_capital|round(0)|int|string|replace(',', '') }}</div>
-            <div class="text-gray-500 text-[10px] mt-1">Total capital limit{% if max_capital_note %} {{ max_capital_note|e }}{% endif %}</div>
         </div>
     </div>
 </div>
+
+<script>
+    lucide.createIcons();
+    
+    // HTMX Gold Standard: Handle afterSwap to reinitialize Alpine.js
+    document.addEventListener('htmx:afterSwap', function(event) {
+        if (event.detail.target?.id === 'strategy-display') {
+            const strategyContent = event.detail.target.querySelector('#strategy-display-content');
+            Alpine.initTree(strategyContent || event.detail.target);
+            setTimeout(() => lucide.createIcons(), 150);
+        }
+    });
+    
+    // HTMX Gold Standard: Listen for server-triggered event to show re-evaluate button and trigger it
+    document.addEventListener('strategySaved', function() {
+        const container = document.getElementById('reevaluate-watchlist-container');
+        const reevaluateBtn = document.getElementById('reevaluate-watchlist-btn');
+        
+        // Show re-evaluate button
+        if (container && container.__x) {
+            container.__x.$data.show = true;
+        }
+        
+        // Auto-trigger re-evaluation using HTMX
+        setTimeout(() => {
+            if (reevaluateBtn) {
+                htmx.trigger(reevaluateBtn, 'click');
+            }
+        }, 300);
+    });
+</script>

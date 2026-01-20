@@ -2,17 +2,27 @@
 
 HTMX Best Practice: CSRF protection is essential for POST endpoints.
 This module provides CSRF token generation, validation, and middleware.
+
+CSRF tokens are automatically generated and stored per session.
+HTMX requests should include the token in the X-CSRF-Token header.
 """
+import os
 import secrets
 from typing import Optional
 from fastapi import Request, HTTPException, status
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
+from starlette.responses import Response, JSONResponse
 from mdb_engine.observability import get_logger
 
 logger = get_logger(__name__)
 
+# CSRF protection can be disabled for development/testing
+# Set ENABLE_CSRF_PROTECTION=false to disable (not recommended for production)
+# Default to false - enable after adding CSRF tokens to HTMX requests via hx-headers
+ENABLE_CSRF_PROTECTION = os.getenv("ENABLE_CSRF_PROTECTION", "false").lower() == "true"
+
 # CSRF token storage (in production, use Redis or database)
+# Using in-memory dict for simplicity - consider Redis for multi-instance deployments
 _csrf_tokens: dict[str, str] = {}
 
 
@@ -101,42 +111,74 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         """Process request and validate CSRF token for state-changing methods.
         
         HTMX Gold Standard: CSRF protection for POST/PUT/DELETE requests.
-        For now, we'll be lenient and allow requests without CSRF tokens during migration.
-        In production, enforce CSRF validation strictly.
+        
+        CSRF tokens are expected in the X-CSRF-Token header for HTMX requests.
+        Tokens are automatically generated and stored per session.
+        
+        To disable CSRF protection (not recommended), set ENABLE_CSRF_PROTECTION=false.
         """
-        # Skip CSRF check for GET, HEAD, OPTIONS
+        # Skip CSRF check if disabled
+        if not ENABLE_CSRF_PROTECTION:
+            response = await call_next(request)
+            return response
+        
+        # Skip CSRF check for GET, HEAD, OPTIONS (safe methods)
         if request.method in ("GET", "HEAD", "OPTIONS"):
             response = await call_next(request)
             return response
         
-        # Skip CSRF check for health/metrics endpoints
+        # Skip CSRF check for health/metrics endpoints (monitoring)
         if request.url.path in ("/health", "/metrics"):
             response = await call_next(request)
             return response
         
-        # Skip CSRF check for WebSocket endpoints
+        # Skip CSRF check for WebSocket endpoints (different protocol)
         if request.url.path.startswith("/ws"):
             response = await call_next(request)
             return response
         
         # Get CSRF token from header (HTMX sends in X-CSRF-Token)
         # HTMX Gold Standard: CSRF tokens sent via headers, not form data
-        # Don't consume request body here - let FastAPI handle form parsing
-        csrf_token = request.headers.get("X-CSRF-Token") or request.headers.get("X-Csrf-Token")
+        # Also check form data as fallback for non-HTMX requests
+        csrf_token = (
+            request.headers.get("X-CSRF-Token") or 
+            request.headers.get("X-Csrf-Token") or
+            request.headers.get("X-Csrf-Token")
+        )
         
-        # CSRF validation: Currently disabled during migration to avoid consuming request body
-        # In production, enable strict validation and ensure HTMX sends CSRF tokens in headers
-        # For now, we skip validation to allow the application to work
-        # TODO: Enable CSRF validation in production after adding hx-headers to all HTMX requests
-        if csrf_token and not validate_csrf_token(request, csrf_token):
-            logger.warning(f"CSRF validation failed for {request.method} {request.url.path} - allowing for now (migration)")
-            # TODO: Enable strict CSRF validation in production
-            # return Response(
-            #     content='{"error": "CSRF token validation failed"}',
-            #     status_code=status.HTTP_403_FORBIDDEN,
-            #     media_type="application/json"
-            # )
+        # Try to get from form data if not in headers (for non-HTMX requests)
+        if not csrf_token:
+            try:
+                # Note: This requires reading the request body, which FastAPI handles
+                # For HTMX requests, tokens should be in headers
+                form_data = await request.form()
+                csrf_token = form_data.get("csrf_token")
+            except Exception:
+                # Request body already consumed or not form data
+                pass
         
+        # Validate CSRF token
+        if not csrf_token:
+            logger.warning(
+                f"CSRF token missing for {request.method} {request.url.path}. "
+                "HTMX requests should include X-CSRF-Token header."
+            )
+            return JSONResponse(
+                content={"error": "CSRF token missing", "detail": "Please include X-CSRF-Token header"},
+                status_code=status.HTTP_403_FORBIDDEN
+            )
+        
+        if not validate_csrf_token(request, csrf_token):
+            logger.warning(
+                f"CSRF validation failed for {request.method} {request.url.path}. "
+                "Token may be expired or invalid."
+            )
+            return JSONResponse(
+                content={"error": "CSRF token validation failed", "detail": "Invalid or expired CSRF token"},
+                status_code=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Token is valid, proceed with request
         response = await call_next(request)
         return response
 
@@ -144,11 +186,17 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 def get_csrf_token_for_template(request: Request) -> str:
     """Get or generate CSRF token for template rendering.
     
+    This function ensures a CSRF token exists for the current session.
+    Tokens are automatically generated if missing.
+    
+    HTMX Best Practice: Include CSRF token in all forms and HTMX requests.
+    Use hx-headers attribute to include token: hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+    
     Args:
         request: FastAPI request object
         
     Returns:
-        CSRF token string
+        CSRF token string for the current session
     """
     session_id = _get_session_id(request)
     token = get_csrf_token(session_id)
@@ -156,5 +204,6 @@ def get_csrf_token_for_template(request: Request) -> str:
     if not token:
         token = generate_csrf_token()
         store_csrf_token(session_id, token)
+        logger.debug(f"Generated new CSRF token for session {session_id[:8]}...")
     
     return token

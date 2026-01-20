@@ -178,25 +178,16 @@
                         if (value) {
                             // Initialize TradingView widget when expanded
                             setTimeout(() => {
-                                const containerId = {{ tradingview_id|tojson }};
-                                const symbolName = {{ symbol|tojson }};
-                                const container = document.getElementById(containerId);
-                                if (container && typeof TradingView !== 'undefined') {
-                                    try {
-                                        new TradingView.widget({
-                                            'autosize': true,
-                                            'symbol': symbolName,
-                                            'interval': 'D',
-                                            'timezone': 'Etc/UTC',
-                                            'theme': 'dark',
-                                            'style': '1',
-                                            'container_id': containerId,
-                                            'locale': 'en'
-                                        });
-                                    } catch (e) {
-                                        console.warn('TradingView widget initialization error:', e);
-                                    }
-                                }
+                                new TradingView.widget({
+                                    'autosize': true,
+                                    'symbol': {{ symbol|tojson }},
+                                    'interval': 'D',
+                                    'timezone': 'Etc/UTC',
+                                    'theme': 'dark',
+                                    'style': '1',
+                                    'container_id': {{ tradingview_id|tojson }},
+                                    'locale': 'en'
+                                });
                             }, 300);
                         }
                     });

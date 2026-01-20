@@ -1,0 +1,22 @@
+<div class="glass rounded-lg p-2.5 mb-2 border {{ border_class }} {{ bg_class }}">
+    <div class="flex justify-between items-center">
+        <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg {{ bg_class }} flex items-center justify-center border {{ border_class }}">
+                <i data-lucide="{{ icon }}" class="text-xs w-4 h-4 {{ color_class }}"></i>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="font-semibold text-white text-sm">{{ symbol }}</span>
+                    <span class="text-xs {{ color_class }} font-medium">{{ action }}</span>
+                </div>
+                <div class="text-xs text-gray-400">{{ qty }} shares @ ${{ "%.2f"|format(price) }}</div>
+                {% if reason %}
+                <div class="text-xs text-gray-500 mt-0.5">{{ reason|e }}</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="text-right">
+            <div class="text-xs text-gray-400">{{ timestamp }}</div>
+        </div>
+    </div>
+</div>

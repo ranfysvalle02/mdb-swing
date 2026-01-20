@@ -46,8 +46,6 @@ class StrategyConfig(BaseModel):
     rsi_min: int = Field(description="Minimum RSI to avoid extreme oversold (15-25, typical: 20).")
     sma_proximity_pct: float = Field(description="Maximum percentage above SMA-200 for entry (0-5, typical: 3.0). Lower = closer to support (more conservative).")
     ai_score_required: int = Field(description="Minimum AI score required (0-10, typical: 6-9). Higher = more conservative.")
-    risk_per_trade: float = Field(description="Dollar amount to risk per trade (25-200, typical: 50-100).")
-    max_capital: float = Field(description="Maximum capital to deploy (1000-50000, typical: 2500-10000).")
     reasoning: str = Field(description="Brief explanation of why these parameters match the goal.")
 
 
@@ -162,14 +160,11 @@ class EyeAI:
                 "PARAMETER GUIDELINES:\n"
                 "- rsi_threshold (20-50): Maximum RSI for entry. Lower = more conservative (fewer signals). Typical: 30-40\n"
                 "- rsi_min (15-25): Minimum RSI to avoid extreme oversold. Typical: 20\n"
-                "- ai_score_required (0-10): Minimum AI score. Higher = more conservative. Typical: 6-9\n"
-                "- risk_per_trade (25-200): Dollar risk per trade. Typical: 50-100\n"
-                "- max_capital (1000-50000): Max capital to deploy. Should scale with budget. Typical: 2500-10000\n\n"
+                "- ai_score_required (0-10): Minimum AI score. Higher = more conservative. Typical: 6-9\n\n"
                 "INTERPRET THE GOAL:\n"
-                "- 'Conservative' / 'Safe' / 'Low risk' → Lower RSI threshold (30), Higher AI score (8-9), Lower risk per trade\n"
-                "- 'Aggressive' / 'More opportunities' → Higher RSI threshold (40), Lower AI score (6-7), Higher risk per trade\n"
-                "- 'Balanced' / 'Moderate' → Middle values (RSI 35, Score 7, Risk $50)\n"
-                "- Budget considerations: If budget < $5000, use lower max_capital. If > $10000, can use higher max_capital\n\n"
+                "- 'Conservative' / 'Safe' / 'Low risk' → Lower RSI threshold (30), Higher AI score (8-9)\n"
+                "- 'Aggressive' / 'More opportunities' → Higher RSI threshold (40), Lower AI score (6-7)\n"
+                "- 'Balanced' / 'Moderate' → Middle values (RSI 35, Score 7)\n\n"
                 "Generate parameters that best match the user's goal and risk tolerance."
             )),
             ("human", (

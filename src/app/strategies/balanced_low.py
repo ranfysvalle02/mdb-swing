@@ -202,8 +202,6 @@ def get_budget_preset(budget: float) -> Dict[str, Any]:
             "rsi_threshold": 30,  # More conservative (lower = fewer signals)
             "rsi_min": 20,  # Avoid extreme oversold
             "ai_min_score": 8,  # Higher quality required
-            "risk_per_trade": budget * 0.05,  # 5% of budget per trade
-            "max_capital": budget * 0.8,  # Use 80% max
             "name": "Balanced Low (Conservative)",
             "description": "Conservative bounce-back opportunities - high probability setups only"
         }
@@ -213,8 +211,6 @@ def get_budget_preset(budget: float) -> Dict[str, Any]:
             "rsi_threshold": 35,  # Balanced - RSI sweet spot 20-35
             "rsi_min": 20,  # Avoid extreme oversold
             "ai_min_score": 7,  # Good bounce-back opportunities
-            "risk_per_trade": 50.0,  # Fixed $50 risk
-            "max_capital": min(budget * 0.5, 5000),  # Use up to $5k
             "name": "Balanced Low (Moderate)",
             "description": "Buy low, sell high - oversold stocks ready to ride the wave back up"
         }
@@ -224,8 +220,6 @@ def get_budget_preset(budget: float) -> Dict[str, Any]:
             "rsi_threshold": 40,  # More signals - wider RSI range
             "rsi_min": 20,  # Still avoid extreme oversold
             "ai_min_score": 6,  # Accept more bounce-back opportunities
-            "risk_per_trade": 100.0,  # Higher risk per trade
-            "max_capital": min(budget * 0.3, 10000),  # Use up to $10k
             "name": "Balanced Low (Aggressive)",
             "description": "Aggressive bounce-back strategy - more opportunities to buy low and sell high"
         }

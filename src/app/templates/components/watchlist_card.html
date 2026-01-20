@@ -1,7 +1,51 @@
-{% if price is not none or rsi is not none %}
+{% if error is defined and error %}
+{# ERROR CARD - Show error state #}
+<div class="ticker-card watchlist-card watchlist-card-error watchlist-interactive-element glass-panel rounded-lg p-3 border border-red-500/30 bg-red-500/5 group transition-all relative cursor-default min-w-[320px]" 
+     data-symbol="{{ symbol|e }}"
+     data-meets-criteria="false"
+     data-error="true"
+     role="listitem"
+     aria-label="Ticker {{ symbol|e }} - error loading data">
+    <div class="flex items-center justify-between gap-2 mb-2">
+        <span class="text-lg font-mono font-bold text-white">{{ symbol|e }}</span>
+        <div class="flex items-center gap-2">
+            <button 
+                hx-get="/api/watch-list"
+                hx-target="#watch-list"
+                hx-swap="innerHTML"
+                hx-indicator="#watchlist-loading-overlay"
+                class="retry-symbol-btn flex items-center gap-1 px-2 py-1 rounded-md bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-xs font-medium border border-cyan-500/30 transition-all"
+                title="Retry loading {{ symbol|e }}"
+                aria-label="Retry loading {{ symbol|e }}">
+                <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                <span>Retry</span>
+            </button>
+            <button 
+                hx-post="/api/watch-list"
+                hx-vals='{{ {"action": "remove", "symbol": symbol} | tojson | e }}'
+                hx-confirm="Remove {{ symbol|e }} from watch list?"
+                hx-target="#watch-list"
+                hx-swap="innerHTML"
+                hx-indicator="#watchlist-loading-overlay"
+                class="remove-ticker-btn flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/80 hover:bg-red-500 text-white border border-red-400/50 shadow-md hover:shadow-lg transition-all focus:ring-2 focus:ring-red-500/50 focus:outline-none group/remove"
+                title="Remove {{ symbol|e }} from watch list"
+                aria-label="Remove {{ symbol|e }} from watch list">
+                <i data-lucide="x" class="w-4 h-4 group-hover/remove:scale-110 transition-transform" aria-hidden="true"></i>
+            </button>
+        </div>
+    </div>
+    <div class="flex items-center gap-2 px-2 py-2 rounded-md bg-red-500/10 border border-red-500/30">
+        <i data-lucide="alert-circle" class="w-4 h-4 text-red-400 flex-shrink-0"></i>
+        <div class="flex-1 min-w-0">
+            <div class="text-xs font-semibold text-red-300 mb-0.5">Error loading data</div>
+            <div class="text-xs text-red-400/80 line-clamp-2">{{ error|e }}</div>
+        </div>
+    </div>
+</div>
+{% elif price is not none or rsi is not none %}
 {# CANDIDATE CARD - Meets Criteria #}
 {% if meets_criteria %}
-<div class="ticker-card watchlist-card watchlist-card-candidate glass-panel rounded-xl p-2 border-2 border-green-500/60 bg-gradient-to-br from-green-500/25 via-green-500/15 to-green-500/10 shadow-lg shadow-green-500/40 group transition-all relative cursor-pointer hover:scale-[1.02] hover:shadow-2xl hover:shadow-green-500/50 hover:border-green-400 hover:bg-gradient-to-br hover:from-green-500/30 hover:via-green-500/20 hover:to-green-500/15 focus-within:ring-2 focus-within:ring-green-500/70 active:scale-[0.99] min-w-[320px]" 
+<div class="ticker-card watchlist-card watchlist-card-candidate watchlist-interactive-element glass-panel rounded-xl p-2 border-2 border-green-500/60 bg-gradient-to-br from-green-500/25 via-green-500/15 to-green-500/10 shadow-lg shadow-green-500/40 group transition-all relative cursor-pointer hover:scale-[1.02] hover:shadow-2xl hover:shadow-green-500/50 hover:border-green-400 hover:bg-gradient-to-br hover:from-green-500/30 hover:via-green-500/20 hover:to-green-500/15 focus-within:ring-2 focus-within:ring-green-500/70 active:scale-[0.99] min-w-[320px]" 
      data-symbol="{{ symbol|e }}"
      data-meets-criteria="true"
      data-price="{{ price if price else '' }}"
@@ -42,9 +86,9 @@
                     hx-confirm="Remove {{ symbol|e }} from watch list?"
                     hx-target="#watch-list"
                     hx-swap="innerHTML"
-                    hx-indicator="#watch-list"
+                    hx-indicator="#watchlist-loading-overlay"
                     hx-on:click="event.stopPropagation()"
-                    class="remove-ticker-btn flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/80 hover:bg-red-500 text-white border border-red-400/50 shadow-md hover:shadow-lg transition-all focus:ring-2 focus:ring-red-500/50 focus:outline-none group/remove"
+                    class="remove-ticker-btn watchlist-interactive-element flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/80 hover:bg-red-500 text-white border border-red-400/50 shadow-md hover:shadow-lg transition-all focus:ring-2 focus:ring-red-500/50 focus:outline-none group/remove"
                     title="Remove {{ symbol|e }} from watch list"
                     aria-label="Remove {{ symbol|e }} from watch list">
                     <i data-lucide="x" class="w-4 h-4 group-hover/remove:scale-110 transition-transform" aria-hidden="true"></i>
@@ -176,7 +220,7 @@
 
 {# NON-CANDIDATE CARD - Doesn't Meet Criteria #}
 {% else %}
-<div class="ticker-card watchlist-card watchlist-card-non-candidate glass-panel rounded-xl p-2 border border-gray-600/40 bg-gradient-to-br from-gray-800/30 to-gray-900/30 group transition-all relative cursor-pointer hover:scale-[1.02] hover:border-gray-500/60 hover:shadow-lg hover:bg-gradient-to-br hover:from-gray-800/40 hover:to-gray-900/40 focus-within:ring-2 focus-within:ring-gray-500/50 active:scale-[0.99] min-w-[320px]" 
+<div class="ticker-card watchlist-card watchlist-card-non-candidate watchlist-interactive-element glass-panel rounded-xl p-2 border border-gray-600/40 bg-gradient-to-br from-gray-800/30 to-gray-900/30 group transition-all relative cursor-pointer hover:scale-[1.02] hover:border-gray-500/60 hover:shadow-lg hover:bg-gradient-to-br hover:from-gray-800/40 hover:to-gray-900/40 focus-within:ring-2 focus-within:ring-gray-500/50 active:scale-[0.99] min-w-[320px]" 
      data-symbol="{{ symbol|e }}"
      data-meets-criteria="false"
      data-price="{{ price if price else '' }}"
@@ -210,7 +254,7 @@
                 hx-confirm="Remove {{ symbol|e }} from watch list?"
                 hx-target="#watch-list"
                 hx-swap="innerHTML"
-                hx-indicator="#watch-list"
+                hx-indicator="#watchlist-loading-overlay"
                 hx-on:click="event.stopPropagation()"
                 class="remove-ticker-btn flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/80 hover:bg-red-500 text-white border border-red-400/50 shadow-md hover:shadow-lg transition-all focus:ring-2 focus:ring-red-500/50 focus:outline-none group/remove flex-shrink-0"
                 title="Remove {{ symbol|e }} from watch list"
@@ -344,31 +388,49 @@
 
 {# LOADING/NO DATA CARD #}
 {% else %}
-<div class="ticker-card watchlist-card watchlist-card-loading glass-panel rounded-lg p-3 border border-blue-500/30 flex items-center justify-between group hover:border-blue-500/50 transition-all relative cursor-default min-w-[320px]" 
+<div class="ticker-card watchlist-card watchlist-card-loading watchlist-interactive-element glass-panel rounded-lg p-3 border border-blue-500/30 group transition-all relative cursor-default min-w-[320px] animate-pulse" 
      data-symbol="{{ symbol|e }}"
      data-meets-criteria="false"
+     data-loading="true"
      role="listitem"
-     aria-label="Ticker {{ symbol|e }} - preview data unavailable">
-    <div class="flex items-center justify-between gap-2 flex-1 min-w-0">
-        <span class="text-lg font-mono font-bold text-white truncate">{{ symbol|e }}</span>
-        
-        <div class="flex items-center gap-2 flex-shrink-0">
-            <span class="text-sm text-gray-500">Loading...</span>
-            
-            <!-- Remove Button -->
-            <button 
-                hx-post="/api/watch-list"
-                hx-vals='{{ {"action": "remove", "symbol": symbol} | tojson | e }}'
-                hx-confirm="Remove {{ symbol|e }} from watch list?"
-                hx-target="#watch-list"
-                hx-swap="innerHTML"
-                hx-indicator="#watch-list"
-                class="remove-ticker-btn flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/80 hover:bg-red-500 text-white border border-red-400/50 shadow-md hover:shadow-lg transition-all focus:ring-2 focus:ring-red-500/50 focus:outline-none group/remove"
-                title="Remove {{ symbol|e }} from watch list"
-                aria-label="Remove {{ symbol|e }} from watch list">
-                <i data-lucide="x" class="w-4 h-4 group-hover/remove:scale-110 transition-transform" aria-hidden="true"></i>
-            </button>
+     aria-label="Ticker {{ symbol|e }} - loading data">
+    <!-- Loading Skeleton -->
+    <div class="mb-1">
+        <div class="flex items-start justify-between gap-2 mb-0.5">
+            <div class="flex items-baseline gap-2 flex-1 min-w-0">
+                <div class="h-10 w-24 bg-gray-700/50 rounded animate-pulse"></div>
+                <div class="h-8 w-20 bg-gray-700/50 rounded animate-pulse"></div>
+            </div>
+            <div class="w-8 h-8 bg-gray-700/50 rounded animate-pulse"></div>
         </div>
     </div>
+    
+    <!-- Skeleton Metrics Grid -->
+    <div class="grid grid-cols-2 gap-1 mb-1">
+        <div class="h-12 bg-gray-700/30 rounded animate-pulse"></div>
+        <div class="h-12 bg-gray-700/30 rounded animate-pulse"></div>
+        <div class="h-12 bg-gray-700/30 rounded animate-pulse"></div>
+        <div class="h-12 bg-gray-700/30 rounded animate-pulse"></div>
+    </div>
+    
+    <!-- Loading Indicator -->
+    <div class="flex items-center justify-center gap-2 py-2">
+        <div class="w-4 h-4 border-2 border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin"></div>
+        <span class="text-xs text-gray-400">Loading {{ symbol|e }}...</span>
+    </div>
+    
+    <!-- Remove Button (still functional during loading) -->
+    <button 
+        hx-post="/api/watch-list"
+        hx-vals='{{ {"action": "remove", "symbol": symbol} | tojson | e }}'
+        hx-confirm="Remove {{ symbol|e }} from watch list?"
+        hx-target="#watch-list"
+        hx-swap="innerHTML"
+        hx-indicator="#watchlist-loading-overlay"
+        class="absolute top-2 right-2 remove-ticker-btn flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/80 hover:bg-red-500 text-white border border-red-400/50 shadow-md hover:shadow-lg transition-all focus:ring-2 focus:ring-red-500/50 focus:outline-none group/remove z-10"
+        title="Remove {{ symbol|e }} from watch list"
+        aria-label="Remove {{ symbol|e }} from watch list">
+        <i data-lucide="x" class="w-4 h-4 group-hover/remove:scale-110 transition-transform" aria-hidden="true"></i>
+    </button>
 </div>
 {% endif %}

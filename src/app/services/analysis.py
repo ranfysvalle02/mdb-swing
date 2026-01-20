@@ -3,9 +3,7 @@
 MDB-Engine Integration:
 - Logging: Uses `get_logger(__name__)` from mdb_engine.observability for structured logging
 """
-import math
 import pandas as pd
-import time
 from typing import Tuple, Optional, Dict, Any
 import vectorbt as vbt
 from datetime import datetime, timedelta
@@ -38,19 +36,31 @@ except Exception as e:
     logger.warning(f"Firecrawl initialization failed: {e}")
     firecrawl_client = None
 
-async def get_market_data(symbol: str, days: int = 100, query_template: Optional[str] = None, db=None) -> Tuple[Optional[pd.DataFrame], list, list]:
+async def get_market_data(symbol: str, days: int = 100, db=None) -> Tuple[Optional[pd.DataFrame], list, list]:
     """Fetch market data and news for a symbol.
+    
+    Uses caching to reduce API calls. Market data is cached for 5 minutes.
     
     Args:
         symbol: Stock ticker symbol
         days: Number of days of historical data to fetch
-        query_template: Optional Firecrawl query template (legacy)
         db: Optional MongoDB database instance for caching
         
     Returns:
         Tuple of (bars DataFrame, headlines list, news_objects list)
         news_objects contains full news data with URLs for explanation feature
     """
+    # Check cache first
+    try:
+        from .watchlist_cache import get_cache
+        cache = get_cache()
+        cached_data = cache.get_market_data(symbol, ttl_seconds=300)  # 5-minute TTL
+        if cached_data:
+            logger.debug(f"Using cached market data for {symbol}")
+            return cached_data
+    except Exception as e:
+        logger.debug(f"Cache check failed for {symbol}: {e}")
+    
     if not api:
         logger.error("❌ Alpaca API not initialized - cannot fetch market data")
         logger.error(f"ALPACA_KEY present: {bool(ALPACA_KEY)}, ALPACA_SECRET present: {bool(ALPACA_SECRET)}")
@@ -202,10 +212,18 @@ async def get_market_data(symbol: str, days: int = 100, query_template: Optional
         except Exception as e:
             logger.warning(f"Alpaca news fetch failed for {symbol}: {e}")
         
+        # Cache the result before returning
+        try:
+            from .watchlist_cache import get_cache
+            cache = get_cache()
+            cache.set_market_data(symbol, (bars, news_items, news_objects))
+        except Exception as e:
+            logger.debug(f"Cache store failed for {symbol}: {e}")
+        
         return bars, news_items, news_objects
     except Exception as e:
         logger.error(f"Data fail {symbol}: {e}")
-        return None, [], [], {}
+        return None, [], []
 
 def analyze_technicals(df: pd.DataFrame) -> Dict[str, Any]:
     """Calculate technical indicators using vectorbt.

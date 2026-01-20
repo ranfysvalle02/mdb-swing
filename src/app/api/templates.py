@@ -12,7 +12,7 @@ Best Practice: Using Jinja2 templates instead of f-strings for:
 import json
 import re
 import time
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from fastapi.responses import HTMLResponse
 from ..core.templates import templates
 from ..services.positions import PositionMetrics, SellSignal
@@ -529,3 +529,135 @@ def stock_card(stock_data: Dict[str, Any]) -> str:
         rsi_icon=rsi_icon,
         rsi_bg=rsi_bg
     )
+
+
+def transaction_history_item(
+    symbol: str,
+    action: str,
+    qty: int,
+    price: float,
+    timestamp: Any,
+    reason: Optional[str] = None
+) -> str:
+    """Generate HTML for a transaction history item.
+    
+    Args:
+        symbol: Stock symbol
+        action: 'buy' or 'sell'
+        qty: Number of shares
+        price: Execution price
+        timestamp: Transaction timestamp (datetime object)
+        reason: Optional reason for the transaction
+    """
+    from datetime import datetime
+    
+    # Format timestamp
+    if isinstance(timestamp, datetime):
+        formatted_time = timestamp.strftime("%m/%d %H:%M")
+    else:
+        formatted_time = str(timestamp)[:16] if len(str(timestamp)) > 16 else str(timestamp)
+    
+    # Determine icon and color based on action
+    icon = "arrow-up" if action.lower() == "buy" else "arrow-down"
+    color_class = "text-green-400" if action.lower() == "buy" else "text-red-400"
+    bg_class = "bg-green-500/10" if action.lower() == "buy" else "bg-red-500/10"
+    border_class = "border-green-500/30" if action.lower() == "buy" else "border-red-500/30"
+    
+    return templates.get_template("components/transaction_history_item.html").render(
+        symbol=symbol,
+        action=action.upper(),
+        qty=qty,
+        price=price,
+        timestamp=formatted_time,
+        reason=reason or "",
+        icon=icon,
+        color_class=color_class,
+        bg_class=bg_class,
+        border_class=border_class
+    )
+
+
+def empty_transactions() -> str:
+    """Empty state for transactions list."""
+    return templates.get_template("components/empty_transactions.html").render()
+
+
+def transactions_view(
+    pending_orders: list,
+    transaction_history: list,
+    trade_records_map: Optional[Dict[str, Dict]] = None
+) -> str:
+    """Generate complete transactions view HTML.
+    
+    Combines pending orders section + transaction history section.
+    
+    Args:
+        pending_orders: List of pending order objects from Alpaca API
+        transaction_history: List of transaction history records from database
+        trade_records_map: Optional dict mapping (symbol, side) -> trade_record for pending orders
+    """
+    html_parts = []
+    
+    # Pending Orders Section
+    if pending_orders:
+        html_parts.append('<div class="mb-6">')
+        html_parts.append('<h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">')
+        html_parts.append('<i data-lucide="clock" class="w-4 h-4 text-yellow-400"></i>')
+        html_parts.append('<span>Pending Orders</span>')
+        html_parts.append('</h3>')
+        
+        # Render pending orders
+        for order in pending_orders:
+            try:
+                # Get trade record if available
+                trade_record = None
+                if trade_records_map:
+                    key = (order.symbol, order.side.lower())
+                    trade_record = trade_records_map.get(key)
+                
+                html_parts.append(pending_order_card(
+                    symbol=order.symbol,
+                    qty=int(order.qty),
+                    side=order.side,
+                    order_type=order.type,
+                    limit_price=float(order.limit_price) if order.limit_price else None,
+                    order_id=str(order.id),
+                    stop_loss=trade_record.get("stop_loss") if trade_record else None,
+                    take_profit=trade_record.get("take_profit") if trade_record else None
+                ))
+            except Exception as e:
+                from mdb_engine.observability import get_logger
+                logger = get_logger(__name__)
+                logger.warning(f"Error rendering pending order {order.symbol}: {e}")
+        
+        html_parts.append('</div>')
+    
+    # Transaction History Section
+    if transaction_history:
+        html_parts.append('<div class="mt-6">')
+        html_parts.append('<h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">')
+        html_parts.append('<i data-lucide="history" class="w-4 h-4 text-gray-400"></i>')
+        html_parts.append('<span>Recent Transactions</span>')
+        html_parts.append('</h3>')
+        
+        for record in transaction_history:
+            try:
+                html_parts.append(transaction_history_item(
+                    symbol=record.get("symbol", "N/A"),
+                    action=record.get("action", "buy"),
+                    qty=record.get("qty", 0),
+                    price=record.get("price", 0.0),
+                    timestamp=record.get("timestamp"),
+                    reason=record.get("reason")
+                ))
+            except Exception as e:
+                from mdb_engine.observability import get_logger
+                logger = get_logger(__name__)
+                logger.warning(f"Error rendering transaction history item: {e}")
+        
+        html_parts.append('</div>')
+    
+    # Add Lucide icon initialization
+    html_parts.append(lucide_init_script())
+    
+    return "".join(html_parts)

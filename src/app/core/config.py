@@ -16,6 +16,8 @@ MDB-Engine Integration:
 - Configuration values are used throughout the app via imports
 """
 import os
+import hashlib
+import json
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from mdb_engine.observability import get_logger
@@ -53,13 +55,10 @@ CURRENT_STRATEGY = os.getenv("CURRENT_STRATEGY", "balanced_low")
 STRATEGY_CONFIG: Dict[str, Any] = {
     "name": "Balanced Low",
     "description": "High probability bounce-back opportunities - find stocks that are low but ready to ride the wave back up (buy low, sell high)",
-    "goal": "Buy low, sell high - find oversold stocks ready to bounce back up",
     "rsi_threshold": 35,  # Maximum oversold level
     "rsi_min": 20,  # Minimum RSI - avoid extreme oversold (sweet spot: 20-35)
     "sma_proximity_pct": 3.0,  # Maximum percentage above SMA-200 for entry (0-5%, default 3%)
     "ai_score_required": 7,
-    "risk_per_trade": 50.0,
-    "max_capital": 5000.0,
     "color": "green",
     "pe_ratio_max": float(os.getenv("PE_RATIO_MAX", "50.0")),  # Reject if P/E > this
     "market_cap_min": float(os.getenv("MARKET_CAP_MIN", "300000000")),  # Reject if market cap < this (in USD)
@@ -85,11 +84,8 @@ async def get_strategy_from_db(db) -> Optional[Dict[str, Any]]:
                 "rsi_min": active_config.get("rsi_min", 20),
                 "sma_proximity_pct": active_config.get("sma_proximity_pct", 3.0),
                 "ai_score_required": active_config.get("ai_score_required", 7),
-                "risk_per_trade": active_config.get("risk_per_trade", 50.0),
-                "max_capital": active_config.get("max_capital", 5000.0),
                 "name": active_config.get("name", "Balanced Low"),
                 "description": active_config.get("description", "High probability bounce-back opportunities - buy low, sell high"),
-                "goal": active_config.get("goal", "Buy low, sell high - find oversold stocks ready to bounce back up"),
                 "color": active_config.get("color", "green"),
                 "preset": active_config.get("preset", "Custom"),
             }
@@ -128,11 +124,8 @@ async def get_strategy_config(db=None, budget: Optional[float] = None) -> Dict[s
                     "sma_proximity_pct": db_config.get("sma_proximity_pct", 3.0),
                     "ai_min_score": db_config.get("ai_score_required", 7),
                     "ai_score_required": db_config.get("ai_score_required", 7),  # Alias for compatibility
-                    "risk_per_trade": db_config.get("risk_per_trade", 50.0),
-                    "max_capital": db_config.get("max_capital", 5000.0),
                     "name": db_config.get("name", "Balanced Low"),
                     "description": db_config.get("description", "High probability bounce-back opportunities - buy low, sell high"),
-                    "goal": db_config.get("goal", STRATEGY_CONFIG.get("goal", "Buy low, sell high - find oversold stocks ready to bounce back up")),
                     "color": db_config.get("color", "green")
                 }
         except Exception as e:
@@ -145,11 +138,8 @@ async def get_strategy_config(db=None, budget: Optional[float] = None) -> Dict[s
         "sma_proximity_pct": STRATEGY_CONFIG.get("sma_proximity_pct", 3.0),
         "ai_min_score": STRATEGY_CONFIG.get("ai_score_required", 7),
         "ai_score_required": STRATEGY_CONFIG.get("ai_score_required", 7),  # Alias for compatibility
-        "risk_per_trade": STRATEGY_CONFIG.get("risk_per_trade", 50.0),
-        "max_capital": STRATEGY_CONFIG.get("max_capital", 5000.0),
         "name": STRATEGY_CONFIG.get("name", "Balanced Low"),
         "description": STRATEGY_CONFIG.get("description", "High probability bounce-back opportunities - buy low, sell high"),
-        "goal": STRATEGY_CONFIG.get("goal", "Buy low, sell high - find oversold stocks ready to bounce back up"),
         "color": STRATEGY_CONFIG.get("color", "green")
     }
 
@@ -237,3 +227,29 @@ def get_today_date_et() -> str:
     except Exception as e:
         logger.warning(f"Error getting today's date in ET: {e}, using UTC")
         return datetime.utcnow().strftime("%Y-%m-%d")
+
+
+def calculate_watchlist_config_hash(config: Dict[str, Any]) -> str:
+    """Calculate hash of watchlist-relevant parameters.
+    
+    This hash is used to detect when strategy parameters that affect watchlist
+    evaluation have changed, allowing smart re-evaluation only when needed.
+    
+    Args:
+        config: Strategy configuration dictionary
+        
+    Returns:
+        MD5 hash as hex string
+    """
+    # Extract watchlist-relevant parameters
+    relevant_params = {
+        'rsi_threshold': config.get('rsi_threshold', 35),
+        'rsi_min': config.get('rsi_min', 20),
+        'sma_proximity_pct': config.get('sma_proximity_pct', 3.0),
+        'earnings_days_min': config.get('earnings_days_min', 3),
+        'pe_ratio_max': config.get('pe_ratio_max', 50.0),
+        'market_cap_min': config.get('market_cap_min', 300_000_000),
+    }
+    # Sort keys for deterministic hash
+    param_str = json.dumps(relevant_params, sort_keys=True)
+    return hashlib.md5(param_str.encode()).hexdigest()

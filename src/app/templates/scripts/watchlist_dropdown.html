@@ -1,13 +1,10 @@
 <script>
-    if (typeof lucide !== 'undefined') lucide.createIcons();
+    lucide.createIcons();
     
     // Clear input after successful watchlist add
     document.body.addEventListener('htmx:afterRequest', function(event) {
-        if (event.detail.target && event.detail.target.id === 'watch-list' && event.detail.successful) {
-            const input = document.getElementById('add-ticker-input');
-            if (input) {
-                input.value = '';
-            }
+        if (event.detail.target?.id === 'watch-list' && event.detail.successful) {
+            document.getElementById('add-ticker-input').value = '';
         }
     });
     
@@ -18,81 +15,124 @@
             const leftBtn = document.getElementById('watchlist-scroll-left');
             const rightBtn = document.getElementById('watchlist-scroll-right');
             
-            if (!container || !leftBtn || !rightBtn) return;
-            
             function updateButtonStates() {
                 const scrollLeft = container.scrollLeft;
-                const scrollWidth = container.scrollWidth;
-                const clientWidth = container.clientWidth;
-                const maxScroll = scrollWidth - clientWidth;
-                
-                // Enable/disable buttons based on scroll position
-                leftBtn.disabled = scrollLeft <= 5; // Small threshold for smooth UX
+                const maxScroll = container.scrollWidth - container.clientWidth;
+                leftBtn.disabled = scrollLeft <= 5;
                 rightBtn.disabled = scrollLeft >= maxScroll - 5;
             }
             
-            // Scroll left
-            leftBtn.addEventListener('click', function() {
-                const scrollAmount = container.clientWidth * 0.8;
-                container.scrollBy({
-                    left: -scrollAmount,
-                    behavior: 'smooth'
-                });
+            leftBtn.addEventListener('click', () => {
+                container.scrollBy({ left: -container.clientWidth * 0.8, behavior: 'smooth' });
             });
             
-            // Scroll right
-            rightBtn.addEventListener('click', function() {
-                const scrollAmount = container.clientWidth * 0.8;
-                container.scrollBy({
-                    left: scrollAmount,
-                    behavior: 'smooth'
-                });
+            rightBtn.addEventListener('click', () => {
+                container.scrollBy({ left: container.clientWidth * 0.8, behavior: 'smooth' });
             });
             
-            // Update button states on scroll
             container.addEventListener('scroll', updateButtonStates);
-            
-            // Update button states on resize
             window.addEventListener('resize', updateButtonStates);
-            
-            // Initial state update
             updateButtonStates();
             
-            // Initialize Lucide icons for navigation buttons
-            if (typeof lucide !== 'undefined') {
-                lucide.createIcons(leftBtn);
-                lucide.createIcons(rightBtn);
-            }
+            lucide.createIcons(leftBtn);
+            lucide.createIcons(rightBtn);
             
-            // Update after HTMX swaps (when watchlist is refreshed)
             document.addEventListener('htmx:afterSwap', function(event) {
-                if (event.detail.target && event.detail.target.id === 'watch-list') {
-                    setTimeout(function() {
+                if (event.detail.target?.id === 'watch-list') {
+                    setTimeout(() => {
                         updateButtonStates();
-                        if (typeof lucide !== 'undefined') {
-                            lucide.createIcons();
-                        }
+                        lucide.createIcons();
                     }, 100);
                 }
             });
         }
         
-        // Initialize on DOM ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', initWatchlistScroll);
         } else {
             initWatchlistScroll();
         }
         
-        // Re-initialize after HTMX swaps
         document.addEventListener('htmx:afterSwap', function(event) {
-            if (event.detail.target && (event.detail.target.id === 'watch-list' || event.detail.target.closest('#watch-list'))) {
-                setTimeout(function() {
+            if (event.detail.target?.id === 'watch-list' || event.detail.target?.closest('#watch-list')) {
+                setTimeout(() => {
                     initWatchlistScroll();
-                    if (typeof lucide !== 'undefined') {
-                        lucide.createIcons();
-                    }
+                    lucide.createIcons();
                 }, 50);
+            }
+        });
+    })();
+    
+    // Manual re-evaluation only - no auto-triggering
+    (function() {
+        function showReevaluateButton() {
+            const container = document.getElementById('reevaluate-watchlist-container');
+            Alpine.$data(container).show = true;
+            setTimeout(() => lucide.createIcons(), 100);
+        }
+        
+        // Track changed parameters
+        let changedParams = [];
+        
+        window.addEventListener('strategyChanged', function(event) {
+            changedParams = event.detail.changedParams || [];
+            updateChangedParamsIndicator();
+            // Show re-evaluate button - user must manually click to re-evaluate
+            showReevaluateButton();
+        });
+        
+        function updateChangedParamsIndicator() {
+            if (changedParams.length === 0) return;
+            const paramNames = {
+                'rsi_threshold': 'RSI Threshold',
+                'rsi_min': 'RSI Minimum',
+                'sma_proximity_pct': 'SMA Proximity',
+                'ai_score_required': 'AI Score Required',
+                'earnings_days_min': 'Earnings Days',
+                'pe_ratio_max': 'P/E Ratio Max',
+                'market_cap_min': 'Market Cap Min'
+            };
+            const indicator = document.getElementById('changed-params-indicator');
+            if (indicator) {
+                indicator.textContent = 
+                    `Click below to re-evaluate watchlist with new settings.`;
+            }
+        }
+        
+        document.addEventListener('htmx:afterSwap', function(event) {
+            const target = event.detail.target;
+            
+            if (target?.id === 'watch-list' || target?.closest('#watch-list')) {
+                const watchlist = document.getElementById('watch-list');
+                const configHash = watchlist.dataset.configHash;
+                if (configHash && configHash !== 'unknown') {
+                    localStorage.setItem('lastEvaluatedConfigHash', configHash);
+                }
+                watchlist.classList.remove('watchlist-updating');
+                
+                setTimeout(() => lucide.createIcons(), 100);
+                
+                target.querySelectorAll('.ticker-card').forEach((card, index) => {
+                    card.style.animation = 'none';
+                    setTimeout(() => {
+                        card.style.animation = `cardFadeIn 0.5s ease-out forwards`;
+                        card.style.animationDelay = `${index * 0.05}s`;
+                    }, 10);
+                });
+                
+                const container = document.getElementById('reevaluate-watchlist-container');
+                if (Alpine.$data(container)?.show) {
+                    setTimeout(() => Alpine.$data(container).show = false, 800);
+                }
+                
+                window.dispatchEvent(new CustomEvent('watchlistReevaluated'));
+            }
+        });
+        
+        document.addEventListener('htmx:beforeRequest', function(event) {
+            if (event.detail.target?.id === 'watch-list') {
+                document.getElementById('watch-list').classList.add('watchlist-updating');
+                window.dispatchEvent(new CustomEvent('watchlistReevaluating'));
             }
         });
     })();

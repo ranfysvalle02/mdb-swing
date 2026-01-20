@@ -103,32 +103,19 @@
         const containerId = {{ tradingview_id|tojson }};
         const symbol = {{ symbol|tojson }};
         
-        // Wait for DOM to be ready and HTMX swap to complete
-        setTimeout(function() {
-            const container = document.getElementById(containerId);
-            if (container && typeof TradingView !== 'undefined') {
-                try {
-                    new TradingView.widget({
-                        "autosize": true,
-                        "symbol": symbol,
-                        "interval": "D",
-                        "timezone": "Etc/UTC",
-                        "theme": "dark",
-                        "style": "1",
-                        "container_id": containerId,
-                        "locale": "en"
-                    });
-                } catch (e) {
-                    console.warn('TradingView widget initialization error:', e);
-                }
-            }
+        setTimeout(() => {
+            new TradingView.widget({
+                "autosize": true,
+                "symbol": symbol,
+                "interval": "D",
+                "timezone": "Etc/UTC",
+                "theme": "dark",
+                "style": "1",
+                "container_id": containerId,
+                "locale": "en"
+            });
         }, 100);
         
-        // Initialize Lucide icons
-        if (typeof lucide !== 'undefined') {
-            setTimeout(function() {
-                lucide.createIcons();
-            }, 50);
-        }
+        setTimeout(() => lucide.createIcons(), 50);
     })();
 </script>

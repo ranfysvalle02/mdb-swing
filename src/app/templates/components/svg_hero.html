@@ -54,6 +54,32 @@
         max-width: 600px;
         height: auto;
         filter: drop-shadow(0 0 40px rgba(112, 0, 255, 0.2));
+        animation: svg-glow-pulse 3s ease-in-out infinite;
+    }
+    
+    @keyframes svg-glow-pulse {
+        0%, 100% {
+            filter: drop-shadow(0 0 40px rgba(112, 0, 255, 0.2));
+        }
+        50% {
+            filter: drop-shadow(0 0 60px rgba(112, 0, 255, 0.4));
+        }
+    }
+    
+    .main-svg .anim-spin-slow {
+        animation: spin 30s linear infinite;
+    }
+    
+    .main-svg .anim-spin-reverse {
+        animation: spin 20s linear reverse infinite;
+    }
+    
+    .main-svg .anim-pulse {
+        animation: pulse 2s ease-in-out infinite;
+    }
+    
+    .main-svg .anim-float {
+        animation: float-element 6s ease-in-out infinite;
     }
     
     @media (max-width: 768px) {

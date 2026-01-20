@@ -21,7 +21,7 @@ Routes return HTMLResponse for HTMX integration, or JSONResponse for API endpoin
 from fastapi import Depends, Form, WebSocket, WebSocketDisconnect, Request, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 import json
 from mdb_engine.observability import get_logger
 from mdb_engine.dependencies import get_embedding_service
@@ -35,12 +35,49 @@ from ..services.ai import EyeAI, _ai_engine
 from ..services.radar import RadarService
 from ..services.positions import calculate_position_metrics, detect_sell_signal
 from ..services.logo import get_logo_html
-from ..api.templates import empty_positions, pending_order_card, position_card, lucide_init_script, toast_notification, htmx_response, htmx_modal_wrapper, error_response
+from ..api.templates import empty_positions, pending_order_card, position_card, lucide_init_script, toast_notification, htmx_response, htmx_modal_wrapper, error_response, transaction_history_item, empty_transactions, transactions_view
 from ..core.templates import templates
 from ..core.config import ALPACA_KEY, ALPACA_SECRET, STRATEGY_CONFIG, get_strategy_from_db, get_strategy_config as get_strategy_config_dict, FIRECRAWL_SEARCH_QUERY_TEMPLATE
 from ..services.ai_prompts import get_balanced_low_prompt
 
 logger = get_logger(__name__)
+
+
+def error_response_html(message: str, status_code: int = 200) -> HTMLResponse:
+    """Create a standardized HTML error response for HTMX.
+    
+    HTMX Best Practice: Return HTML fragments for errors, not JSON.
+    This ensures errors can be swapped into the DOM seamlessly.
+    
+    Args:
+        message: Error message to display
+        status_code: HTTP status code (default 200 for HTMX compatibility)
+        
+    Returns:
+        HTMLResponse with error message template
+    """
+    return HTMLResponse(
+        content=templates.get_template("partials/error_message.html").render(message=message),
+        status_code=status_code
+    )
+
+
+def error_response_json(message: str, detail: Optional[str] = None, status_code: int = 400) -> JSONResponse:
+    """Create a standardized JSON error response for API endpoints.
+    
+    Args:
+        message: Error message
+        detail: Optional detailed error information
+        status_code: HTTP status code
+        
+    Returns:
+        JSONResponse with error structure
+    """
+    content = {"error": message}
+    if detail:
+        content["detail"] = detail
+    return JSONResponse(content=content, status_code=status_code)
+
 
 async def get_timeout_error() -> HTMLResponse:
     """Get timeout error template for HTMX timeout handling.
@@ -51,17 +88,7 @@ async def get_timeout_error() -> HTMLResponse:
     """
     return HTMLResponse(content=templates.get_template("partials/timeout_error.html").render())
 
-async def _get_firecrawl_query_template(db) -> str:
-    """Get Firecrawl search query template from database or fall back to env var."""
-    try:
-        settings = await db.app_settings.find_one({"key": "firecrawl_search_query_template"})
-        if settings and settings.get("value"):
-            return settings["value"]
-    except Exception as e:
-        logger.debug(f"Could not get query template from database: {e}")
-    return FIRECRAWL_SEARCH_QUERY_TEMPLATE
-
-async def _get_target_symbols(db, force_discovery: bool = False) -> List[str]:
+async def _get_target_symbols(db: Any, force_discovery: bool = False) -> List[str]:
     """Get target symbols from watch list.
     
     Returns all symbols from watch list (no limit).
@@ -90,7 +117,7 @@ async def _get_target_symbols(db, force_discovery: bool = False) -> List[str]:
         from ..core.config import SYMBOLS
         return SYMBOLS
 
-async def _safe_send_json(websocket, data: Dict[str, Any]) -> bool:
+async def _safe_send_json(websocket: WebSocket, data: Dict[str, Any]) -> bool:
     """Safely send JSON via WebSocket with automatic datetime sanitization.
     
     MDB-Engine Pattern: Ensures all WebSocket messages are JSON-serializable.
@@ -154,7 +181,7 @@ async def _safe_send_json(websocket, data: Dict[str, Any]) -> bool:
             return False
         raise
 
-def _convert_timestamp_to_iso(timestamp) -> Optional[str]:
+def _convert_timestamp_to_iso(timestamp: Union[datetime, str, None]) -> Optional[str]:
     """Convert various timestamp types to ISO format string for JSON serialization.
     
     Handles: datetime, pandas Timestamp, MongoDB Timestamp, None
@@ -296,9 +323,7 @@ async def get_balance() -> HTMLResponse:
     except Exception as e:
         logger.error(f"Failed to get balance: {e}", exc_info=True)
         error_msg = str(e)[:50] if str(e) else "Unknown error"
-        return HTMLResponse(content=templates.get_template("partials/error_message.html").render(
-            message=f"API Error: {error_msg}"
-        ))
+        return error_response_html(f"API Error: {error_msg}")
 
 def _check_has_position(symbol: str) -> bool:
     """Check if user has an open position for the given symbol."""
@@ -325,7 +350,7 @@ def _adjust_action_for_context(action: str, has_position: bool) -> str:
 
 async def analyze_symbol(
     ticker: str = Form(...),
-    db = Depends(get_scoped_db),
+    db: Any = Depends(get_scoped_db),
     embedding_service: EmbeddingService = Depends(get_embedding_service)
 ) -> HTMLResponse:
     """Analyze a symbol using AI - uses cached data if available."""
@@ -538,7 +563,7 @@ async def analyze_symbol(
         no_ai_content = templates.get_template("pages/analysis_no_ai.html").render()
         return HTMLResponse(content=no_ai_content)
 
-async def analyze_preview(ticker: str = Form(...), db = Depends(get_scoped_db)) -> HTMLResponse:
+async def analyze_preview(ticker: str = Form(...), db: Any = Depends(get_scoped_db)) -> HTMLResponse:
     """Show pre-computed analysis preview for both candidates and non-candidates.
     
     Unified preview that shows technical indicators without AI analysis.
@@ -562,6 +587,7 @@ async def analyze_preview(ticker: str = Form(...), db = Depends(get_scoped_db)) 
         
         strategy_config = await get_strategy_config(db)
         rsi_threshold = strategy_config.get('rsi_threshold', 35)
+        rsi_min = strategy_config.get('rsi_min', 20)
         sma_proximity_pct = strategy_config.get('sma_proximity_pct', 3.0)
         
         bars, headlines, news_objects = await get_market_data(symbol, days=100, db=db)
@@ -596,9 +622,10 @@ async def analyze_preview(ticker: str = Form(...), db = Depends(get_scoped_db)) 
         if price and sma_200 and sma_200 > 0:
             price_vs_sma_pct = ((price - sma_200) / sma_200) * 100
         
-        # Check if meets criteria (RSI < threshold AND uptrend AND within SMA-200 proximity)
+        # Check if meets criteria (RSI in sweet spot: rsi_min < RSI < rsi_threshold AND uptrend AND within SMA-200 proximity)
         meets_criteria = (
             rsi is not None and 
+            rsi > rsi_min and
             rsi < rsi_threshold and
             trend == "UP" and
             (price_vs_sma_pct is None or price_vs_sma_pct <= sma_proximity_pct)
@@ -608,8 +635,11 @@ async def analyze_preview(ticker: str = Form(...), db = Depends(get_scoped_db)) 
         rejection_reason = None
         if not meets_criteria:
             reasons = []
-            if rsi is not None and rsi >= rsi_threshold:
-                reasons.append(f"RSI {rsi:.1f} ≥ {rsi_threshold} (not oversold)")
+            if rsi is not None:
+                if rsi <= rsi_min:
+                    reasons.append(f"RSI {rsi:.1f} ≤ {rsi_min} (too extreme oversold)")
+                elif rsi >= rsi_threshold:
+                    reasons.append(f"RSI {rsi:.1f} ≥ {rsi_threshold} (not oversold)")
             if trend != "UP":
                 if trend == "DOWN":
                     reasons.append(f"Downtrend (Price ${price:.2f} < SMA-200 ${sma_200:.2f})")
@@ -657,7 +687,7 @@ async def analyze_preview(ticker: str = Form(...), db = Depends(get_scoped_db)) 
         )
         return HTMLResponse(content=modal_html)
 
-async def analyze_rejection(ticker: str = Form(...), db = Depends(get_scoped_db)) -> HTMLResponse:
+async def analyze_rejection(ticker: str = Form(...), db: Any = Depends(get_scoped_db)) -> HTMLResponse:
     """Analyze why a symbol doesn't meet entry criteria - simple explanation."""
     symbol = ticker.upper().strip()
     if not symbol:
@@ -781,7 +811,7 @@ async def analyze_rejection(ticker: str = Form(...), db = Depends(get_scoped_db)
         )
         return HTMLResponse(content=modal_html)
 
-async def execute_trade(ticker: str = Form(...), action: str = Form(...), db = Depends(get_scoped_db)) -> HTMLResponse:
+async def execute_trade(ticker: str = Form(...), action: str = Form(...), db: Any = Depends(get_scoped_db)) -> HTMLResponse:
     """Execute a manual trade."""
     if not check_alpaca_config():
         return HTMLResponse(content=templates.get_template("partials/error_message.html").render(
@@ -823,13 +853,14 @@ async def execute_trade(ticker: str = Form(...), action: str = Form(...), db = D
                 message=error_msg
             ))
 
-async def get_positions(db = Depends(get_scoped_db)) -> HTMLResponse:
-    """Get current positions and pending orders.
+async def get_positions(db: Any = Depends(get_scoped_db)) -> HTMLResponse:
+    """Get current active positions only.
     
     MDB-Engine Pattern: Uses Depends(get_scoped_db) for automatic connection management.
-    Returns HTML with htmx buttons for closing positions (hx-post="/api/quick-sell")
-    and canceling pending orders (hx-post="/api/cancel-order").
+    Returns HTML with htmx buttons for closing positions (hx-post="/api/quick-sell").
     This endpoint is polled every 5 seconds via hx-trigger="every 5s".
+    
+    Note: Pending orders are now shown in the Transactions tab.
     """
     if not check_alpaca_config():
         return HTMLResponse(content=templates.get_template("partials/error_message.html").render(
@@ -844,41 +875,13 @@ async def get_positions(db = Depends(get_scoped_db)) -> HTMLResponse:
     try:
         pos = api.list_positions()
         
-        # Get pending orders (new, pending_new, accepted, pending_replace, etc.)
-        pending_orders = []
-        try:
-            all_orders = api.list_orders(status='open')
-            # Filter for pending statuses (orders that haven't been filled yet)
-            pending_statuses = ['new', 'pending_new', 'accepted', 'pending_replace', 'pending_cancel', 'partially_filled']
-            pending_orders = [o for o in all_orders if o.status in pending_statuses]
-            logger.debug(f"Found {len(pending_orders)} pending orders")
-        except Exception as e:
-            logger.warning(f"Could not fetch pending orders: {e}", exc_info=True)
-        
         # Empty state
-        if not pos and not pending_orders:
+        if not pos:
             return HTMLResponse(content=empty_positions())
         
         html_parts = []
         
-        # Pending orders
-        for order in pending_orders:
-            trade_record = await db.history.find_one(
-                {"symbol": order.symbol, "action": order.side},
-                sort=[("timestamp", -1)]
-            )
-            html_parts.append(pending_order_card(
-                symbol=order.symbol,
-                qty=int(order.qty),
-                side=order.side,
-                order_type=order.type,
-                limit_price=float(order.limit_price) if order.limit_price else None,
-                order_id=str(order.id),
-                stop_loss=trade_record.get("stop_loss") if trade_record else None,
-                take_profit=trade_record.get("take_profit") if trade_record else None
-            ))
-        
-        # Active positions
+        # Active positions only
         for p in pos:
             trade_record = await db.history.find_one(
                 {"symbol": p.symbol, "action": "buy"},
@@ -912,11 +915,95 @@ async def get_positions(db = Depends(get_scoped_db)) -> HTMLResponse:
             message=f"API Error: {error_msg}"
         ))
 
-async def cancel_order(order_id: str = Form(...), db = Depends(get_scoped_db)) -> HTMLResponse:
+async def get_transactions(db: Any = Depends(get_scoped_db)) -> HTMLResponse:
+    """Get pending orders and transaction history.
+    
+    MDB-Engine Pattern: Uses Depends(get_scoped_db) for automatic connection management.
+    Returns HTML with pending orders section and transaction history section.
+    This endpoint is polled every 5 seconds via hx-trigger="every 5s".
+    
+    Filters out bracket order children (SELL orders for symbols with active positions).
+    """
+    if not check_alpaca_config():
+        return HTMLResponse(content=templates.get_template("partials/error_message.html").render(
+            message="Alpaca API not configured"
+        ))
+    
+    if api is None:
+        return HTMLResponse(content=templates.get_template("partials/error_message.html").render(
+            message="Alpaca API not initialized"
+        ))
+    
+    try:
+        # Get active positions to filter out bracket children
+        pos = api.list_positions()
+        position_symbols = {p.symbol for p in pos} if pos else set()
+        
+        # Get pending orders
+        pending_orders = []
+        try:
+            all_orders = api.list_orders(status='open')
+            # Filter for pending statuses (orders that haven't been filled yet)
+            pending_statuses = ['new', 'pending_new', 'accepted', 'pending_replace', 'pending_cancel', 'partially_filled']
+            pending_orders = [o for o in all_orders if o.status in pending_statuses]
+            
+            # Filter out SELL orders for symbols with active positions
+            # These are bracket order children (take profit/stop loss) and shouldn't show as pending
+            pending_orders = [
+                o for o in pending_orders 
+                if not (o.side.lower() == 'sell' and o.symbol in position_symbols)
+            ]
+            logger.debug(f"Found {len(pending_orders)} pending orders (excluded bracket children)")
+        except Exception as e:
+            logger.warning(f"Could not fetch pending orders: {e}", exc_info=True)
+        
+        # Get transaction history from database
+        transaction_history = []
+        try:
+            history_records = await db.history.find().sort("timestamp", -1).limit(50).to_list(length=50)
+            transaction_history = history_records if history_records else []
+            logger.debug(f"Found {len(transaction_history)} transaction history records")
+        except Exception as e:
+            logger.warning(f"Could not fetch transaction history: {e}", exc_info=True)
+        
+        # Empty state
+        if not pending_orders and not transaction_history:
+            return HTMLResponse(content=empty_transactions())
+        
+        # Fetch trade records for pending orders
+        trade_records_map = {}
+        for order in pending_orders:
+            try:
+                trade_record = await db.history.find_one(
+                    {"symbol": order.symbol, "action": order.side.lower()},
+                    sort=[("timestamp", -1)]
+                )
+                if trade_record:
+                    key = (order.symbol, order.side.lower())
+                    trade_records_map[key] = trade_record
+            except Exception as e:
+                logger.debug(f"Could not fetch trade record for {order.symbol}: {e}")
+        
+        # Build HTML using transactions_view helper
+        html = transactions_view(
+            pending_orders=pending_orders,
+            transaction_history=transaction_history,
+            trade_records_map=trade_records_map
+        )
+        
+        return HTMLResponse(content=html)
+    except Exception as e:
+        logger.error(f"Failed to get transactions: {e}", exc_info=True)
+        error_msg = str(e)[:50] if str(e) else "Unknown error"
+        return HTMLResponse(content=templates.get_template("partials/error_message.html").render(
+            message=f"API Error: {error_msg}"
+        ))
+
+async def cancel_order(order_id: str = Form(...), db: Any = Depends(get_scoped_db)) -> HTMLResponse:
     """Cancel a pending order.
     
     MDB-Engine Pattern: Uses Depends(get_scoped_db) for automatic connection management.
-    Returns HTML with hx-swap-oob to update positions list and show toast notification.
+    Returns HTML with hx-swap-oob to update transactions list and show toast notification.
     """
     if not check_alpaca_config() or api is None:
         return HTMLResponse(content=toast_notification(
@@ -930,19 +1017,19 @@ async def cancel_order(order_id: str = Form(...), db = Depends(get_scoped_db)) -
         # Cancel the order via Alpaca API
         api.cancel_order(order_id)
         
-        positions_response = await get_positions(db=db)
-        positions_html = positions_response.body.decode() if hasattr(positions_response.body, 'decode') else str(positions_response.body)
+        transactions_response = await get_transactions(db=db)
+        transactions_html = transactions_response.body.decode() if hasattr(transactions_response.body, 'decode') else str(transactions_response.body)
         
-        # Return HTML with hx-swap-oob to update positions and show success toast
+        # Return HTML with hx-swap-oob to update transactions and show success toast
         success_toast = toast_notification("Order canceled successfully", "success", 3000)
         response_content = htmx_response(
             updates={
-                "positions-list": positions_html,
+                "transactions-list": transactions_html,
                 "toast-container": success_toast
             }
         )
         response = HTMLResponse(content=response_content)
-        response.headers["HX-Trigger"] = "refreshPositions"
+        response.headers["HX-Trigger"] = "refreshTransactions"
         return response
         
     except Exception as e:
@@ -953,16 +1040,18 @@ async def cancel_order(order_id: str = Form(...), db = Depends(get_scoped_db)) -
             type="error"
         ), status_code=500)
 
-async def get_strategy_display_html(db = Depends(get_scoped_db)) -> HTMLResponse:
+async def get_strategy_display_html(db: Any = Depends(get_scoped_db)) -> HTMLResponse:
     """Get strategy configuration display view - Balanced Low Buy System.
     
-    Returns a read-only display of current strategy configuration.
+    Returns an inline-editable display of current strategy configuration.
     Loads from database first, falls back to env vars/defaults.
     """
     try:
         # Load config from database or fallback
         try:
-            config = await get_strategy_config_dict(db)
+            config = await get_strategy_from_db(db)
+            if not config:
+                raise ValueError("No active config found")
         except Exception as config_error:
             logger.warning(f"Could not load strategy config from DB, using defaults: {config_error}")
             from ..core.config import STRATEGY_CONFIG
@@ -971,12 +1060,10 @@ async def get_strategy_display_html(db = Depends(get_scoped_db)) -> HTMLResponse
                 "rsi_min": STRATEGY_CONFIG.get("rsi_min", 20),
                 "sma_proximity_pct": STRATEGY_CONFIG.get("sma_proximity_pct", 3.0),
                 "ai_score_required": STRATEGY_CONFIG.get("ai_score_required", 7),
-                "risk_per_trade": STRATEGY_CONFIG.get("risk_per_trade", 50.0),
-                "max_capital": STRATEGY_CONFIG.get("max_capital", 5000.0),
                 "name": STRATEGY_CONFIG.get("name", "Balanced Low"),
                 "description": STRATEGY_CONFIG.get("description", "Buy stocks at balanced lows"),
-                "goal": STRATEGY_CONFIG.get("goal", "Buy low, sell high - find oversold stocks ready to bounce back up"),
-                "color": STRATEGY_CONFIG.get("color", "green")
+                "color": STRATEGY_CONFIG.get("color", "green"),
+                "preset": "Custom"
             }
         
         color = config.get('color', 'green')
@@ -992,23 +1079,17 @@ async def get_strategy_display_html(db = Depends(get_scoped_db)) -> HTMLResponse
         rsi_min = config.get('rsi_min', 20)
         sma_proximity_pct = config.get('sma_proximity_pct', 3.0)
         ai_score_required = config.get('ai_score_required', 7)
-        risk_per_trade = config.get('risk_per_trade', 50.0)
-        max_capital = config.get('max_capital', 5000.0)
         name = config.get('name', 'Balanced Low')
-        goal = config.get('goal', 'Buy low, sell high - find oversold stocks ready to bounce back up')
         
         # Render template
         return HTMLResponse(content=templates.get_template("pages/strategy_display.html").render(
             name=name,
-            goal=goal,
             rsi_threshold=rsi_threshold,
             rsi_min=rsi_min,
             sma_proximity_pct=sma_proximity_pct,
             ai_score_required=ai_score_required,
-            risk_per_trade=risk_per_trade,
-            max_capital=max_capital,
-            max_capital_note="",
-            border_class=border_class
+            border_class=border_class,
+            current_preset='Custom'
         ))
     except Exception as e:
         logger.error(f"Error loading strategy display: {e}", exc_info=True)
@@ -1025,244 +1106,42 @@ async def get_strategy_display_html(db = Depends(get_scoped_db)) -> HTMLResponse
         
         return HTMLResponse(content=templates.get_template("pages/strategy_display.html").render(
             name=fallback_config.get('name', 'Balanced Low'),
-            goal=fallback_config.get('goal', 'Buy low, sell high - find oversold stocks ready to bounce back up'),
             rsi_threshold=fallback_config.get('rsi_threshold', 35),
             rsi_min=fallback_config.get('rsi_min', 20),
             sma_proximity_pct=fallback_config.get('sma_proximity_pct', 3.0),
             ai_score_required=fallback_config.get('ai_score_required', 7),
-            risk_per_trade=fallback_config.get('risk_per_trade', 50.0),
-            max_capital=fallback_config.get('max_capital', 5000.0),
-            max_capital_note="",
-            border_class=fallback_border_class
+            border_class=fallback_border_class,
+            current_preset='Custom'
         ))
 
-async def get_strategy_config_modal(db = Depends(get_scoped_db)) -> HTMLResponse:
-    """Get strategy configuration modal - returns HTMX modal wrapper."""
-    try:
-        # Reuse the logic from get_strategy_config_html but wrap in modal
-        config = await get_strategy_config_dict(db)
-        # ... (copy config loading logic)
-        rsi_threshold = config.get('rsi_threshold', 35)
-        rsi_min = config.get('rsi_min', 20)
-        sma_proximity_pct = config.get('sma_proximity_pct', 3.0)
-        ai_score_required = config.get('ai_score_required', 7)
-        risk_per_trade = config.get('risk_per_trade', 50.0)
-        max_capital = config.get('max_capital', 5000.0)
-        goal = config.get('goal', 'Buy low, sell high - find oversold stocks ready to bounce back up')
-        preset = config.get('preset', 'Balanced')
-        
-        # ... (copy preset logic from get_strategy_config_html)
-        GOAL_PRESETS = {
-            'Conservative': 'Conservative swing trades with high probability of success - focus on quality over quantity',
-            'Moderate': 'Buy low, sell high - find oversold stocks ready to bounce back up',
-            'Aggressive': 'Aggressive swing trading - maximize opportunities with higher risk tolerance',
-            'Custom': goal if goal not in ['Conservative', 'Balanced', 'Aggressive', 'Moderate'] and goal not in ['Conservative swing trades with high probability of success - focus on quality over quantity', 'Buy low, sell high - find oversold stocks ready to bounce back up', 'Aggressive swing trading - maximize opportunities with higher risk tolerance'] else 'Buy low, sell high - find oversold stocks ready to bounce back up'
-        }
-        current_preset = preset if preset in GOAL_PRESETS else 'Moderate'
-        if current_preset == 'Moderate' and goal not in GOAL_PRESETS.values():
-            for preset_name, preset_goal in GOAL_PRESETS.items():
-                if goal == preset_goal:
-                    current_preset = preset_name
-                    break
-            else:
-                current_preset = 'Custom'
-        
-        PRESET_DISPLAY_MAP = {
-            'Conservative': 'Conservative',
-            'Balanced': 'Moderate',
-            'Aggressive': 'Aggressive',
-            'Custom': 'Custom'
-        }
-        display_presets = ['Conservative', 'Balanced', 'Aggressive', 'Custom']
-        preset_options = [
-            (preset_name, PRESET_DISPLAY_MAP[preset_name])
-            for preset_name in display_presets
-        ]
-        selected_preset = 'Moderate' if current_preset == 'Moderate' else current_preset
-        
-        # Render content (same as get_strategy_config_html)
-        content_html = templates.get_template("pages/strategy_config.html").render(
-            rsi_threshold=rsi_threshold,
-            rsi_min=rsi_min,
-            sma_proximity_pct=sma_proximity_pct,
-            ai_score_required=ai_score_required,
-            risk_per_trade=risk_per_trade,
-            max_capital=max_capital,
-            goal=goal,
-            current_preset=selected_preset,
-            preset_options=preset_options
-        )
-        
-        # Add Firecrawl query section
-        firecrawl_section = f'''
-            <div class="mt-6 pt-6 border-t border-gray-700/50">
-                <div id="firecrawl-query-section" 
-                     hx-get="/api/firecrawl-query" 
-                     hx-trigger="load, revealed"
-                     hx-swap="innerHTML"
-                     hx-target="this"
-                     hx-indicator="#firecrawl-query-section">
-                    <div class="text-center py-4 text-gray-500">
-                        <i data-lucide="loader-2" class="text-lg mb-2 w-5 h-5 lucide-spin"></i>
-                        <p class="text-xs">Loading search settings...</p>
-                    </div>
-                </div>
-            </div>
-        '''
-        content = content_html + firecrawl_section
-        
-        # Wrap in HTMX modal
-        modal_html = htmx_modal_wrapper(
-            modal_id="strategy-config-modal",
-            title="Strategy Configuration",
-            content=content,
-            size="large",
-            icon="settings",
-            icon_color="text-purple-400"
-        )
-        return HTMLResponse(content=modal_html)
-    except Exception as e:
-        logger.error(f"Error loading strategy config modal: {e}", exc_info=True)
-        error_content = templates.get_template("partials/error_message.html").render(
-            message=f"Error loading strategy configuration: {str(e)[:100]}"
-        )
-        modal_html = htmx_modal_wrapper(
-            modal_id="strategy-config-modal",
-            title="Strategy Configuration Error",
-            content=error_content,
-            size="medium",
-            icon="alert-circle",
-            icon_color="text-red-400"
-        )
-        return HTMLResponse(content=modal_html)
-
-async def get_strategy_config_html(db = Depends(get_scoped_db)) -> HTMLResponse:
-    """Get strategy configuration edit form - Balanced Low Buy System.
-    
-    Returns an editable form with goal text box and parameter fields.
-    Loads from database first, falls back to env vars/defaults.
-    """
-    try:
-        # Load config from database or fallback
-        try:
-            config = await get_strategy_config_dict(db)
-        except Exception as config_error:
-            logger.warning(f"Could not load strategy config from DB, using defaults: {config_error}")
-            from ..core.config import STRATEGY_CONFIG
-            config = {
-                "rsi_threshold": STRATEGY_CONFIG.get("rsi_threshold", 35),
-                "rsi_min": STRATEGY_CONFIG.get("rsi_min", 20),
-                "sma_proximity_pct": STRATEGY_CONFIG.get("sma_proximity_pct", 3.0),
-                "ai_score_required": STRATEGY_CONFIG.get("ai_score_required", 7),
-                "risk_per_trade": STRATEGY_CONFIG.get("risk_per_trade", 50.0),
-                "max_capital": STRATEGY_CONFIG.get("max_capital", 5000.0),
-                "name": STRATEGY_CONFIG.get("name", "Balanced Low"),
-                "description": STRATEGY_CONFIG.get("description", "Buy stocks at balanced lows"),
-                "goal": STRATEGY_CONFIG.get("goal", "Buy low, sell high - find oversold stocks ready to bounce back up"),
-                "color": STRATEGY_CONFIG.get("color", "green")
-            }
-        
-        rsi_threshold = config.get('rsi_threshold', 35)
-        rsi_min = config.get('rsi_min', 20)
-        sma_proximity_pct = config.get('sma_proximity_pct', 3.0)
-        ai_score_required = config.get('ai_score_required', 7)
-        risk_per_trade = config.get('risk_per_trade', 50.0)
-        max_capital = config.get('max_capital', 5000.0)
-        goal = config.get('goal', 'Buy low, sell high - find oversold stocks ready to bounce back up')
-        preset = config.get('preset', 'Balanced')
-        
-        # Goal presets - map to backend preset names
-        GOAL_PRESETS = {
-            'Conservative': 'Conservative swing trades with high probability of success - focus on quality over quantity',
-            'Moderate': 'Buy low, sell high - find oversold stocks ready to bounce back up',  # Backend uses "Moderate" not "Balanced"
-            'Aggressive': 'Aggressive swing trading - maximize opportunities with higher risk tolerance',
-            'Custom': goal if goal not in ['Conservative', 'Balanced', 'Aggressive', 'Moderate'] and goal not in ['Conservative swing trades with high probability of success - focus on quality over quantity', 'Buy low, sell high - find oversold stocks ready to bounce back up', 'Aggressive swing trading - maximize opportunities with higher risk tolerance'] else 'Buy low, sell high - find oversold stocks ready to bounce back up'
-        }
-        
-        # Determine current preset based on goal or stored preset
-        current_preset = preset if preset in GOAL_PRESETS else 'Moderate'
-        if current_preset == 'Moderate' and goal not in GOAL_PRESETS.values():
-            # Check if goal matches a preset
-            for preset_name, preset_goal in GOAL_PRESETS.items():
-                if goal == preset_goal:
-                    current_preset = preset_name
-                    break
-            else:
-                current_preset = 'Custom'
-        
-        # Map display names to backend preset names
-        PRESET_DISPLAY_MAP = {
-            'Conservative': 'Conservative',
-            'Balanced': 'Moderate',  # Display as "Balanced" but save as "Moderate"
-            'Aggressive': 'Aggressive',
-            'Custom': 'Custom'
-        }
-        
-        # Prepare preset options for template
-        display_presets = ['Conservative', 'Balanced', 'Aggressive', 'Custom']
-        preset_options = [
-            (preset_name, PRESET_DISPLAY_MAP[preset_name])
-            for preset_name in display_presets
-        ]
-        
-        # Determine selected preset for template
-        selected_preset = 'Moderate' if current_preset == 'Moderate' else current_preset
-        
-        # Render template with proper data structure
-        return HTMLResponse(content=templates.get_template("pages/strategy_config.html").render(
-            rsi_threshold=rsi_threshold,
-            rsi_min=rsi_min,
-            sma_proximity_pct=sma_proximity_pct,
-            ai_score_required=ai_score_required,
-            risk_per_trade=risk_per_trade,
-            max_capital=max_capital,
-            goal=goal,
-            current_preset=selected_preset,
-            preset_options=preset_options
-        ))
-    except Exception as e:
-        logger.error(f"Error loading strategy config: {e}", exc_info=True)
-        import traceback
-        error_details = traceback.format_exc()
-        logger.error(f"Full traceback: {error_details}")
-        # Fallback to static config with safe defaults
-        try:
-            from ..core.config import STRATEGY_CONFIG
-            fallback_config = STRATEGY_CONFIG
-            return HTMLResponse(content=templates.get_template("partials/error_message.html").render(
-                message="Error loading strategy configuration. Using fallback defaults."
-            ))
-        except Exception as fallback_error:
-            logger.error(f"Fallback also failed: {fallback_error}", exc_info=True)
-            return HTMLResponse(content=templates.get_template("partials/error_message.html").render(
-                message=f"Error loading strategy config: {str(e)[:100]}. Fallback also failed: {str(fallback_error)[:100]}"
-            ))
-
-async def get_strategy_api(db = Depends(get_scoped_db)) -> JSONResponse:
+async def get_strategy_api(db: Any = Depends(get_scoped_db)) -> JSONResponse:
     """Get current active strategy config from MongoDB or env vars."""
     try:
         db_config = await get_strategy_from_db(db)
         if db_config:
+            # Remove goal from response
+            response_config = {k: v for k, v in db_config.items() if k != 'goal'}
             return JSONResponse(content={
                 "success": True,
                 "source": "database",
-                "config": db_config
+                "config": response_config
             })
-        
-        # Fallback to env vars
+        # Fallback to defaults
+        from ..core.config import STRATEGY_CONFIG
+        fallback_config = {k: v for k, v in STRATEGY_CONFIG.items() if k != 'goal'}
         return JSONResponse(content={
             "success": True,
-            "source": "environment",
-            "config": STRATEGY_CONFIG
+            "source": "defaults",
+            "config": fallback_config
         })
     except Exception as e:
         logger.error(f"Error getting strategy config: {e}", exc_info=True)
-        return JSONResponse(
-            content={"success": False, "error": str(e)[:100]},
-            status_code=500
-        )
+        return JSONResponse(content={
+            "success": False,
+            "error": str(e)[:100]
+        }, status_code=500)
 
-async def update_strategy_api(request: Request, db = Depends(get_scoped_db)):
+async def update_strategy_api(request: Request, db: Any = Depends(get_scoped_db)) -> JSONResponse:
     """Update strategy configuration in MongoDB.
     
     HTMX Gold Standard: Returns HTMLResponse for HTMX requests, JSONResponse for API requests.
@@ -1283,7 +1162,7 @@ async def update_strategy_api(request: Request, db = Depends(get_scoped_db)):
                         body[key] = int(body[key])
                     except (ValueError, TypeError):
                         pass
-            for key in ['risk_per_trade', 'max_capital', 'sma_proximity_pct']:
+            for key in ['sma_proximity_pct']:
                 if key in body:
                     try:
                         body[key] = float(body[key])
@@ -1291,62 +1170,15 @@ async def update_strategy_api(request: Request, db = Depends(get_scoped_db)):
                         pass
         else:
             body = await request.json()
-        preset = body.get('preset')
         
-        # Strategy presets
-        presets = {
-            "Conservative": {
-                "rsi_threshold": 30,
-                "rsi_min": 20,
-                "sma_proximity_pct": 2.0,
-                "ai_score_required": 9,
-                "risk_per_trade": 25.0,
-                "max_capital": 2500.0
-            },
-            "Moderate": {
-                "rsi_threshold": 35,
-                "rsi_min": 20,
-                "sma_proximity_pct": 3.0,
-                "ai_score_required": 7,
-                "risk_per_trade": 50.0,
-                "max_capital": 5000.0
-            },
-            "Aggressive": {
-                "rsi_threshold": 40,
-                "rsi_min": 20,
-                "sma_proximity_pct": 5.0,
-                "ai_score_required": 6,
-                "risk_per_trade": 100.0,
-                "max_capital": 10000.0
-            }
+        # Build config from custom parameters
+        config = {
+            "rsi_threshold": body.get('rsi_threshold', STRATEGY_CONFIG.get('rsi_threshold', 35)),
+            "rsi_min": body.get('rsi_min', STRATEGY_CONFIG.get('rsi_min', 20)),
+            "sma_proximity_pct": body.get('sma_proximity_pct', STRATEGY_CONFIG.get('sma_proximity_pct', 3.0)),
+            "ai_score_required": body.get('ai_score_required', STRATEGY_CONFIG.get('ai_score_required', 7)),
+            "preset": "Custom"
         }
-        
-        # Determine config values
-        if preset and preset in presets:
-            config = presets[preset].copy()
-            config['preset'] = preset
-            # Presets don't override goal if provided
-            if body.get('goal'):
-                config['goal'] = body.get('goal')
-        elif preset == "Custom" or body.get('rsi_threshold'):
-            # Custom parameters
-            config = {
-                "rsi_threshold": body.get('rsi_threshold', STRATEGY_CONFIG.get('rsi_threshold', 35)),
-                "rsi_min": body.get('rsi_min', STRATEGY_CONFIG.get('rsi_min', 20)),
-                "sma_proximity_pct": body.get('sma_proximity_pct', STRATEGY_CONFIG.get('sma_proximity_pct', 3.0)),
-                "ai_score_required": body.get('ai_score_required', STRATEGY_CONFIG.get('ai_score_required', 7)),
-                "risk_per_trade": body.get('risk_per_trade', STRATEGY_CONFIG.get('risk_per_trade', 50.0)),
-                "max_capital": body.get('max_capital', STRATEGY_CONFIG.get('max_capital', 5000.0)),
-                "preset": "Custom"
-            }
-            # Include goal if provided
-            if body.get('goal'):
-                config['goal'] = body.get('goal')
-        else:
-            error_msg = "Invalid request: provide 'preset' or custom parameters"
-            if is_htmx:
-                return error_response(error_msg, status_code=400, target_id="toast-container")
-            return JSONResponse(content={"success": False, "error": error_msg}, status_code=400)
         
         # Validate parameters
         if not (0 < config['rsi_threshold'] <= 100):
@@ -1369,24 +1201,6 @@ async def update_strategy_api(request: Request, db = Depends(get_scoped_db)):
             if is_htmx:
                 return error_response(error_msg, status_code=400, target_id="toast-container")
             return JSONResponse(content={"success": False, "error": error_msg}, status_code=400)
-        if config['risk_per_trade'] <= 0:
-            error_msg = "risk_per_trade must be positive"
-            if is_htmx:
-                return error_response(error_msg, status_code=400, target_id="toast-container")
-            return JSONResponse(content={"success": False, "error": error_msg}, status_code=400)
-        if config['max_capital'] <= 0:
-            error_msg = "max_capital must be positive"
-            if is_htmx:
-                return error_response(error_msg, status_code=400, target_id="toast-container")
-            return JSONResponse(content={"success": False, "error": error_msg}, status_code=400)
-        
-        # Validate goal if provided
-        goal = config.get('goal', '')
-        if goal and len(goal) > 280:
-            error_msg = "goal must be 280 characters or less"
-            if is_htmx:
-                return error_response(error_msg, status_code=400, target_id="toast-container")
-            return JSONResponse(content={"success": False, "error": error_msg}, status_code=400)
         
         # Set all existing configs to inactive
         await db.strategy_config.update_many(
@@ -1402,22 +1216,24 @@ async def update_strategy_api(request: Request, db = Depends(get_scoped_db)):
             "name": STRATEGY_CONFIG.get('name', 'Balanced Low'),
             "description": STRATEGY_CONFIG.get('description', 'Buy stocks at balanced lows')
         }
-        # Ensure goal is included (use default if not provided)
-        if 'goal' not in config_doc:
-            config_doc['goal'] = STRATEGY_CONFIG.get('goal', 'Buy low, sell high - find oversold stocks ready to bounce back up')
         
         await db.strategy_config.insert_one(config_doc)
         
-        logger.info(f"Strategy updated: {config.get('preset', 'Custom')} - RSI<{config['rsi_threshold']}, Score≥{config['ai_score_required']}, Goal: {config_doc.get('goal', 'N/A')[:50]}")
+        logger.info(f"Strategy updated: RSI<{config['rsi_threshold']}, Score≥{config['ai_score_required']}")
         
         if is_htmx:
-            success_toast = toast_notification(
-                message="Strategy configuration saved successfully!",
-                type="success",
-                duration=3000
-            )
-            response = HTMLResponse(content=htmx_response(updates={"toast-container": success_toast}))
-            response.headers["HX-Trigger"] = "refreshStrategy"
+            # HTMX Gold Standard: Return updated strategy display HTML
+            # Strategy changes affect watchlist evaluation, so trigger re-evaluation
+            logger.info(f"✅ Strategy updated: RSI {config.get('rsi_min', 20)}-{config['rsi_threshold']}, SMA proximity {config.get('sma_proximity_pct', 3.0)}%")
+            
+            # Get updated strategy display HTML
+            strategy_display_html = await get_strategy_display_html(db)
+            strategy_display_content = strategy_display_html.body.decode('utf-8') if isinstance(strategy_display_html.body, bytes) else str(strategy_display_html.body)
+            
+            # Return HTML with hx-swap-oob to update strategy display
+            # Use HX-Trigger header to trigger watchlist re-evaluation
+            response = HTMLResponse(content=strategy_display_content)
+            response.headers["HX-Trigger"] = "strategySaved"
             return response
         
         return JSONResponse(content={
@@ -1429,6 +1245,177 @@ async def update_strategy_api(request: Request, db = Depends(get_scoped_db)):
         error_msg = str(e)[:100]
         if is_htmx:
             return error_response(f"Failed to save: {error_msg}", status_code=500, target_id="toast-container")
+        return JSONResponse(content={"success": False, "error": error_msg}, status_code=500)
+
+
+async def update_strategy_parameter_api(request: Request, db: Any = Depends(get_scoped_db)) -> HTMLResponse:
+    """Update a single strategy parameter.
+    
+    HTMX endpoint for inline editing of individual parameters.
+    """
+    is_htmx = request.headers.get("HX-Request") == "true"
+    
+    try:
+        # Handle both form data (HTMX) and JSON (API)
+        content_type = request.headers.get("content-type", "")
+        if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+            form_data = await request.form()
+            body = dict(form_data)
+        else:
+            body = await request.json()
+        
+        param_name = body.get('param')
+        param_value = body.get('value')
+        
+        # Log incoming request for debugging
+        logger.debug(f"Strategy param update request: param={param_name}, value={param_value}, content_type={content_type}")
+        
+        # Validate required fields (handle both None and empty string)
+        if not param_name or param_value is None or param_value == '':
+            error_msg = f"Missing 'param' or 'value' (got param={param_name}, value={param_value})"
+            logger.warning(error_msg)
+            if is_htmx:
+                # Return current strategy display with 200 OK (HTMX doesn't swap on error codes)
+                display_response = await get_strategy_display_html(db)
+                display_html = display_response.body.decode('utf-8') if isinstance(display_response.body, bytes) else str(display_response.body)
+                return HTMLResponse(content=display_html, status_code=200)
+            return JSONResponse(content={"success": False, "error": error_msg}, status_code=400)
+        
+        # Validate parameter name
+        valid_params = ['rsi_threshold', 'rsi_min', 'sma_proximity_pct', 'ai_score_required']
+        if param_name not in valid_params:
+            error_msg = f"Invalid parameter name. Must be one of: {', '.join(valid_params)}"
+            if is_htmx:
+                # Return current strategy display with 200 OK
+                display_response = await get_strategy_display_html(db)
+                display_html = display_response.body.decode('utf-8') if isinstance(display_response.body, bytes) else str(display_response.body)
+                return HTMLResponse(content=display_html, status_code=200)
+            return JSONResponse(content={"success": False, "error": error_msg}, status_code=400)
+        
+        # Convert and validate value
+        try:
+            # Handle string values from form data
+            if isinstance(param_value, str):
+                param_value = param_value.strip()
+                if not param_value:
+                    raise ValueError("Empty value")
+            
+            if param_name in ['rsi_threshold', 'rsi_min', 'ai_score_required']:
+                param_value = int(param_value)
+            elif param_name == 'sma_proximity_pct':
+                param_value = float(param_value)
+        except (ValueError, TypeError) as e:
+            error_msg = f"Invalid value for {param_name}: {param_value} ({type(param_value).__name__}) - {str(e)}"
+            logger.warning(error_msg)
+            if is_htmx:
+                # Return current strategy display with 200 OK
+                display_response = await get_strategy_display_html(db)
+                display_html = display_response.body.decode('utf-8') if isinstance(display_response.body, bytes) else str(display_response.body)
+                return HTMLResponse(content=display_html, status_code=200)
+            return JSONResponse(content={"success": False, "error": error_msg}, status_code=400)
+        
+        # Validate ranges
+        if param_name == 'rsi_threshold' and not (0 < param_value <= 100):
+            error_msg = "rsi_threshold must be between 0 and 100"
+            logger.warning(f"Validation failed: {error_msg}")
+            if is_htmx:
+                display_response = await get_strategy_display_html(db)
+                display_html = display_response.body.decode('utf-8') if isinstance(display_response.body, bytes) else str(display_response.body)
+                return HTMLResponse(content=display_html, status_code=200)
+            return JSONResponse(content={"success": False, "error": error_msg}, status_code=400)
+        elif param_name == 'rsi_min' and not (15 <= param_value <= 25):
+            error_msg = "rsi_min must be between 15 and 25"
+            logger.warning(f"Validation failed: {error_msg}")
+            if is_htmx:
+                display_response = await get_strategy_display_html(db)
+                display_html = display_response.body.decode('utf-8') if isinstance(display_response.body, bytes) else str(display_response.body)
+                return HTMLResponse(content=display_html, status_code=200)
+            return JSONResponse(content={"success": False, "error": error_msg}, status_code=400)
+        elif param_name == 'sma_proximity_pct' and not (0 <= param_value <= 5.0):
+            error_msg = "sma_proximity_pct must be between 0 and 5"
+            logger.warning(f"Validation failed: {error_msg}")
+            if is_htmx:
+                display_response = await get_strategy_display_html(db)
+                display_html = display_response.body.decode('utf-8') if isinstance(display_response.body, bytes) else str(display_response.body)
+                return HTMLResponse(content=display_html, status_code=200)
+            return JSONResponse(content={"success": False, "error": error_msg}, status_code=400)
+        elif param_name == 'ai_score_required' and not (0 <= param_value <= 10):
+            error_msg = "ai_score_required must be between 0 and 10"
+            logger.warning(f"Validation failed: {error_msg}")
+            if is_htmx:
+                display_response = await get_strategy_display_html(db)
+                display_html = display_response.body.decode('utf-8') if isinstance(display_response.body, bytes) else str(display_response.body)
+                return HTMLResponse(content=display_html, status_code=200)
+            return JSONResponse(content={"success": False, "error": error_msg}, status_code=400)
+        
+        # Get current config
+        current_config = await get_strategy_config_dict(db)
+        
+        # Update the parameter
+        config = {
+            "rsi_threshold": current_config.get('rsi_threshold', 35),
+            "rsi_min": current_config.get('rsi_min', 20),
+            "sma_proximity_pct": current_config.get('sma_proximity_pct', 3.0),
+            "ai_score_required": current_config.get('ai_score_required', 7),
+            "preset": "Custom"
+        }
+        config[param_name] = param_value
+        
+        # Set all existing configs to inactive
+        await db.strategy_config.update_many(
+            {"active": True},
+            {"$set": {"active": False}}
+        )
+        
+        # Insert new active config
+        config_doc = {
+            **config,
+            "active": True,
+            "created_at": datetime.now(),
+            "name": STRATEGY_CONFIG.get('name', 'Balanced Low'),
+            "description": STRATEGY_CONFIG.get('description', 'Buy stocks at balanced lows')
+        }
+        
+        await db.strategy_config.insert_one(config_doc)
+        
+        logger.info(f"Strategy parameter updated: {param_name} = {param_value}")
+        
+        if is_htmx:
+            # Return updated strategy display HTML (will replace innerHTML of #strategy-display)
+            display_response = await get_strategy_display_html(db)
+            
+            # Decode response body properly
+            if isinstance(display_response.body, bytes):
+                display_html = display_response.body.decode('utf-8')
+            elif hasattr(display_response.body, 'decode'):
+                display_html = display_response.body.decode('utf-8')
+            else:
+                display_html = str(display_response.body)
+            
+            # Staff Engineer Solution: Strategy changes require user to manually re-evaluate watchlist
+            # Show re-evaluate button instead of auto-refreshing watchlist
+            logger.info(f"✅ Strategy parameter updated: {param_name}={param_value} (new config: RSI {config.get('rsi_min', 20)}-{config.get('rsi_threshold', 35)}, SMA proximity {config.get('sma_proximity_pct', 3.0)}%)")
+            response = HTMLResponse(content=display_html)
+            # Trigger strategyChanged event to show re-evaluate button (user must click to re-evaluate)
+            response.headers["HX-Trigger"] = "strategyChanged"
+            return response
+        
+        return JSONResponse(content={
+            "success": True,
+            "config": config_doc
+        })
+    except Exception as e:
+        logger.error(f"Error updating strategy parameter: {e}", exc_info=True)
+        error_msg = f"Failed to update parameter: {str(e)[:100]}"
+        if is_htmx:
+            # Return current strategy display on error with 200 OK (so HTMX can swap it)
+            try:
+                display_response = await get_strategy_display_html(db)
+                display_html = display_response.body.decode('utf-8') if isinstance(display_response.body, bytes) else str(display_response.body)
+                return HTMLResponse(content=display_html, status_code=200)
+            except Exception:
+                # Fallback: return minimal valid HTML
+                return HTMLResponse(content="<div id='strategy-display-content'>Error updating parameter</div>", status_code=200)
         return JSONResponse(content={"success": False, "error": error_msg}, status_code=500)
 
 
@@ -1462,8 +1449,6 @@ async def generate_strategy_params_api(request: Request) -> JSONResponse:
                 "rsi_threshold": ai_config.rsi_threshold,
                 "rsi_min": ai_config.rsi_min,
                 "ai_score_required": ai_config.ai_score_required,
-                "risk_per_trade": ai_config.risk_per_trade,
-                "max_capital": ai_config.max_capital,
                 "reasoning": ai_config.reasoning
             }
             
@@ -1475,16 +1460,14 @@ async def generate_strategy_params_api(request: Request) -> JSONResponse:
             })
         except Exception as ai_error:
             logger.error(f"AI parameter generation failed: {ai_error}", exc_info=True)
-            # Fallback to default moderate preset
+            # Fallback to default parameters
             return JSONResponse(content={
                 "success": True,
                 "config": {
                     "rsi_threshold": 35,
                     "rsi_min": 20,
                     "ai_score_required": 7,
-                    "risk_per_trade": 50.0,
-                    "max_capital": 5000.0,
-                    "reasoning": "Using default moderate preset (AI generation unavailable)"
+                    "reasoning": "Using default parameters (AI generation unavailable)"
                 },
                 "warning": "AI generation unavailable, using default parameters"
             })
@@ -1495,49 +1478,8 @@ async def generate_strategy_params_api(request: Request) -> JSONResponse:
             status_code=500
         )
 
-async def get_strategy_presets() -> JSONResponse:
-    """List available strategy presets."""
-    presets = [
-        {
-            "name": "Conservative",
-            "description": "Low risk, high quality signals only",
-            "rsi_threshold": 30,
-            "ai_score_required": 9,
-            "risk_per_trade": 25.0,
-            "max_capital": 2500.0
-        },
-        {
-            "name": "Moderate",
-            "description": "Balanced risk and reward",
-            "rsi_threshold": 35,
-            "ai_score_required": 7,
-            "risk_per_trade": 50.0,
-            "max_capital": 5000.0
-        },
-        {
-            "name": "Aggressive",
-            "description": "Higher risk, more opportunities",
-            "rsi_threshold": 40,
-            "ai_score_required": 6,
-            "risk_per_trade": 100.0,
-            "max_capital": 10000.0
-        },
-        {
-            "name": "Custom",
-            "description": "Configure your own parameters",
-            "rsi_threshold": None,
-            "ai_score_required": None,
-            "risk_per_trade": None,
-            "max_capital": None
-        }
-    ]
-    
-    return JSONResponse(content={
-        "success": True,
-        "presets": presets
-    })
 
-async def get_firecrawl_query(db = Depends(get_scoped_db)) -> HTMLResponse:
+async def get_firecrawl_query(db: Any = Depends(get_scoped_db)) -> HTMLResponse:
     """Get current Firecrawl search query template - returns HTML for HTMX."""
     try:
         settings = await db.app_settings.find_one({"key": "firecrawl_search_query_template"})
@@ -1555,7 +1497,7 @@ async def get_firecrawl_query(db = Depends(get_scoped_db)) -> HTMLResponse:
             message=f"Error loading search settings: {str(e)[:100]}"
         ))
 
-async def get_analysis_preview(db = Depends(get_scoped_db)) -> JSONResponse:
+async def get_analysis_preview(db: Any = Depends(get_scoped_db)) -> JSONResponse:
     """Get preview of symbols that will be analyzed with current prices and pre-calculated technical indicators.
     
     Returns list of symbols with:
@@ -1725,7 +1667,7 @@ async def get_analysis_preview(db = Depends(get_scoped_db)) -> JSONResponse:
         }, status_code=500)
 
 
-async def get_watch_list(db = Depends(get_scoped_db)) -> HTMLResponse:
+async def get_watch_list(db: Any = Depends(get_scoped_db)) -> HTMLResponse:
     """Get current watch list display with integrated pre-calculated indicators.
     
     Combines watchlist management with preview indicators for a streamlined UX.
@@ -1745,10 +1687,17 @@ async def get_watch_list(db = Depends(get_scoped_db)) -> HTMLResponse:
         if not isinstance(symbols, list):
             symbols = []
         
-        from ..core.config import get_strategy_config
+        from ..core.config import get_strategy_config, calculate_watchlist_config_hash
         strategy_config = await get_strategy_config(db)
         rsi_threshold = strategy_config.get('rsi_threshold', 35)
+        rsi_min = strategy_config.get('rsi_min', 20)
         sma_proximity_pct = strategy_config.get('sma_proximity_pct', 3.0)
+        
+        # Calculate config hash for smart re-evaluation detection
+        config_hash = calculate_watchlist_config_hash(strategy_config)
+        
+        # Log watchlist re-evaluation with current strategy parameters
+        logger.info(f"📋 Re-evaluating watchlist with strategy params: RSI {rsi_min}-{rsi_threshold}, SMA proximity {sma_proximity_pct}% (config hash: {config_hash[:8]}...)")
         
         # Get preview data for symbols (pre-calculated indicators)
         # Parallelize data fetching for better performance
@@ -1756,7 +1705,6 @@ async def get_watch_list(db = Depends(get_scoped_db)) -> HTMLResponse:
         ready_count = 0
         if symbols:
             try:
-                # Import analysis preview logic
                 import asyncio
                 import time
                 from ..services.analysis import get_market_data, analyze_technicals
@@ -1768,6 +1716,14 @@ async def get_watch_list(db = Depends(get_scoped_db)) -> HTMLResponse:
                 async def process_symbol(symbol: str) -> dict:
                     """Process a single symbol and return preview data."""
                     try:
+                        # Check evaluation cache first
+                        from ..services.watchlist_cache import get_cache
+                        cache = get_cache()
+                        cached_eval = cache.get_evaluation(symbol, config_hash, ttl_seconds=60)
+                        if cached_eval:
+                            logger.debug(f"Using cached evaluation for {symbol}")
+                            return cached_eval
+                        
                         bars, _, _ = await get_market_data(symbol, days=100, db=db)
                         current_price = None
                         rsi = None
@@ -1810,12 +1766,14 @@ async def get_watch_list(db = Depends(get_scoped_db)) -> HTMLResponse:
                             if market_cap and market_cap < market_cap_min:
                                 passes_filters = False
                             
-                            # Check if meets entry criteria (RSI < threshold AND uptrend AND within SMA-200 proximity)
+                            # Check if meets entry criteria (RSI in sweet spot: rsi_min < RSI < rsi_threshold AND uptrend AND within SMA-200 proximity)
+                            # This matches the strategy's generate_signals logic exactly
                             meets_criteria = (
                                 passes_filters and
                                 current_price is not None and
                                 rsi is not None and
-                                rsi < rsi_threshold and
+                                rsi > rsi_min and  # Not too extreme (avoid RSI < rsi_min)
+                                rsi < rsi_threshold and  # Oversold (RSI < threshold)
                                 trend == "UP" and
                                 (price_vs_sma_pct is None or price_vs_sma_pct <= sma_proximity_pct)
                             )
@@ -1831,8 +1789,11 @@ async def get_watch_list(db = Depends(get_scoped_db)) -> HTMLResponse:
                                         reasons.append(f"P/E {pe_ratio:.1f} > {pe_ratio_max:.0f}")
                                     if market_cap and market_cap < market_cap_min:
                                         reasons.append(f"Market cap < ${market_cap_min/1_000_000:.0f}M")
-                                if rsi is not None and rsi >= rsi_threshold:
-                                    reasons.append(f"RSI {rsi:.1f} ≥ {rsi_threshold} (not oversold)")
+                                if rsi is not None:
+                                    if rsi <= rsi_min:
+                                        reasons.append(f"RSI {rsi:.1f} ≤ {rsi_min} (too extreme oversold)")
+                                    elif rsi >= rsi_threshold:
+                                        reasons.append(f"RSI {rsi:.1f} ≥ {rsi_threshold} (not oversold)")
                                 if trend != "UP":
                                     if trend == "DOWN":
                                         reasons.append(f"Downtrend (Price ${current_price:.2f} < SMA-200 ${sma_200:.2f})")
@@ -1853,7 +1814,7 @@ async def get_watch_list(db = Depends(get_scoped_db)) -> HTMLResponse:
                             sma_progress_pct = None
                             rejection_reason = "Insufficient data"
                         
-                        return {
+                        result = {
                             "symbol": symbol,
                             "price": round(current_price, 2) if current_price else None,
                             "rsi": round(rsi, 2) if rsi else None,
@@ -1870,9 +1831,17 @@ async def get_watch_list(db = Depends(get_scoped_db)) -> HTMLResponse:
                             "meets_criteria": meets_criteria,
                             "rejection_reason": rejection_reason if not meets_criteria else None
                         }
+                        
+                        # Cache the evaluation result
+                        try:
+                            cache.set_evaluation(symbol, config_hash, result)
+                        except Exception as e:
+                            logger.debug(f"Failed to cache evaluation for {symbol}: {e}")
+                        
+                        return result
                     except Exception as e:
                         logger.error(f"Error processing symbol {symbol} in watchlist: {e}", exc_info=True)
-                        return {
+                        error_result = {
                             "symbol": symbol,
                             "price": None,
                             "rsi": None,
@@ -1886,11 +1855,13 @@ async def get_watch_list(db = Depends(get_scoped_db)) -> HTMLResponse:
                             "market_cap": None,
                             "rsi_progress_pct": None,
                             "sma_progress_pct": None,
-                            "meets_criteria": False
+                            "meets_criteria": False,
+                            "error": str(e)[:100]  # Include error message for UI display
                         }
+                        # Don't cache error results
+                        return error_result
                 
                 # Process all symbols in parallel with timeout protection
-                # Process symbols in parallel with timeout protection
                 tasks = [process_symbol(symbol) for symbol in symbols]
                 # Use gather with return_exceptions to handle individual failures gracefully
                 # Each symbol has a 30s timeout (via get_market_data internal timeouts)
@@ -1918,7 +1889,8 @@ async def get_watch_list(db = Depends(get_scoped_db)) -> HTMLResponse:
                     "sma_200": None,
                     "atr": None,
                     "price_vs_sma_pct": None,
-                    "meets_criteria": False
+                    "meets_criteria": False,
+                    "error": None
                 }) for symbol in symbols]
                 
             except Exception as e:
@@ -1996,6 +1968,7 @@ async def get_watch_list(db = Depends(get_scoped_db)) -> HTMLResponse:
                     "sma_progress_pct": preview.get("sma_progress_pct"),
                     "meets_criteria": meets_criteria,
                     "rejection_reason": preview.get("rejection_reason"),
+                    "error": preview.get("error"),  # Include error if present
                     "rsi_color": rsi_color,
                     "trend_icon": trend_icon,
                     "trend_color": trend_color,
@@ -2007,13 +1980,19 @@ async def get_watch_list(db = Depends(get_scoped_db)) -> HTMLResponse:
                 })
         
         # Render template
-        return HTMLResponse(content=templates.get_template("pages/watchlist.html").render(
+        response = HTMLResponse(content=templates.get_template("pages/watchlist.html").render(
             symbols=symbols,
             preview_data=template_preview_data if template_preview_data else None,
             ready_count=ready_count,
             rsi_threshold=rsi_threshold,
-            sma_proximity_pct=sma_proximity_pct
+            sma_proximity_pct=sma_proximity_pct,
+            config_hash=config_hash,
+            evaluation_timestamp=datetime.now().isoformat()
         ))
+        # Add config hash to response headers for frontend access
+        response.headers["X-Config-Hash"] = config_hash
+        response.headers["X-Evaluation-Timestamp"] = datetime.now().isoformat()
+        return response
     except Exception as e:
         logger.error(f"Error loading watch list: {e}", exc_info=True)
         import traceback
@@ -2022,12 +2001,24 @@ async def get_watch_list(db = Depends(get_scoped_db)) -> HTMLResponse:
         # Return watchlist template with empty data rather than error message
         # This ensures the UI doesn't break
         try:
-            return HTMLResponse(content=templates.get_template("pages/watchlist.html").render(
+            # Get config hash even in error case
+            from ..core.config import get_strategy_config, calculate_watchlist_config_hash
+            try:
+                error_strategy_config = await get_strategy_config(db)
+                error_config_hash = calculate_watchlist_config_hash(error_strategy_config)
+            except:
+                error_config_hash = "unknown"
+            
+            response = HTMLResponse(content=templates.get_template("pages/watchlist.html").render(
                 symbols=symbols if 'symbols' in locals() else [],
                 preview_data=None,
                 ready_count=0,
-                rsi_threshold=35
+                rsi_threshold=35,
+                config_hash=error_config_hash,
+                evaluation_timestamp=None
             ))
+            response.headers["X-Config-Hash"] = error_config_hash
+            return response
         except Exception as template_error:
             logger.error(f"Error rendering watchlist template: {template_error}", exc_info=True)
             return HTMLResponse(content=templates.get_template("partials/status_message.html").render(
@@ -2069,10 +2060,14 @@ def get_logo(ticker: str, size: str = Query("14", description="Logo size in pixe
     
     except Exception as e:
         logger.warning(f"Error generating logo for {ticker}: {e}")
-        # Fallback to SVG initials
+        # Fallback to SVG initials using template
         from ..services.logo import get_svg_initials
         svg = get_svg_initials(ticker if ticker else "?")
-        return HTMLResponse(content=f'<div class="logo-initials">{svg}</div>')
+        return HTMLResponse(content=templates.get_template("components/logo.html").render(
+            symbol=ticker if ticker else "?",
+            logo_svg=svg,
+            size_class="w-14 h-14"
+        ))
 
 
 async def search_tickers(query: str = None) -> JSONResponse:
@@ -2131,7 +2126,7 @@ async def search_tickers(query: str = None) -> JSONResponse:
         )
 
 
-async def update_watch_list(request: Request, db = Depends(get_scoped_db)):
+async def update_watch_list(request: Request, db: Any = Depends(get_scoped_db)) -> JSONResponse:
     """Update watch list - supports add, remove, and bulk update operations.
     
     No longer limited to 5 tickers - can have many tickers in watchlist.
@@ -2290,7 +2285,7 @@ async def update_watch_list(request: Request, db = Depends(get_scoped_db)):
         )
 
 
-async def update_target_symbols(request: Request, db = Depends(get_scoped_db)) -> HTMLResponse:
+async def update_target_symbols(request: Request, db: Any = Depends(get_scoped_db)) -> HTMLResponse:
     """Update target symbols for initial search."""
     try:
         body = await request.json()
@@ -2346,7 +2341,7 @@ async def update_target_symbols(request: Request, db = Depends(get_scoped_db)) -
             message=f"Error: {str(e)[:100]}"
         ))
 
-async def update_firecrawl_query(request: Request, db = Depends(get_scoped_db)) -> HTMLResponse:
+async def update_firecrawl_query(request: Request, db: Any = Depends(get_scoped_db)) -> HTMLResponse:
     """Update Firecrawl search query template."""
     try:
         body = await request.json()
@@ -2510,7 +2505,7 @@ async def get_trending_stocks_with_analysis() -> JSONResponse:
     result = await _get_trending_stocks_with_analysis_internal()
     return JSONResponse(content=result)
 
-async def quick_buy(symbol: str = Form(...), qty: Optional[int] = Form(10), db = Depends(get_scoped_db)) -> HTMLResponse:
+async def quick_buy(symbol: str = Form(...), qty: Optional[int] = Form(10), db: Any = Depends(get_scoped_db)) -> HTMLResponse:
     """Quick buy order from stock card - returns HTML with hx-swap-oob for multiple updates.
     
     HTMX Pattern: Returns HTML with hx-swap-oob="true" to update multiple elements:
@@ -2607,7 +2602,7 @@ async def quick_buy(symbol: str = Form(...), qty: Optional[int] = Form(10), db =
 
 async def get_latest_scan(
     date: Optional[str] = None,
-    db = Depends(get_scoped_db),
+    db: Any = Depends(get_scoped_db),
     embedding_service: EmbeddingService = Depends(get_embedding_service)
 ) -> JSONResponse:
     """Get latest scan (or final scan if after 6pm ET).
@@ -2647,7 +2642,7 @@ async def get_latest_scan(
             status_code=500
         )
 
-async def quick_sell(symbol: str = Form(...), db = Depends(get_scoped_db)) -> HTMLResponse:
+async def quick_sell(symbol: str = Form(...), db: Any = Depends(get_scoped_db)) -> HTMLResponse:
     """Quick sell/close position - returns HTML with hx-swap-oob for multiple updates.
     
     MDB-Engine Pattern: Uses Depends(get_scoped_db) for database access.
@@ -2735,7 +2730,7 @@ async def get_open_orders() -> JSONResponse:
         logger.error(f"Get open orders failed: {e}", exc_info=True)
         return JSONResponse(content={"success": False, "orders": []})
 
-async def _get_trending_stocks_with_analysis_streaming(websocket: WebSocket, db, custom_symbols: Optional[List[str]] = None) -> None:
+async def _get_trending_stocks_with_analysis_streaming(websocket: WebSocket, db: Any, custom_symbols: Optional[List[str]] = None) -> None:
     """Stream stock analysis with progress updates via WebSocket.
     
     Simplified version - analyzes sample stocks without Firecrawl discovery.
@@ -2888,9 +2883,7 @@ async def _get_trending_stocks_with_analysis_streaming(websocket: WebSocket, db,
                 start_time = time.time()
                 
                 try:
-                    # Get query template from database for this scan
-                    query_template = await _get_firecrawl_query_template(db)
-                    bars, headlines, news_objects = await get_market_data(symbol, days=500, query_template=query_template, db=db)
+                    bars, headlines, news_objects = await get_market_data(symbol, days=500, db=db)
                     fetch_time = time.time() - start_time
                     logger.info(f"⏱️ [WS] [{idx}/{total}] Market data fetch for {symbol} took {fetch_time:.2f}s")
                 except Exception as e:
@@ -3243,7 +3236,7 @@ async def _get_trending_stocks_with_analysis_streaming(websocket: WebSocket, db,
 
 async def get_explanation(
     symbol: str = Form(...), 
-    db = Depends(get_scoped_db),
+    db: Any = Depends(get_scoped_db),
     embedding_service: EmbeddingService = Depends(get_embedding_service)
 ) -> HTMLResponse:
     """Get detailed explanation for a stock analysis including calculations, data, insights, and news.
