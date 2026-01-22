@@ -3,23 +3,19 @@
          rsi_threshold: {{ rsi_threshold }},
          rsi_min: {{ rsi_min }},
          sma_proximity_pct: {{ sma_proximity_pct }},
-         ai_score_required: {{ ai_score_required }},
          original_rsi_threshold: {{ rsi_threshold }},
          original_rsi_min: {{ rsi_min }},
          original_sma_proximity_pct: {{ sma_proximity_pct }},
-         original_ai_score_required: {{ ai_score_required }},
          get hasChanges() {
              return this.rsi_threshold !== this.original_rsi_threshold ||
                     this.rsi_min !== this.original_rsi_min ||
-                    Math.abs(this.sma_proximity_pct - this.original_sma_proximity_pct) > 0.01 ||
-                    this.ai_score_required !== this.original_ai_score_required;
+                    Math.abs(this.sma_proximity_pct - this.original_sma_proximity_pct) > 0.01;
          },
          adjust(param, delta) {
              const limits = {
                  rsi_threshold: { min: 20, max: 50 },
                  rsi_min: { min: 10, max: 30 },
-                 sma_proximity_pct: { min: 0, max: 5 },
-                 ai_score_required: { min: 0, max: 10 }
+                 sma_proximity_pct: { min: 0, max: 5 }
              };
              const limit = limits[param];
              if (!limit) return;
@@ -64,7 +60,6 @@
                 <input type="hidden" name="rsi_threshold" :value="rsi_threshold">
                 <input type="hidden" name="rsi_min" :value="rsi_min">
                 <input type="hidden" name="sma_proximity_pct" :value="sma_proximity_pct">
-                <input type="hidden" name="ai_score_required" :value="ai_score_required">
                 
                 <button 
                     type="submit"
@@ -228,56 +223,6 @@
                 </div>
                 <div class="text-gray-500 text-xs mt-2">Near support level</div>
             </div>
-            
-            <!-- AI Score Required -->
-            <div class="glass rounded-lg p-5 transition-all duration-200 hover:border-cyan-500/30 group" role="listitem">
-                <div class="flex items-start justify-between mb-4">
-                    <div class="flex items-center gap-2">
-                        <div class="text-sm text-gray-300 font-medium">AI Score Required</div>
-                        <div class="tooltip">
-                            <button type="button" aria-label="Learn about AI score requirement" class="focus:ring-2 focus:ring-cyan-500/50 rounded opacity-60 hover:opacity-100 transition-opacity">
-                                <i data-lucide="info" class="w-3.5 h-3.5 text-cyan-400 cursor-help"></i>
-                            </button>
-                            <div class="tooltip-text">
-                                <strong>AI Score Required</strong><br/>
-                                Minimum AI confidence score (0-10) required for entry. AI analyzes news, technicals, and patterns to score bounce-back probability.<br/><br/>
-                                <strong>How it works:</strong> Score ≥ <span x-text="ai_score_required"></span> means we only buy when AI is confident about bounce potential.<br/><br/>
-                                <strong>Effect:</strong> Higher = fewer but higher quality signals, Lower = more signals but lower confidence
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="flex items-baseline gap-2 mb-4">
-                    <span class="text-gray-500 text-lg">≥</span>
-                    <span class="text-3xl font-bold text-white transition-all duration-150" x-text="ai_score_required"></span>
-                </div>
-                
-                <div class="flex items-center gap-2">
-                    <button 
-                        type="button"
-                        @click="adjust('ai_score_required', -1)"
-                        :disabled="ai_score_required <= 0"
-                        class="w-10 h-10 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                        <i data-lucide="minus" class="w-4 h-4 text-cyan-400"></i>
-                    </button>
-                    <div class="flex-1 px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700 text-white text-center font-semibold">
-                        <span x-text="ai_score_required" class="text-lg"></span>
-                    </div>
-                    <button 
-                        type="button"
-                        @click="adjust('ai_score_required', 1)"
-                        :disabled="ai_score_required >= 10"
-                        class="w-10 h-10 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-cyan-500/50 hover:bg-cyan-500/10 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                        <i data-lucide="plus" class="w-4 h-4 text-cyan-400"></i>
-                    </button>
-                </div>
-                <div class="flex items-center justify-between text-xs text-gray-500 mt-2">
-                    <span>0</span>
-                    <span>10</span>
-                </div>
-                <div class="text-gray-500 text-xs mt-2">Bounce-back confidence</div>
-            </div>
         </div>
     </div>
 </div>
@@ -299,9 +244,22 @@
         const container = document.getElementById('reevaluate-watchlist-container');
         const reevaluateBtn = document.getElementById('reevaluate-watchlist-btn');
         
-        // Show re-evaluate button
-        if (container && container.__x) {
-            container.__x.$data.show = true;
+        // Show re-evaluate button - safely access Alpine.js
+        if (container) {
+            if (typeof Alpine !== 'undefined' && typeof Alpine.$data === 'function') {
+                try {
+                    Alpine.$data(container).show = true;
+                } catch (e) {
+                    console.debug('Alpine.js not ready:', e);
+                }
+            } else if (container.__x && container.__x.$data) {
+                // Fallback to internal API
+                try {
+                    container.__x.$data.show = true;
+                } catch (e) {
+                    console.debug('Alpine.js internal API error:', e);
+                }
+            }
         }
         
         // Auto-trigger re-evaluation using HTMX

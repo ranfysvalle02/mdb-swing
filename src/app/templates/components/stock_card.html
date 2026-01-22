@@ -104,7 +104,7 @@
             <div class="text-base font-bold {{ score_color }} mb-1 tracking-tight" aria-label="AI Score: {% if ai_score is not none %}{{ ai_score }}/10{% else %}N/A{% endif %}">{% if ai_score is not none %}{{ ai_score }}/10{% else %}N/A{% endif %}</div>
             <div class="text-xs text-gray-500 uppercase tracking-wider">AI Score</div>
             <div class="text-xs font-semibold {{ score_color }} mt-0.5">{{ score_label }}</div>
-            {% if meets_criteria and ai_score and ai_score >= 7 %}
+            {% if meets_criteria %}
             <div class="text-[10px] text-green-400 mt-0.5 font-semibold" aria-label="Meets entry criteria">✓ Meets Criteria</div>
             {% endif %}
         </div>
@@ -193,22 +193,18 @@
     </div>
     {% endif %}
     
-    <div class="mt-3 pt-3 border-t border-white/8">
+    <div class="mt-3 pt-3 border-t border-white/8" 
+         x-on:click.stop>
+        {# Buy Button - Opens Modal via HTMX #}
         <button 
-            hx-post="/api/analyze"
-            hx-vals='{{ {"ticker": symbol} | tojson }}'
+            hx-post="/api/buy-confirmation"
+            hx-vals='{{ {"symbol": symbol} | tojson }}'
             hx-target="#modal-container"
             hx-swap="beforeend"
-            hx-indicator="#modal-container"
-            hx-trigger="click consume"
-            hx-on:click="event.stopPropagation()"
-            class="w-full btn-glass py-2 rounded-lg text-sm font-bold text-white hover:bg-blue-600/30 transition-all bg-blue-500/30 flex items-center justify-center gap-2 border border-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="Refresh analysis for {{ symbol|e }}">
-            <span class="htmx-indicator">
-                <i data-lucide="loader-2" class="text-xs w-4 h-4 lucide-spin"></i>
-            </span>
-            <i data-lucide="refresh-cw" class="text-xs w-4 h-4 htmx-indicator-hidden"></i>
-            <span>Refresh Analysis</span>
+            class="w-full btn-glass py-2.5 rounded-lg text-sm font-bold text-white hover:bg-green-600/40 transition-all duration-300 bg-green-500/40 flex items-center justify-center gap-2 border-2 border-green-400/60 hover:border-green-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-green-500/40 active:scale-[0.98]"
+            aria-label="Buy {{ symbol|e }}">
+            <i data-lucide="shopping-cart" class="text-xs w-4 h-4"></i>
+            <span>Buy {{ symbol|e }}</span>
         </button>
     </div>
 </div>

@@ -63,7 +63,6 @@ class RadarService:
         if self.embedding_service:
             return self.embedding_service
         
-        # Fallback: Try to get from mdb-engine if not injected
         try:
             from mdb_engine.embeddings.dependencies import get_embedding_service_for_app
             from ..core.engine import engine, APP_SLUG
@@ -75,7 +74,6 @@ class RadarService:
         except (ImportError, AttributeError) as e:
             logger.debug(f"mdb-engine EmbeddingService not available: {e}")
         
-        # Last resort: Try OpenAI client directly
         try:
             from openai import OpenAI
             from ..core.config import OPENAI_API_KEY
@@ -113,7 +111,6 @@ class RadarService:
                     }
                 else:
                     logger.debug(f"Cache expired for {symbol} with strategy {strategy_id}")
-                    # Remove expired cache
                     await self.db.radar_cache.delete_one({"_id": cached["_id"]})
             
             return None
@@ -144,7 +141,6 @@ class RadarService:
                 "expires_at": expires_at
             }
             
-            # Upsert cache entry
             await self.db.radar_cache.update_one(
                 {"symbol": symbol, "strategy_id": strategy_id},
                 {"$set": cache_doc},
@@ -191,19 +187,16 @@ class RadarService:
         try:
             # Try mdb-engine EmbeddingService interface first (embed_chunks method)
             if hasattr(embedding_service, 'embed_chunks'):
-                # EmbeddingService.embed_chunks() returns a list of embeddings
                 embeddings = await embedding_service.embed_chunks([text], model="text-embedding-3-small")
                 if embeddings and len(embeddings) > 0:
                     embedding = embeddings[0]
                 else:
                     logger.error("embed_chunks returned empty result")
                     return None
-            # Try alternative mdb-engine methods
             elif hasattr(embedding_service, 'embed'):
                 embedding = await embedding_service.embed(text)
             elif hasattr(embedding_service, 'embed_query'):
                 embedding = await embedding_service.embed_query(text)
-            # Fallback to OpenAI client (direct OpenAI instance)
             elif hasattr(embedding_service, 'embeddings'):
                 response = embedding_service.embeddings.create(
                     model="text-embedding-3-small",
@@ -214,7 +207,6 @@ class RadarService:
                 logger.error("Unknown embedding service interface")
                 return None
             
-            # Ensure it's a list of floats
             if isinstance(embedding, list):
                 return [float(x) for x in embedding]
             elif hasattr(embedding, 'tolist'):
@@ -242,20 +234,18 @@ class RadarService:
             headlines = analysis_data.get('headlines', [])
             verdict = analysis_data.get('verdict')
             
-            # Build embedding text
             headlines_text = "\n".join(headlines[:5]) if isinstance(headlines, list) else str(headlines)
             
-            # Handle verdict as dict or object
             if isinstance(verdict, dict):
                 reason = verdict.get('reason', '') if verdict else analysis_data.get('reason', '')
                 verdict_score = verdict.get('score', 0) if verdict else analysis_data.get('score', 0)
                 verdict_risk = verdict.get('risk_level', 'UNKNOWN') if verdict else analysis_data.get('risk_level', 'UNKNOWN')
-                verdict_action = verdict.get('action', 'WAIT') if verdict else analysis_data.get('action', 'WAIT')
+                verdict_action = verdict.get('action', 'NOT BUY') if verdict else analysis_data.get('action', 'NOT BUY')
             else:
                 reason = verdict.reason if verdict and hasattr(verdict, 'reason') else analysis_data.get('reason', '')
                 verdict_score = verdict.score if verdict and hasattr(verdict, 'score') else analysis_data.get('score', 0)
                 verdict_risk = verdict.risk_level if verdict and hasattr(verdict, 'risk_level') else analysis_data.get('risk_level', 'UNKNOWN')
-                verdict_action = verdict.action if verdict and hasattr(verdict, 'action') else analysis_data.get('action', 'WAIT')
+                verdict_action = verdict.action if verdict and hasattr(verdict, 'action') else analysis_data.get('action', 'NOT BUY')
             
             embedding_text = (
                 f"{symbol} RSI:{techs.get('rsi', 0):.1f} "
@@ -266,7 +256,6 @@ class RadarService:
                 f"AI:{reason[:200]}"
             )
             
-            # Generate embedding
             embedding = await self._generate_embedding(embedding_text)
             
             timestamp = datetime.now()
@@ -317,10 +306,8 @@ class RadarService:
             headlines = analysis_data.get('headlines', [])
             verdict = analysis_data.get('verdict')
             
-            # Build embedding text (same format as store_to_history)
             headlines_text = "\n".join(headlines[:5]) if isinstance(headlines, list) else str(headlines)
             
-            # Handle verdict as dict or object
             if isinstance(verdict, dict):
                 reason = verdict.get('reason', '') if verdict else analysis_data.get('reason', '')
             else:
@@ -335,28 +322,23 @@ class RadarService:
                 f"AI:{reason[:200]}"
             )
             
-            # Generate query embedding
             query_embedding = await self._generate_embedding(embedding_text)
             if not query_embedding:
                 logger.warning(f"Could not generate embedding for vector search: {symbol}")
                 return []
             
-            # Calculate date threshold (90 days ago)
             date_threshold = datetime.now() - timedelta(days=90)
             
-            # Use vector search aggregation
-            # MDB-Engine Pattern: Index names are prefixed as {APP_SLUG}_{collection}_{index_name}
-            # The index name in manifest.json is "vector_idx" for collection "radar_history"
             from ..core.engine import APP_SLUG
             vector_index_name = f"{APP_SLUG}_radar_history_vector_idx"
             
             pipeline = [
                 {
                     "$vectorSearch": {
-                        "index": vector_index_name,  # mdb-engine prefixed index name
+                        "index": vector_index_name,
                         "path": "embedding",
                         "queryVector": query_embedding,
-                        "numCandidates": limit * 10,  # Search more candidates for better results
+                        "numCandidates": limit * 10,
                         "limit": limit,
                         "filter": {
                             "metadata.symbol": symbol,
@@ -381,7 +363,6 @@ class RadarService:
             return results
         except Exception as e:
             logger.error(f"Error finding similar signals for {symbol}: {e}", exc_info=True)
-            # Fallback to simple query without vector search
             try:
                 date_threshold = datetime.now() - timedelta(days=90)
                 results = await self.db.radar_history.find({
@@ -428,7 +409,6 @@ class RadarService:
                     "reason": "No outcomes yet"
                 }
             
-            # Calculate win rate
             profitable_count = sum(
                 1 for s in signals_with_outcomes
                 if s.get('outcome', {}).get('profitable', False)
@@ -436,7 +416,6 @@ class RadarService:
             total_count = len(signals_with_outcomes)
             win_rate = profitable_count / total_count if total_count > 0 else 0.0
             
-            # Calculate boost: (win_rate - 0.5) * 2.0, clamped to [-1.0, +1.0]
             boost = (win_rate - 0.5) * 2.0
             boost = max(-1.0, min(1.0, boost))
             
@@ -481,7 +460,6 @@ class RadarService:
             scan_date = get_today_date_et()
             is_final = is_after_final_scan_time()
             
-            # Build scan document
             scan_doc = {
                 "date": scan_date,
                 "timestamp": scan_timestamp,
@@ -496,10 +474,7 @@ class RadarService:
                 }
             }
             
-            # If this is a final scan and one already exists for today, update it
-            # Otherwise, insert new document
             if is_final:
-                # Update existing final scan for today if it exists
                 result = await self.db.daily_scans.update_one(
                     {"date": scan_date, "is_final": True},
                     {"$set": scan_doc},
@@ -507,7 +482,6 @@ class RadarService:
                 )
                 logger.info(f"Saved {'final' if is_final else 'regular'} scan for {scan_date}: {len(stocks)} stocks")
             else:
-                # Insert new scan (multiple allowed per day before 6pm)
                 await self.db.daily_scans.insert_one(scan_doc)
                 logger.info(f"Saved scan for {scan_date}: {len(stocks)} stocks")
             
@@ -540,9 +514,7 @@ class RadarService:
             
             is_after_6pm = is_after_final_scan_time()
             
-            # If after 6pm, prefer final scan
             if is_after_6pm:
-                # Try to get final scan first
                 final_scan = await self.db.daily_scans.find_one(
                     {"date": date, "is_final": True},
                     sort=[("timestamp", -1)]
@@ -551,7 +523,6 @@ class RadarService:
                     logger.debug(f"Found final scan for {date}")
                     return final_scan
                 
-                # Fallback to latest scan if no final exists
                 latest_scan = await self.db.daily_scans.find_one(
                     {"date": date},
                     sort=[("timestamp", -1)]
@@ -560,7 +531,6 @@ class RadarService:
                     logger.debug(f"Found latest scan for {date} (no final scan)")
                     return latest_scan
             else:
-                # Before 6pm: get latest scan
                 latest_scan = await self.db.daily_scans.find_one(
                     {"date": date},
                     sort=[("timestamp", -1)]
@@ -569,7 +539,6 @@ class RadarService:
                     logger.debug(f"Found latest scan for {date}")
                     return latest_scan
             
-            # If no scan found for date, try to get latest overall
             latest_overall = await self.db.daily_scans.find_one(
                 {},
                 sort=[("timestamp", -1)]
@@ -603,7 +572,6 @@ class RadarService:
             if final_scan:
                 return final_scan
             
-            # Fallback to latest scan for that date
             latest_scan = await self.db.daily_scans.find_one(
                 {"date": date},
                 sort=[("timestamp", -1)]

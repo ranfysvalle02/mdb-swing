@@ -1,0 +1,20 @@
+{# Info Panel Container - Rendered once per page #}
+<div id="info-panel-container" class="info-panel-container hidden fixed inset-0 z-[100000] pointer-events-none">
+    <div class="info-panel-backdrop fixed inset-0 bg-black/50 backdrop-blur-sm pointer-events-auto" data-info-close></div>
+    <div class="info-panel-content glass-strong rounded-xl p-4 max-w-md w-[90vw] max-h-[70vh] overflow-y-auto border border-blue-500/30 shadow-2xl shadow-blue-500/20 pointer-events-auto animate-slide-up">
+        <div class="flex items-start justify-between gap-3 mb-3">
+            <div class="flex items-center gap-2 text-blue-400">
+                <i data-lucide="info" class="w-5 h-5"></i>
+                <h4 class="text-sm font-semibold text-white">Information</h4>
+            </div>
+            <button 
+                type="button"
+                class="info-panel-close text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-gray-700/50"
+                aria-label="Close info panel"
+                data-info-close>
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+        <div class="info-panel-body text-xs text-gray-300 leading-relaxed space-y-2"></div>
+    </div>
+</div>

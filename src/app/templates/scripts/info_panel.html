@@ -1,0 +1,138 @@
+{# Info Panel Script - Click-based, reliable, accessible #}
+<script>
+(function() {
+    'use strict';
+    
+    function initInfoPanels() {
+        const triggers = document.querySelectorAll('.info-trigger');
+        const container = document.getElementById('info-panel-container');
+        const backdrop = container?.querySelector('.info-panel-backdrop');
+        const panel = container?.querySelector('.info-panel-content');
+        const body = container?.querySelector('.info-panel-body');
+        const closeBtn = container?.querySelector('.info-panel-close');
+        
+        if (!container || !panel || !body) return;
+        
+        function showPanel(content, triggerElement) {
+            // Content is already HTML from hidden element
+            body.innerHTML = content;
+            
+            // Position panel near trigger if possible
+            if (triggerElement) {
+                const rect = triggerElement.getBoundingClientRect();
+                const panelRect = panel.getBoundingClientRect();
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                
+                // Try to position below and to the right of trigger
+                let top = rect.bottom + 12;
+                let left = rect.left;
+                
+                // Adjust if would go off screen
+                if (top + panelRect.height > viewportHeight - 20) {
+                    top = rect.top - panelRect.height - 12;
+                }
+                if (left + panelRect.width > viewportWidth - 20) {
+                    left = viewportWidth - panelRect.width - 20;
+                }
+                if (left < 20) {
+                    left = 20;
+                }
+                if (top < 20) {
+                    top = 20;
+                }
+                
+                panel.style.top = top + 'px';
+                panel.style.left = left + 'px';
+                panel.style.right = 'auto';
+                panel.style.bottom = 'auto';
+                panel.style.transform = 'none';
+            } else {
+                // Center if no trigger
+                panel.style.top = '50%';
+                panel.style.left = '50%';
+                panel.style.right = 'auto';
+                panel.style.bottom = 'auto';
+                panel.style.transform = 'translate(-50%, -50%)';
+                panel.style.position = 'fixed';
+            }
+            
+            // Show panel
+            container.classList.remove('hidden');
+            container.style.pointerEvents = 'auto';
+            
+            // Update ARIA
+            triggerElement?.setAttribute('aria-expanded', 'true');
+            
+            // Initialize Lucide icons
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        }
+        
+        function hidePanel() {
+            container.classList.add('hidden');
+            container.style.pointerEvents = 'none';
+            
+            // Reset all triggers
+            triggers.forEach(trigger => {
+                trigger.setAttribute('aria-expanded', 'false');
+            });
+        }
+        
+        // Setup triggers
+        triggers.forEach(trigger => {
+            trigger.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const infoId = this.getAttribute('data-info-id');
+                if (infoId) {
+                    const contentElement = document.getElementById(infoId);
+                    if (contentElement) {
+                        const content = contentElement.innerHTML;
+                        // Toggle if same trigger clicked
+                        const isExpanded = this.getAttribute('aria-expanded') === 'true';
+                        if (isExpanded) {
+                            hidePanel();
+                        } else {
+                            showPanel(content, this);
+                        }
+                    }
+                }
+            });
+        });
+        
+        // Close on backdrop/close button click
+        [backdrop, closeBtn].forEach(el => {
+            if (el) {
+                el.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    hidePanel();
+                });
+            }
+        });
+        
+        // Close on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !container.classList.contains('hidden')) {
+                hidePanel();
+            }
+        });
+    }
+    
+    // Initialize on load
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initInfoPanels);
+    } else {
+        initInfoPanels();
+    }
+    
+    // Re-initialize after HTMX swaps
+    if (typeof htmx !== 'undefined') {
+        document.body.addEventListener('htmx:afterSwap', function(event) {
+            if (event.target.querySelector && event.target.querySelector('.info-trigger')) {
+                initInfoPanels();
+            }
+        });
+    }
+})();
+</script>

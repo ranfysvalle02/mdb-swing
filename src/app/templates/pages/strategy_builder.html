@@ -1,0 +1,506 @@
+<div class="strategy-builder-wizard"
+     x-data="{
+        currentStep: 1,
+        totalSteps: 4,
+        strategyName: '',
+        strategyDescription: '',
+        selectedConditions: [],
+        selectedMetrics: {},
+        selectedCategory: null,
+        availableCategories: {{ available_metrics.keys() | list | tojson }},
+        allMetrics: {{ available_metrics | tojson }},
+        
+        // Step navigation
+        nextStep() {
+            if (this.canProceedToNextStep()) {
+                this.currentStep = Math.min(this.currentStep + 1, this.totalSteps);
+            }
+        },
+        
+        prevStep() {
+            this.currentStep = Math.max(this.currentStep - 1, 1);
+        },
+        
+        goToStep(step) {
+            if (step >= 1 && step <= this.totalSteps) {
+                this.currentStep = step;
+            }
+        },
+        
+        canProceedToNextStep() {
+            if (this.currentStep === 1) {
+                return this.strategyName && this.strategyName.trim() !== '';
+            }
+            if (this.currentStep === 2) {
+                return this.selectedConditions.length > 0;
+            }
+            if (this.currentStep === 3) {
+                return true; // Review step, always can proceed
+            }
+            return true;
+        },
+        
+        
+        getMetricByKey(metricKey) {
+            // Search through all categories to find the metric
+            if (!this.allMetrics || typeof this.allMetrics !== 'object') {
+                console.error('allMetrics not loaded yet');
+                return null;
+            }
+            for (const category in this.allMetrics) {
+                const metrics = this.allMetrics[category];
+                if (Array.isArray(metrics)) {
+                    const metric = metrics.find(m => m && m.key === metricKey);
+                    if (metric) {
+                        return metric;
+                    }
+                }
+            }
+            return null;
+        },
+        
+        toggleMetric(metricKey) {
+            try {
+                if (!metricKey) {
+                    console.error('No metricKey provided');
+                    return;
+                }
+                const metric = this.getMetricByKey(metricKey);
+                if (!metric) {
+                    console.error('Metric not found:', metricKey);
+                    return;
+                }
+                
+                if (this.isMetricSelected(metricKey)) {
+                    // Remove condition
+                    this.selectedConditions = this.selectedConditions.filter(c => c.metric !== metricKey);
+                    delete this.selectedMetrics[metricKey];
+                } else {
+                    // Add condition with defaults
+                    const condition = {
+                        metric: metricKey,
+                        operator: (metric && metric.default_operator) ? metric.default_operator : 'between',
+                        min: (metric && metric.default_min !== undefined && metric.default_min !== null) ? metric.default_min : 0,
+                        max: (metric && metric.default_max !== undefined && metric.default_max !== null) ? metric.default_max : 100,
+                        value: (metric && metric.default_value !== undefined && metric.default_value !== null) ? metric.default_value : 0
+                    };
+                    this.selectedConditions.push(condition);
+                    this.selectedMetrics[metricKey] = metric;
+                }
+            } catch (e) {
+                console.error('Error in toggleMetric:', e);
+            }
+        },
+        
+        getConditionForMetric(metricKey) {
+            return this.selectedConditions.find(c => c.metric === metricKey);
+        },
+        
+        updateConditionOperator(metricKey, operator) {
+            const condition = this.getConditionForMetric(metricKey);
+            if (condition) {
+                condition.operator = operator;
+                const metric = this.selectedMetrics[metricKey];
+                if (operator === 'between') {
+                    condition.min = (metric && metric.default_min !== undefined && metric.default_min !== null) ? metric.default_min : 0;
+                    condition.max = (metric && metric.default_max !== undefined && metric.default_max !== null) ? metric.default_max : 100;
+                    delete condition.value;
+                } else {
+                    condition.value = (metric && metric.default_value !== undefined && metric.default_value !== null) ? metric.default_value : 0;
+                    delete condition.min;
+                    delete condition.max;
+                }
+            }
+        },
+        
+        updateConditionValue(metricKey, field, value) {
+            const condition = this.getConditionForMetric(metricKey);
+            if (condition) {
+                condition[field] = parseFloat(value) || 0;
+            }
+        },
+        
+        isMetricSelected(metricKey) {
+            return this.selectedConditions.some(c => c.metric === metricKey);
+        },
+        
+        formatCondition(condition) {
+            const metric = this.selectedMetrics[condition.metric];
+            const metricName = metric?.name || condition.metric;
+            if (condition.operator === 'between') {
+                return `${metricName} between ${condition.min} and ${condition.max}`;
+            } else if (condition.operator === 'less_than') {
+                return `${metricName} < ${condition.value}`;
+            } else if (condition.operator === 'less_than_or_equal') {
+                return `${metricName} ≤ ${condition.value}`;
+            } else if (condition.operator === 'greater_than') {
+                return `${metricName} > ${condition.value}`;
+            } else if (condition.operator === 'greater_than_or_equal') {
+                return `${metricName} ≥ ${condition.value}`;
+            } else if (condition.operator === 'equals') {
+                return `${metricName} = ${condition.value}`;
+            } else if (condition.operator === 'not_equals') {
+                return `${metricName} ≠ ${condition.value}`;
+            }
+            return `${metricName} (${condition.operator})`;
+        },
+        
+        strategySummary() {
+            if (this.selectedConditions.length === 0) {
+                return 'No conditions selected';
+            }
+            return this.selectedConditions.map(c => this.formatCondition(c)).join(' AND ');
+        },
+        
+        getMetricsForCategory(category) {
+            return this.allMetrics[category] || [];
+        }
+     }">
+    
+    {# Progress Indicator #}
+    <div class="mb-6">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-xs text-gray-400">Step <span x-text="currentStep"></span> of <span x-text="totalSteps"></span></span>
+            <span class="text-xs text-gray-400" x-text="Math.round((currentStep / totalSteps) * 100) + '%'"></span>
+        </div>
+        <div class="w-full bg-gray-800/50 rounded-full h-2">
+            <div class="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-300"
+                 :style="'width: ' + (currentStep / totalSteps * 100) + '%'"></div>
+        </div>
+        <div class="flex justify-between mt-3 text-xs">
+            <button @click="goToStep(1)" 
+                    :class="currentStep >= 1 ? 'text-purple-400' : 'text-gray-600'"
+                    class="flex flex-col items-center gap-1">
+                <i data-lucide="tag" class="w-4 h-4"></i>
+                <span>Name</span>
+            </button>
+            <button @click="goToStep(2)" 
+                    :class="currentStep >= 2 ? 'text-purple-400' : 'text-gray-600'"
+                    class="flex flex-col items-center gap-1">
+                <i data-lucide="layers" class="w-4 h-4"></i>
+                <span>Metrics</span>
+            </button>
+            <button @click="goToStep(3)" 
+                    :class="currentStep >= 3 ? 'text-purple-400' : 'text-gray-600'"
+                    class="flex flex-col items-center gap-1">
+                <i data-lucide="check-circle" class="w-4 h-4"></i>
+                <span>Review</span>
+            </button>
+            <button @click="goToStep(4)" 
+                    :class="currentStep >= 4 ? 'text-purple-400' : 'text-gray-600'"
+                    class="flex flex-col items-center gap-1">
+                <i data-lucide="save" class="w-4 h-4"></i>
+                <span>Save</span>
+            </button>
+        </div>
+    </div>
+    
+    {# Step 1: Name and Description #}
+    <div :style="currentStep === 1 ? '' : 'display: none;'" 
+         class="space-y-4">
+        <div class="text-center mb-4">
+            <h3 class="text-lg font-bold text-white mb-2">Strategy Name & Description</h3>
+            <p class="text-xs text-gray-400">Give your strategy a memorable name and optional description</p>
+        </div>
+        
+        <div class="glass rounded-lg p-4 border border-purple-500/30">
+            <label for="strategy-name" class="block text-sm font-semibold text-gray-300 mb-2">
+                <i data-lucide="tag" class="w-4 h-4 inline mr-1 text-purple-400"></i>
+                Strategy Name <span class="text-red-400">*</span>
+            </label>
+            <input 
+                type="text" 
+                id="strategy-name"
+                name="strategy-name"
+                placeholder="e.g., Oversold Momentum, Breakout Hunter"
+                class="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                x-model="strategyName"
+            />
+            <p class="text-xs text-gray-500 mt-1">Give your strategy a memorable name</p>
+        </div>
+        
+        <div class="glass rounded-lg p-4 border border-purple-500/30">
+            <label for="strategy-description" class="block text-sm font-semibold text-gray-300 mb-2">
+                <i data-lucide="file-text" class="w-4 h-4 inline mr-1 text-purple-400"></i>
+                Description (Optional)
+            </label>
+            <textarea 
+                id="strategy-description"
+                name="strategy-description"
+                placeholder="Describe what this strategy looks for..."
+                rows="3"
+                class="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 resize-none"
+                x-model="strategyDescription"
+            ></textarea>
+        </div>
+    </div>
+    
+    {# Step 2: Select Metrics #}
+    <div :style="currentStep === 2 ? '' : 'display: none;'" 
+         class="space-y-4">
+        <div class="text-center mb-4">
+            <h3 class="text-lg font-bold text-white mb-2">Select Metrics</h3>
+            <p class="text-xs text-gray-400">Choose metrics to build your strategy conditions</p>
+            <p class="text-xs text-purple-400 mt-1" :style="selectedConditions.length > 0 ? '' : 'display: none;'">
+                <span x-text="selectedConditions.length"></span> condition<span x-text="selectedConditions.length !== 1 ? 's' : ''"></span> selected
+            </p>
+        </div>
+        
+        {# Category Filter Tabs #}
+        <div class="flex gap-2 overflow-x-auto pb-2 mb-4">
+            <button
+                @click="selectedCategory = null"
+                :class="selectedCategory === null ? 'bg-purple-500/20 border-purple-500/50 text-purple-300' : 'bg-gray-800/30 border-gray-700/50 text-gray-400'"
+                class="px-4 py-2 rounded-lg border text-xs font-medium whitespace-nowrap transition-all"
+            >
+                All Categories
+            </button>
+            {% for category in available_metrics.keys() %}
+            <button
+                @click="selectedCategory = '{{ category }}'"
+                :class="selectedCategory === '{{ category }}' ? 'bg-purple-500/20 border-purple-500/50 text-purple-300' : 'bg-gray-800/30 border-gray-700/50 text-gray-400'"
+                class="px-4 py-2 rounded-lg border text-xs font-medium whitespace-nowrap transition-all"
+            >
+                {{ category }}
+            </button>
+            {% endfor %}
+        </div>
+        
+        {# Metrics Grid - Show filtered categories #}
+        <div class="max-h-[50vh] overflow-y-auto space-y-4">
+            {% for category, metrics in available_metrics.items() %}
+            <div :style="(selectedCategory === null || selectedCategory === '{{ category }}') ? '' : 'display: none;'"
+                 class="space-y-2">
+                <h4 class="text-xs font-semibold text-purple-300 mb-2 flex items-center gap-2 sticky top-0 bg-gray-900/95 py-1 z-10">
+                    <i data-lucide="{% if category == 'Momentum Indicators' %}activity{% elif category == 'Moving Averages' %}line-chart{% elif category == 'Bollinger Bands' %}maximize-2{% elif category == 'Volatility & Range' %}shield{% elif category == 'Volume' %}activity{% elif category == 'Trend' %}trending-up{% else %}dollar-sign{% endif %}" class="w-4 h-4"></i>
+                    {{ category }}
+                </h4>
+                <div class="grid grid-cols-1 gap-3">
+                    {% for metric in metrics %}
+                    <div class="rounded-lg border transition-all duration-200"
+                         :class="isMetricSelected('{{ metric.key }}') ? 'border-green-500/50 bg-green-500/10' : 'border-gray-700/50 bg-gray-800/30'">
+                        {# Metric Toggle Row #}
+                        <div class="p-3">
+                            <label class="flex items-start gap-3 cursor-pointer">
+                                <input 
+                                    type="checkbox"
+                                    id="metric-{{ metric.key }}"
+                                    name="metric-{{ metric.key }}"
+                                    :checked="isMetricSelected('{{ metric.key }}')"
+                                    @change="toggleMetric('{{ metric.key }}')"
+                                    class="mt-1 w-4 h-4 text-green-500 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2"
+                                />
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-xs font-medium text-white mb-1">{{ metric.name }}</div>
+                                    <div class="text-[10px] text-gray-500 leading-relaxed">{{ metric.description }}</div>
+                                </div>
+                            </label>
+                        </div>
+                        
+                        {# Inline Configuration - Shows when selected #}
+                        <div :style="isMetricSelected('{{ metric.key }}') ? '' : 'display: none;'" 
+                             class="px-3 pb-3 pt-0 border-t border-gray-700/50 mt-2 space-y-3">
+                            <div class="space-y-3" :style="getConditionForMetric('{{ metric.key }}') ? '' : 'display: none;'">
+                                    {# Operator Selection #}
+                                    <div>
+                                        <label for="operator-{{ metric.key }}" class="block text-xs font-semibold text-gray-300 mb-1.5">
+                                            Condition Type
+                                        </label>
+                                        <select 
+                                            id="operator-{{ metric.key }}"
+                                            name="operator-{{ metric.key }}"
+                                            :value="getConditionForMetric('{{ metric.key }}')?.operator || 'between'"
+                                            @change="updateConditionOperator('{{ metric.key }}', $event.target.value)"
+                                            class="w-full px-3 py-1.5 text-xs bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500">
+                                            <option value="between">Between (range)</option>
+                                            <option value="less_than">&lt; Less than</option>
+                                            <option value="less_than_or_equal">≤ Less than or equal</option>
+                                            <option value="greater_than">&gt; Greater than</option>
+                                            <option value="greater_than_or_equal">≥ Greater than or equal</option>
+                                            <option value="equals" :style="getMetricByKey('{{ metric.key }}')?.type === 'string' ? '' : 'display: none;'">= Equals</option>
+                                            <option value="not_equals" :style="getMetricByKey('{{ metric.key }}')?.type === 'string' ? '' : 'display: none;'">≠ Not equals</option>
+                                        </select>
+                                    </div>
+                                    
+                                    {# Between Operator - Min/Max #}
+                                    <div :style="getConditionForMetric('{{ metric.key }}')?.operator === 'between' ? '' : 'display: none;'" 
+                                         class="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label for="min-{{ metric.key }}" class="block text-xs font-semibold text-gray-300 mb-1.5">
+                                                Minimum
+                                            </label>
+                                            <input 
+                                                type="number"
+                                                id="min-{{ metric.key }}"
+                                                name="min-{{ metric.key }}"
+                                                step="0.01"
+                                                :value="getConditionForMetric('{{ metric.key }}')?.min || 0"
+                                                @input="updateConditionValue('{{ metric.key }}', 'min', $event.target.value)"
+                                                class="w-full px-3 py-1.5 text-xs bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label for="max-{{ metric.key }}" class="block text-xs font-semibold text-gray-300 mb-1.5">
+                                                Maximum
+                                            </label>
+                                            <input 
+                                                type="number"
+                                                id="max-{{ metric.key }}"
+                                                name="max-{{ metric.key }}"
+                                                step="0.01"
+                                                :value="getConditionForMetric('{{ metric.key }}')?.max || 100"
+                                                @input="updateConditionValue('{{ metric.key }}', 'max', $event.target.value)"
+                                                class="w-full px-3 py-1.5 text-xs bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                                            />
+                                        </div>
+                                    </div>
+                                    
+                                    {# Single Value Operators #}
+                                    <div :style="(getConditionForMetric('{{ metric.key }}')?.operator !== 'between' && getMetricByKey('{{ metric.key }}')?.type !== 'string') ? '' : 'display: none;'">
+                                        <label for="value-{{ metric.key }}" class="block text-xs font-semibold text-gray-300 mb-1.5">
+                                            Threshold Value
+                                        </label>
+                                        <input 
+                                            type="number"
+                                            id="value-{{ metric.key }}"
+                                            name="value-{{ metric.key }}"
+                                            step="0.01"
+                                            :value="getConditionForMetric('{{ metric.key }}')?.value || 0"
+                                            @input="updateConditionValue('{{ metric.key }}', 'value', $event.target.value)"
+                                            class="w-full px-3 py-1.5 text-xs bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                                        />
+                                    </div>
+                                    
+                                    {# String Type Operators #}
+                                    <div :style="(getConditionForMetric('{{ metric.key }}')?.operator !== 'between' && getMetricByKey('{{ metric.key }}')?.type === 'string') ? '' : 'display: none;'">
+                                        <label for="string-value-{{ metric.key }}" class="block text-xs font-semibold text-gray-300 mb-1.5">
+                                            Value
+                                        </label>
+                                        <select 
+                                            id="string-value-{{ metric.key }}"
+                                            name="string-value-{{ metric.key }}"
+                                            :value="getConditionForMetric('{{ metric.key }}')?.value || 'UP'"
+                                            @change="updateConditionValue('{{ metric.key }}', 'value', $event.target.value)"
+                                            class="w-full px-3 py-1.5 text-xs bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500">
+                                            <option value="UP">UP (Uptrend)</option>
+                                            <option value="DOWN">DOWN (Downtrend)</option>
+                                        </select>
+                                    </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+    </div>
+    
+    {# Step 3: Review #}
+    <div :style="currentStep === 3 ? '' : 'display: none;'" 
+         class="space-y-4">
+        <div class="text-center mb-4">
+            <h3 class="text-lg font-bold text-white mb-2">Review Your Strategy</h3>
+            <p class="text-xs text-gray-400">Review your strategy before saving</p>
+        </div>
+        
+        <div class="glass rounded-lg p-4 border border-purple-500/30 space-y-4">
+            <div>
+                <label class="text-xs font-semibold text-gray-400 mb-1 block">Strategy Name</label>
+                <p class="text-sm text-white" x-text="strategyName || 'Not set'"></p>
+            </div>
+            
+            <div :style="strategyDescription ? '' : 'display: none;'">
+                <label class="text-xs font-semibold text-gray-400 mb-1 block">Description</label>
+                <p class="text-sm text-gray-300" x-text="strategyDescription"></p>
+            </div>
+            
+            <div>
+                <label class="text-xs font-semibold text-gray-400 mb-2 block">Conditions</label>
+                <div class="space-y-2">
+                    <template x-for="(condition, index) in selectedConditions" :key="index">
+                        <div class="p-3 bg-gray-800/30 rounded border border-gray-700/50">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <p class="text-xs text-white font-medium mb-1" x-text="formatCondition(condition)"></p>
+                                    <p class="text-[10px] text-gray-500" x-text="'Condition ' + (index + 1)"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            
+            <div class="pt-3 border-t border-gray-700/50">
+                <p class="text-xs text-gray-400 mb-1">Strategy Logic:</p>
+                <p class="text-sm text-white font-medium" x-text="strategySummary()"></p>
+            </div>
+        </div>
+    </div>
+    
+    {# Step 4: Save #}
+    <div :style="currentStep === 4 ? '' : 'display: none;'" 
+         class="space-y-4">
+        <div class="text-center mb-4">
+            <h3 class="text-lg font-bold text-white mb-2">Ready to Save</h3>
+            <p class="text-xs text-gray-400">Create your custom strategy</p>
+        </div>
+        
+        <div class="glass rounded-lg p-4 border border-green-500/30 bg-green-500/5 text-center">
+            <i data-lucide="check-circle" class="w-12 h-12 text-green-400 mx-auto mb-3"></i>
+            <p class="text-sm text-white mb-1" x-text="'Strategy: ' + strategyName"></p>
+            <p class="text-xs text-gray-400" x-text="selectedConditions.length + ' condition' + (selectedConditions.length !== 1 ? 's' : '')"></p>
+        </div>
+        
+        <form 
+            hx-post="/api/strategies"
+            hx-target="#modal-container"
+            hx-swap="innerHTML"
+            hx-indicator="#save-strategy-loading"
+            class="space-y-3">
+            <input type="hidden" name="name" :value="strategyName">
+            <input type="hidden" name="description" :value="strategyDescription">
+            <input type="hidden" name="conditions" :value="JSON.stringify(selectedConditions)">
+            
+            <div :style="(selectedConditions.length === 0 || !strategyName || strategyName.trim() === '') ? '' : 'display: none;'" 
+                 class="text-xs text-yellow-400 mb-2 flex items-center gap-1 justify-center">
+                <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                <span :style="selectedConditions.length === 0 ? '' : 'display: none;'">Please select at least one metric</span>
+                <span :style="(selectedConditions.length > 0 && (!strategyName || strategyName.trim() === '')) ? '' : 'display: none;'">Please enter a strategy name</span>
+            </div>
+            
+            <button 
+                type="submit"
+                :disabled="selectedConditions.length === 0 || !strategyName || strategyName.trim() === ''"
+                class="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white font-bold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 flex items-center justify-center gap-2">
+                <span id="save-strategy-loading" class="htmx-indicator">
+                    <i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i>
+                </span>
+                <i data-lucide="save" class="w-5 h-5 htmx-indicator-hidden"></i>
+                <span class="htmx-indicator-hidden">Create Strategy</span>
+                <span class="htmx-indicator">Creating...</span>
+            </button>
+        </form>
+    </div>
+    
+    {# Navigation Buttons #}
+    <div class="flex justify-between gap-3 pt-4 border-t border-gray-700/50 mt-6">
+        <button 
+            @click="prevStep()"
+            :style="currentStep > 1 ? '' : 'display: none;'"
+            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-all duration-200 flex items-center gap-2">
+            <i data-lucide="chevron-left" class="w-4 h-4"></i>
+            Previous
+        </button>
+        <div class="flex-1"></div>
+        <button 
+            @click="nextStep()"
+            :style="currentStep < 4 ? '' : 'display: none;'"
+            :disabled="!canProceedToNextStep()"
+            class="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+            Next
+            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+        </button>
+    </div>
+</div>

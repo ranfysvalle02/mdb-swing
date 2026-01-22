@@ -1,0 +1,32 @@
+{# Expandable Info Panel Component
+   Better UX than tooltips - click to expand/collapse info panels
+   More reliable, accessible, and mobile-friendly
+#}
+{% macro info_button(content, aria_label, icon="info", icon_size="w-3.5 h-3.5", icon_color="text-blue-400") %}
+{% set safe_id = aria_label|replace(" ", "-")|replace("'", "")|replace('"', "")|replace(".", "")|replace(",", "")|replace(":", "")|replace(";", "")|replace("!", "")|replace("?", "")|replace("(", "")|replace(")", "")|lower|truncate(50, true, "") %}
+{% set info_id = "info-" ~ safe_id %}
+<div class="hidden info-content-source" id="{{ info_id }}">{{ content|safe }}</div>
+<button 
+    type="button"
+    class="info-trigger group relative opacity-60 hover:opacity-100 transition-opacity focus:outline-none focus:ring-2 focus:ring-blue-500/50 rounded p-1"
+    aria-label="{{ aria_label }}"
+    aria-expanded="false"
+    data-info-id="{{ info_id }}">
+    <i data-lucide="{{ icon }}" class="{{ icon_size }} {{ icon_color }}"></i>
+</button>
+{% endmacro %}
+
+{# Metric Info Button - Smaller #}
+{% macro metric_info_button(content, aria_label, icon_color="text-gray-400") %}
+{% set safe_id = aria_label|replace(" ", "-")|replace("'", "")|replace('"', "")|replace(".", "")|replace(",", "")|replace(":", "")|replace(";", "")|replace("!", "")|replace("?", "")|replace("(", "")|replace(")", "")|lower|truncate(50, true, "") %}
+{% set info_id = "info-metric-" ~ safe_id %}
+<div class="hidden info-content-source" id="{{ info_id }}">{{ content|safe }}</div>
+<button 
+    type="button"
+    class="info-trigger group relative opacity-40 hover:opacity-100 transition-opacity focus:outline-none focus:ring-1 focus:ring-blue-500/50 rounded p-0.5"
+    aria-label="{{ aria_label }}"
+    aria-expanded="false"
+    data-info-id="{{ info_id }}">
+    <i data-lucide="help-circle" class="w-2.5 h-2.5 {{ icon_color }}"></i>
+</button>
+{% endmacro %}

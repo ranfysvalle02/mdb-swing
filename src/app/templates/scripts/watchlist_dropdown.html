@@ -1,10 +1,513 @@
 <script>
     lucide.createIcons();
     
-    // Clear input after successful watchlist add
+    // Premium Ticker Autocomplete with Intelligent UX
+    (function() {
+        let autocompleteTimeout = null;
+        let currentSuggestions = [];
+        let selectedIndex = -1;
+        let isLoading = false;
+        let recentSearches = JSON.parse(localStorage.getItem('ticker_recent_searches') || '[]');
+        const MAX_RECENT = 5;
+        
+        function getDropdown() {
+            return document.getElementById('ticker-autocomplete-dropdown');
+        }
+        
+        function getInput() {
+            return document.getElementById('add-ticker-input');
+        }
+        
+        function getLoadingIndicator() {
+            return document.getElementById('ticker-search-loading');
+        }
+        
+        function saveRecentSearch(ticker) {
+            // Remove if already exists
+            recentSearches = recentSearches.filter(t => t !== ticker);
+            // Add to front
+            recentSearches.unshift(ticker);
+            // Keep only last MAX_RECENT
+            recentSearches = recentSearches.slice(0, MAX_RECENT);
+            localStorage.setItem('ticker_recent_searches', JSON.stringify(recentSearches));
+        }
+        
+        function showLoading(show) {
+            isLoading = show;
+            const loading = getLoadingIndicator();
+            if (loading) {
+                loading.classList.toggle('hidden', !show);
+            }
+        }
+        
+        function highlightMatch(text, query) {
+            if (!query) return text;
+            const regex = new RegExp(`(${query})`, 'gi');
+            return text.replace(regex, '<mark class="bg-cyan-200 text-cyan-900 font-semibold rounded px-0.5">$1</mark>');
+        }
+        
+        function showSuggestions(suggestions, query = '') {
+            const dropdown = getDropdown();
+            const input = getInput();
+            if (!dropdown || !input) return;
+            
+            currentSuggestions = suggestions;
+            selectedIndex = -1;
+            
+            if (suggestions.length === 0) {
+                dropdown.classList.add('hidden');
+                input.setAttribute('aria-expanded', 'false');
+                return;
+            }
+            
+            // Determine if suggestions have names
+            const hasNames = suggestions.length > 0 && typeof suggestions[0] === 'object' && suggestions[0].name;
+            
+            let html = '';
+            
+            // Show recent searches if no query and we have recent searches
+            if (!query && recentSearches.length > 0 && suggestions.length === 0) {
+                html = `
+                    <div class="px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                        <i data-lucide="clock" class="w-3 h-3 inline-block mr-1.5"></i>Recent Searches
+                    </div>
+                `;
+                recentSearches.forEach((ticker, index) => {
+                    html += `
+                        <div class="ticker-suggestion px-4 py-3 cursor-pointer hover:bg-gray-100 active:bg-gray-200 border-b border-gray-100 last:border-b-0 transition-all duration-150 group ${index === selectedIndex ? 'bg-gray-100' : ''}" 
+                             data-index="${index}" 
+                             data-ticker="${ticker}"
+                             role="option"
+                             aria-selected="${index === selectedIndex}">
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-3 flex-1 min-w-0">
+                                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-500 border border-cyan-400 flex items-center justify-center flex-shrink-0 shadow-lg shadow-cyan-500/30">
+                                        <span class="text-xs font-mono font-bold text-white">${ticker}</span>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-sm font-mono font-semibold text-gray-900">${ticker}</div>
+                                        <div class="text-xs text-gray-500 mt-0.5">Recently searched</div>
+                                    </div>
+                                </div>
+                                <i data-lucide="arrow-left" class="w-4 h-4 text-gray-400 group-hover:text-cyan-500 transition-colors opacity-0 group-hover:opacity-100"></i>
+                            </div>
+                        </div>
+                    `;
+                });
+                currentSuggestions = recentSearches;
+            } else if (suggestions.length > 0) {
+                // Show search results
+                if (query) {
+                    html += `
+                        <div class="px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                            <i data-lucide="search" class="w-3 h-3 inline-block mr-1.5"></i>Search Results
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                            <i data-lucide="trending-up" class="w-3 h-3 inline-block mr-1.5"></i>Popular Tickers
+                        </div>
+                    `;
+                }
+                
+                suggestions.slice(0, 12).forEach((item, index) => {
+                    // Handle both string and object formats
+                    const ticker = (typeof item === 'object' && item.symbol) ? item.symbol : (hasNames ? item.symbol : item);
+                    const name = (typeof item === 'object' && item.name) ? item.name : (hasNames ? item.name : '');
+                    const isExactMatch = query && ticker.toUpperCase() === query.toUpperCase();
+                    const isCandidate = (typeof item === 'object' && item.is_candidate === true);
+                    const isNotCandidate = (typeof item === 'object' && item.is_candidate === false);
+                    
+                    html += `
+                        <div class="ticker-suggestion px-4 py-3 cursor-pointer hover:bg-gray-100 active:bg-gray-200 border-b border-gray-100 last:border-b-0 transition-all duration-150 group ${index === selectedIndex ? 'bg-gray-100 border-l-2 border-l-cyan-500' : ''} ${isExactMatch ? 'ring-1 ring-cyan-400 bg-cyan-50' : ''}" 
+                             data-index="${index}" 
+                             data-ticker="${ticker}"
+                             role="option"
+                             aria-selected="${index === selectedIndex}">
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-3 flex-1 min-w-0">
+                                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 border border-cyan-400 flex items-center justify-center flex-shrink-0 shadow-lg shadow-cyan-500/30 ${isExactMatch ? 'ring-2 ring-cyan-400' : ''}">
+                                        <span class="text-xs font-mono font-bold text-white">${ticker}</span>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-sm font-mono font-bold text-gray-900 flex items-center gap-2 flex-wrap">
+                                            ${highlightMatch(ticker, query)}
+                                            ${isExactMatch ? '<span class="px-1.5 py-0.5 text-[10px] bg-green-500 text-white rounded border border-green-600">Exact</span>' : ''}
+                                            ${isCandidate ? '<span class="px-1.5 py-0.5 text-[10px] bg-green-500 text-white rounded border border-green-600 flex items-center gap-1"><i data-lucide="check-circle-2" class="w-3 h-3"></i>Candidate</span>' : ''}
+                                            ${isNotCandidate ? '<span class="px-1.5 py-0.5 text-[10px] bg-gray-400 text-white rounded border border-gray-500">Not candidate</span>' : ''}
+                                        </div>
+                                        ${name ? `<div class="text-xs text-gray-600 mt-0.5 line-clamp-1">${name}</div>` : ''}
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    ${isExactMatch ? '<i data-lucide="check-circle-2" class="w-4 h-4 text-green-500"></i>' : ''}
+                                    ${isCandidate ? '<i data-lucide="sparkles" class="w-4 h-4 text-green-500"></i>' : ''}
+                                    <i data-lucide="arrow-left" class="w-4 h-4 text-gray-400 group-hover:text-cyan-500 transition-colors opacity-0 group-hover:opacity-100"></i>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            dropdown.innerHTML = html;
+            // Smooth fade-in animation
+            dropdown.style.opacity = '0';
+            dropdown.style.transform = 'translateY(-10px) scale(0.95)';
+            dropdown.classList.remove('hidden');
+            input.setAttribute('aria-expanded', 'true');
+            
+            // Animate in
+            requestAnimationFrame(() => {
+                dropdown.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
+                dropdown.style.opacity = '1';
+                dropdown.style.transform = 'translateY(0) scale(1)';
+            });
+            
+            // Re-initialize Lucide icons
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons(dropdown);
+            }
+            
+            // Add click handlers - auto-submit on click
+            dropdown.querySelectorAll('.ticker-suggestion').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const ticker = this.dataset.ticker;
+                    // Auto-submit immediately on click
+                    selectTicker(ticker, true);
+                });
+                
+                item.addEventListener('mouseenter', function() {
+                    selectedIndex = parseInt(this.dataset.index);
+                    updateHighlight();
+                });
+            });
+            
+            // Scroll selected item into view
+            if (selectedIndex >= 0) {
+                scrollToSelected();
+            }
+        }
+        
+        function updateHighlight() {
+            const dropdown = getDropdown();
+            if (!dropdown) return;
+            
+            dropdown.querySelectorAll('.ticker-suggestion').forEach((item, index) => {
+                const isSelected = index === selectedIndex;
+                item.setAttribute('aria-selected', isSelected);
+                
+                if (isSelected) {
+                    item.classList.add('bg-gray-100', 'border-l-2', 'border-l-cyan-500');
+                    item.classList.remove('hover:bg-gray-100');
+                } else {
+                    item.classList.remove('bg-gray-100', 'border-l-2', 'border-l-cyan-500');
+                    item.classList.add('hover:bg-gray-100');
+                }
+            });
+            
+            scrollToSelected();
+        }
+        
+        function scrollToSelected() {
+            if (selectedIndex < 0) return;
+            const dropdown = getDropdown();
+            const selected = dropdown?.querySelector(`[data-index="${selectedIndex}"]`);
+            if (selected) {
+                selected.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        }
+        
+        function selectTicker(ticker, autoSubmit = false) {
+            const input = getInput();
+            if (input) {
+                // Smooth value update with visual feedback
+                input.value = ticker.toUpperCase();
+                saveRecentSearch(ticker);
+                
+                // Show success checkmark briefly
+                const successCheck = document.getElementById('ticker-success-check');
+                if (successCheck) {
+                    successCheck.classList.remove('hidden');
+                    setTimeout(() => {
+                        successCheck.classList.add('hidden');
+                    }, 800);
+                }
+                
+                // Add subtle success animation to input
+                input.classList.add('border-green-400', 'ring-2', 'ring-green-500/30');
+                setTimeout(() => {
+                    input.classList.remove('border-green-400', 'ring-2', 'ring-green-500/30');
+                    if (document.activeElement === input) {
+                        input.classList.add('border-cyan-400', 'ring-2', 'ring-cyan-500/30');
+                    }
+                }, 600);
+                
+                hideSuggestions();
+                
+                if (autoSubmit) {
+                    // Small delay for visual feedback before submit
+                    setTimeout(() => {
+                        const form = input.closest('form');
+                        if (form) {
+                            form.requestSubmit();
+                        }
+                    }, 150);
+                } else {
+                    input.focus();
+                }
+            }
+        }
+        
+        function hideSuggestions() {
+            const dropdown = getDropdown();
+            const input = getInput();
+            if (dropdown && !dropdown.classList.contains('hidden')) {
+                // Smooth fade-out animation
+                dropdown.style.transition = 'opacity 0.15s ease-in, transform 0.15s ease-in';
+                dropdown.style.opacity = '0';
+                dropdown.style.transform = 'translateY(-10px) scale(0.95)';
+                setTimeout(() => {
+                    dropdown.classList.add('hidden');
+                    dropdown.style.opacity = '';
+                    dropdown.style.transform = '';
+                }, 150);
+            }
+            if (input) {
+                input.setAttribute('aria-expanded', 'false');
+            }
+            currentSuggestions = [];
+            selectedIndex = -1;
+            showLoading(false);
+        }
+        
+        // Make hideSuggestions globally accessible for HTMX callbacks
+        window.hideSuggestions = hideSuggestions;
+        
+        async function searchTickers(query) {
+            if (!query || query.length < 1) {
+                // Show popular tickers or recent searches
+                try {
+                    const response = await fetch(`/api/tickers/search?include_names=true`);
+                    const data = await response.json();
+                    if (data.tickers && data.tickers.length > 0) {
+                        showSuggestions(data.tickers.slice(0, 8), '');
+                    } else {
+                        hideSuggestions();
+                    }
+                } catch (error) {
+                    console.error('Error fetching popular tickers:', error);
+                    hideSuggestions();
+                }
+                return;
+            }
+            
+            showLoading(true);
+            
+            try {
+                const response = await fetch(`/api/tickers/search?query=${encodeURIComponent(query)}&include_names=true`);
+                const data = await response.json();
+                
+                showLoading(false);
+                
+                if (data.tickers && data.tickers.length > 0) {
+                    showSuggestions(data.tickers.slice(0, 12), query);
+                } else {
+                    // Show "no results" message
+                    const dropdown = getDropdown();
+                    if (dropdown) {
+                        dropdown.innerHTML = `
+                            <div class="px-4 py-6 text-center">
+                                <i data-lucide="search-x" class="w-8 h-8 text-gray-400 mx-auto mb-2"></i>
+                                <div class="text-sm text-gray-700">No tickers found for "${query}"</div>
+                                <div class="text-xs text-gray-500 mt-1">Try a different symbol</div>
+                            </div>
+                        `;
+                        dropdown.style.opacity = '0';
+                        dropdown.style.transform = 'translateY(-10px) scale(0.95)';
+                        dropdown.classList.remove('hidden');
+                        requestAnimationFrame(() => {
+                            dropdown.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
+                            dropdown.style.opacity = '1';
+                            dropdown.style.transform = 'translateY(0) scale(1)';
+                        });
+                        if (typeof lucide !== 'undefined') {
+                            lucide.createIcons(dropdown);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error searching tickers:', error);
+                showLoading(false);
+                hideSuggestions();
+            }
+        }
+        
+        function initAutocomplete() {
+            const input = getInput();
+            if (!input) return;
+            
+            // Show popular tickers on focus if input is empty
+            input.addEventListener('focus', function() {
+                this.classList.add('border-cyan-400', 'ring-2', 'ring-cyan-500/30');
+                if (!this.value.trim()) {
+                    // Clear any pending search when focusing empty input
+                    if (autocompleteTimeout) {
+                        clearTimeout(autocompleteTimeout);
+                    }
+                    setTimeout(() => searchTickers(''), 100); // Small delay for smooth UX
+                }
+            });
+            
+            input.addEventListener('blur', function() {
+                // Don't remove focus styles immediately - let hideSuggestions handle it
+                setTimeout(() => {
+                    if (document.activeElement !== this) {
+                        this.classList.remove('border-cyan-400', 'ring-2', 'ring-cyan-500/30');
+                    }
+                }, 200);
+            });
+            
+            // Debounced search on input - wait for user to stop typing before checking candidates
+            input.addEventListener('input', function(e) {
+                const query = e.target.value.trim().toUpperCase();
+                
+                if (autocompleteTimeout) {
+                    clearTimeout(autocompleteTimeout);
+                }
+                
+                if (query.length >= 1) {
+                    // Longer debounce (500ms) to wait for user to finish typing before expensive candidate checks
+                    autocompleteTimeout = setTimeout(() => {
+                        searchTickers(query);
+                    }, 500); // 500ms debounce - saves resources by waiting for user to finish typing
+                } else {
+                    // Show popular/recent immediately when input is cleared
+                    searchTickers('');
+                }
+            });
+            
+            // Handle keyboard navigation
+            input.addEventListener('keydown', function(e) {
+                const dropdown = getDropdown();
+                
+                if (!dropdown || dropdown.classList.contains('hidden') || currentSuggestions.length === 0) {
+                    if (e.key === 'Enter' && this.value.trim()) {
+                        // Allow form submission
+                        return true;
+                    }
+                    if (e.key === 'Tab' && this.value.trim()) {
+                        // Allow tab navigation
+                        return true;
+                    }
+                    return;
+                }
+                
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    selectedIndex = Math.min(selectedIndex + 1, currentSuggestions.length - 1);
+                    updateHighlight();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    selectedIndex = Math.max(selectedIndex - 1, -1);
+                    updateHighlight();
+                } else                 if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (selectedIndex >= 0 && currentSuggestions[selectedIndex]) {
+                        const ticker = typeof currentSuggestions[selectedIndex] === 'object' 
+                            ? currentSuggestions[selectedIndex].symbol 
+                            : currentSuggestions[selectedIndex];
+                        selectTicker(ticker, true); // Auto-submit
+                    } else if (this.value.trim()) {
+                        // Submit current value directly
+                        const form = this.closest('form');
+                        if (form) {
+                            form.requestSubmit();
+                        }
+                    }
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    hideSuggestions();
+                    input.blur();
+                } else if (e.key === 'Tab' && selectedIndex >= 0) {
+                    e.preventDefault();
+                    const ticker = typeof currentSuggestions[selectedIndex] === 'object' 
+                        ? currentSuggestions[selectedIndex].symbol 
+                        : currentSuggestions[selectedIndex];
+                    selectTicker(ticker);
+                }
+            });
+            
+            // Hide dropdown when clicking outside
+            document.addEventListener('click', function(e) {
+                const wrapper = document.getElementById('ticker-autocomplete-wrapper');
+                if (wrapper && !wrapper.contains(e.target)) {
+                    hideSuggestions();
+                }
+            });
+            
+            // Hide dropdown on form submit
+            const form = input.closest('form');
+            if (form) {
+                form.addEventListener('submit', function() {
+                    hideSuggestions();
+                });
+            }
+        }
+        
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initAutocomplete);
+        } else {
+            initAutocomplete();
+        }
+        
+        // Re-initialize after HTMX swaps
+        document.addEventListener('htmx:afterSwap', function(event) {
+            if (event.detail.target?.id === 'watch-list' || event.detail.target?.closest('#watch-list')) {
+                setTimeout(() => {
+                    initAutocomplete();
+                    hideSuggestions();
+                }, 100);
+            }
+        });
+    })();
+    
+    // Success feedback after watchlist add
     document.body.addEventListener('htmx:afterRequest', function(event) {
         if (event.detail.target?.id === 'watch-list' && event.detail.successful) {
-            document.getElementById('add-ticker-input').value = '';
+            const input = document.getElementById('add-ticker-input');
+            if (input) {
+                input.value = '';
+                input.blur();
+            }
+            hideSuggestions();
+        }
+    });
+    
+    // Handle form submission start
+    document.body.addEventListener('htmx:beforeRequest', function(event) {
+        if (event.detail.target?.id === 'watch-list' && event.detail.elt?.id === 'add-ticker-form') {
+            const input = document.getElementById('add-ticker-input');
+            if (input && input.value.trim()) {
+                // Disable input during submission
+                input.disabled = true;
+                input.style.opacity = '0.6';
+            }
+        }
+    });
+    
+    // Re-enable input if request fails
+    document.body.addEventListener('htmx:responseError', function(event) {
+        if (event.detail.target?.id === 'watch-list' && event.detail.elt?.id === 'add-ticker-form') {
+            const input = document.getElementById('add-ticker-input');
+            if (input) {
+                input.disabled = false;
+                input.style.opacity = '1';
+            }
         }
     });
     
@@ -67,7 +570,13 @@
     (function() {
         function showReevaluateButton() {
             const container = document.getElementById('reevaluate-watchlist-container');
-            Alpine.$data(container).show = true;
+            if (container && typeof Alpine !== 'undefined' && typeof Alpine.$data === 'function') {
+                try {
+                    Alpine.$data(container).show = true;
+                } catch (e) {
+                    console.debug('Alpine.js not ready:', e);
+                }
+            }
             setTimeout(() => lucide.createIcons(), 100);
         }
         
@@ -87,7 +596,6 @@
                 'rsi_threshold': 'RSI Threshold',
                 'rsi_min': 'RSI Minimum',
                 'sma_proximity_pct': 'SMA Proximity',
-                'ai_score_required': 'AI Score Required',
                 'earnings_days_min': 'Earnings Days',
                 'pe_ratio_max': 'P/E Ratio Max',
                 'market_cap_min': 'Market Cap Min'
@@ -121,8 +629,21 @@
                 });
                 
                 const container = document.getElementById('reevaluate-watchlist-container');
-                if (Alpine.$data(container)?.show) {
-                    setTimeout(() => Alpine.$data(container).show = false, 800);
+                if (container && typeof Alpine !== 'undefined' && typeof Alpine.$data === 'function') {
+                    try {
+                        const data = Alpine.$data(container);
+                        if (data?.show) {
+                            setTimeout(() => {
+                                try {
+                                    Alpine.$data(container).show = false;
+                                } catch (e) {
+                                    console.debug('Alpine.js error:', e);
+                                }
+                            }, 800);
+                        }
+                    } catch (e) {
+                        console.debug('Alpine.js not ready:', e);
+                    }
                 }
                 
                 window.dispatchEvent(new CustomEvent('watchlistReevaluated'));

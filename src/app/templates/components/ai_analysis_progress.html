@@ -136,8 +136,16 @@
                     }
                     
                     // HTMX Gold Standard: Update Alpine.js state instead of innerHTML
-                    if (statusIcon && statusIcon.__x) {
-                        statusIcon.__x.$data.status = 'loading';
+                    if (statusIcon) {
+                        try {
+                            if (typeof Alpine !== 'undefined' && typeof Alpine.$data === 'function') {
+                                Alpine.$data(statusIcon).status = 'loading';
+                            } else if (statusIcon.__x && statusIcon.__x.$data) {
+                                statusIcon.__x.$data.status = 'loading';
+                            }
+                        } catch (e) {
+                            console.debug('Alpine.js not ready:', e);
+                        }
                     }
                 }
             }, stepInfo.delay);
@@ -177,8 +185,16 @@
                     text.classList.add('text-white');
                 }
                 // HTMX Gold Standard: Update Alpine.js state instead of innerHTML
-                if (statusIcon && statusIcon.__x) {
-                    statusIcon.__x.$data.status = 'loading';
+                if (statusIcon) {
+                    try {
+                        if (typeof Alpine !== 'undefined' && typeof Alpine.$data === 'function') {
+                            Alpine.$data(statusIcon).status = 'loading';
+                        } else if (statusIcon.__x && statusIcon.__x.$data) {
+                            statusIcon.__x.$data.status = 'loading';
+                        }
+                    } catch (e) {
+                        console.debug('Alpine.js not ready:', e);
+                    }
                 }
             } else if (status === 'complete') {
                 step.classList.remove('opacity-60', 'bg-gray-800/20', 'bg-blue-500/10', 'border-blue-500/30');
@@ -197,8 +213,16 @@
                     text.classList.add('text-green-300');
                 }
                 // HTMX Gold Standard: Update Alpine.js state instead of innerHTML
-                if (statusIcon && statusIcon.__x) {
-                    statusIcon.__x.$data.status = 'complete';
+                if (statusIcon) {
+                    try {
+                        if (typeof Alpine !== 'undefined' && typeof Alpine.$data === 'function') {
+                            Alpine.$data(statusIcon).status = 'complete';
+                        } else if (statusIcon.__x && statusIcon.__x.$data) {
+                            statusIcon.__x.$data.status = 'complete';
+                        }
+                    } catch (e) {
+                        console.debug('Alpine.js not ready:', e);
+                    }
                 }
             }
         }

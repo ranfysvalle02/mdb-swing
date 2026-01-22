@@ -1,14 +1,17 @@
-"""Balanced Low Strategy - Simple, Adjustable Swing Trading
+"""Balanced Low Strategy - Swing Trading
 
-Architecture: Uses vectorbt for all indicator calculations.
+Entry Criteria (all must be true):
+1. RSI oversold: 20 < RSI < 35
+2. Price > SMA-200 (uptrend)
+3. Price within 3% of SMA-200 (near support)
+4. News filter: AI analysis excludes fraud, bankruptcy, major scandals
+
+Risk Management:
+- Stop Loss: 2x ATR below entry
+- Position Sizing: Based on ATR and risk per trade
+
+Architecture: Uses vectorbt for indicator calculations.
 MongoDB stores configuration and decisions, NOT computed indicators.
-
-Simple strategy that users can adjust based on their budget:
-- Conservative: Lower risk, smaller positions
-- Moderate: Balanced approach
-- Aggressive: Higher risk, larger positions
-
-MongoDB remembers what *happened*. Python decides what *should happen*.
 
 MDB-Engine Integration:
 - Logging: Uses `get_logger(__name__)` from mdb_engine.observability for structured logging
@@ -69,32 +72,30 @@ def generate_signals(
     ai_score = ai_scores.get(symbol)
     ai_min_score = config.get('ai_min_score', 7)
     
-    # Apply Boolean Logic (vectorized)
-    # Entry conditions:
-    # 1. RSI in sweet spot (rsi_min < RSI < rsi_threshold) - oversold but not extreme
-    # 2. Price > SMA-200 (uptrend) - confirms bounce direction
-    # 3. Price within proximity of SMA-200 (near support) - higher bounce probability
-    # 4. AI score >= minimum (if available) - bounce-back probability validation
-    rsi_threshold = config.get('rsi_threshold', 35)  # Maximum oversold level
-    rsi_min = config.get('rsi_min', 20)  # Minimum RSI - avoid extreme oversold (may indicate fundamental issues)
-    sma_proximity_pct = config.get('sma_proximity_pct', 3.0)  # Maximum percentage above SMA-200
+    # Entry conditions (all must be true):
+    # 1. RSI oversold: rsi_min < RSI < rsi_threshold
+    # 2. Price > SMA-200 (uptrend)
+    # 3. Price within proximity of SMA-200 (near support)
+    # 4. News filter handled separately in analysis service
+    rsi_threshold = config.get('rsi_threshold', 35)
+    rsi_min = config.get('rsi_min', 20)
+    sma_proximity_pct = config.get('sma_proximity_pct', 3.0)
     
     # Calculate price vs SMA-200 percentage (vectorized)
     price_vs_sma_pct = ((df['close'] - sma_200) / sma_200) * 100
     
     entries = (
-        (rsi > rsi_min) &  # Not too extreme (avoid RSI < 20)
-        (rsi < rsi_threshold) &  # Oversold (RSI < threshold)
-        (df['close'] > sma_200) &  # Uptrend - confirms bounce direction
-        (price_vs_sma_pct <= sma_proximity_pct)  # Near support - within configured proximity
+        (rsi > rsi_min) &
+        (rsi < rsi_threshold) &
+        (df['close'] > sma_200) &
+        (price_vs_sma_pct <= sma_proximity_pct)
     )
     
-    # Filter by AI score if available
+    # Optional AI score filter (news analysis handled separately)
     if ai_score is not None:
         entries = entries & (ai_score >= ai_min_score)
     else:
-        # If no AI score, still allow entry (AI is optional filter)
-        logger.debug(f"No AI score for {symbol}, proceeding without AI filter")
+        logger.debug(f"No AI score for {symbol}, proceeding with technical signals only")
     
     return entries
 
@@ -107,6 +108,8 @@ def calculate_position_size(
     buying_power: float
 ) -> int:
     """Calculate position size based on volatility (ATR).
+    
+    Stop loss distance: 2x ATR (volatility-adaptive).
     
     Architecture: Pure computation, no MongoDB.
     
@@ -123,7 +126,7 @@ def calculate_position_size(
     if atr <= 0 or price <= 0:
         return 0
     
-    # Stop distance = 2 * ATR
+    # Stop distance = 2 * ATR (volatility-based risk management)
     stop_distance = 2 * atr
     
     # Calculate shares based on risk
@@ -167,20 +170,6 @@ def run_portfolio(
         "config_used": config
     }
     
-    # Use vectorbt for portfolio simulation when we have actual trades
-    # This would simulate the strategy performance:
-    # pf = vbt.Portfolio.from_signals(
-    #     data, entries, 
-    #     size=config.get('risk_per_trade', 50.0),
-    #     sl_stop=0.02,  # 2% stop loss
-    #     tp_stop=0.03   # 3% take profit
-    # )
-    # portfolio_stats.update({
-    #     "total_return": float(pf.total_return()),
-    #     "sharpe_ratio": float(pf.sharpe_ratio()),
-    #     "max_drawdown": float(pf.max_drawdown()),
-    #     "win_rate": float(pf.trades.win_rate())
-    # })
     
     return portfolio_stats
 
@@ -188,7 +177,7 @@ def run_portfolio(
 def get_budget_preset(budget: float) -> Dict[str, Any]:
     """Get strategy preset based on budget.
     
-    Simple, user-friendly presets that adjust risk based on available capital.
+    Adjusts RSI threshold and AI score requirements based on capital.
     
     Args:
         budget: Available trading capital
@@ -197,29 +186,29 @@ def get_budget_preset(budget: float) -> Dict[str, Any]:
         Strategy configuration dict optimized for budget
     """
     if budget < 1000:
-        # Small budget: Conservative
+        # Conservative: tighter RSI range, higher quality
         return {
-            "rsi_threshold": 30,  # More conservative (lower = fewer signals)
-            "rsi_min": 20,  # Avoid extreme oversold
-            "ai_min_score": 8,  # Higher quality required
+            "rsi_threshold": 30,
+            "rsi_min": 20,
+            "ai_min_score": 8,
             "name": "Balanced Low (Conservative)",
-            "description": "Conservative bounce-back opportunities - high probability setups only"
+            "description": "Conservative: RSI 20-30, higher quality requirements"
         }
     elif budget < 10000:
-        # Medium budget: Moderate
+        # Moderate: default parameters
         return {
-            "rsi_threshold": 35,  # Balanced - RSI sweet spot 20-35
-            "rsi_min": 20,  # Avoid extreme oversold
-            "ai_min_score": 7,  # Good bounce-back opportunities
+            "rsi_threshold": 35,
+            "rsi_min": 20,
+            "ai_min_score": 7,
             "name": "Balanced Low (Moderate)",
-            "description": "Buy low, sell high - oversold stocks ready to ride the wave back up"
+            "description": "Moderate: RSI 20-35, standard parameters"
         }
     else:
-        # Large budget: Can be more aggressive
+        # Aggressive: wider RSI range
         return {
-            "rsi_threshold": 40,  # More signals - wider RSI range
-            "rsi_min": 20,  # Still avoid extreme oversold
-            "ai_min_score": 6,  # Accept more bounce-back opportunities
+            "rsi_threshold": 40,
+            "rsi_min": 20,
+            "ai_min_score": 6,
             "name": "Balanced Low (Aggressive)",
-            "description": "Aggressive bounce-back strategy - more opportunities to buy low and sell high"
+            "description": "Aggressive: RSI 20-40, wider range"
         }

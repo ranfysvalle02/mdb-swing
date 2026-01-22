@@ -1,0 +1,46 @@
+<!-- Minimal Account Balance for Nav Bar -->
+{# Set all variables with safe defaults #}
+{% set equity_val = equity|default(0.0)|float %}
+{% set pl_val = pl|default(0.0)|float %}
+{% set pl_abs_val = pl_abs|default(0.0)|float %}
+{% set buying_power_val = buying_power|default(0.0)|float %}
+{% set connected_val = connected|default(False) %}
+{% set pl_pct_val = ((pl_val / equity_val * 100) if equity_val > 0 else 0.0)|float %}
+
+<div class="flex items-center gap-2" 
+     x-data="{
+         equity: {{ equity_val }},
+         pl: {{ pl_val }},
+         connected: {% if connected_val %}true{% else %}false{% endif %},
+         get equityFormatted() {
+             return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(this.equity);
+         },
+         get plFormatted() {
+             return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.abs(this.pl));
+         },
+         get isPositive() {
+             return this.pl >= 0;
+         }
+     }">
+    <!-- Connection Status Dot -->
+    {% if connected_val %}
+    <div class="relative w-2 h-2">
+        <span class="absolute inset-0 w-2 h-2 rounded-full bg-green-400 opacity-75 animate-ping"></span>
+        <span class="absolute inset-0 w-2 h-2 rounded-full bg-green-400"></span>
+    </div>
+    {% else %}
+    <div class="w-2 h-2 rounded-full bg-gray-500"></div>
+    {% endif %}
+    
+    <!-- Equity Amount -->
+    <span class="text-sm font-semibold text-white font-mono tabular-nums" x-text="equityFormatted">
+        ${{ "%.0f"|format(equity_val) }}
+    </span>
+    
+    <!-- P&L Badge (Minimal) -->
+    <span class="text-xs font-medium px-1.5 py-0.5 rounded"
+          :class="isPositive ? 'text-green-400 bg-green-500/10' : 'text-red-400 bg-red-500/10'"
+          x-text="(isPositive ? '+' : '') + plFormatted">
+        {{ '+' if pl_val >= 0 else '' }}${{ "%.0f"|format(pl_abs_val) }}
+    </span>
+</div>

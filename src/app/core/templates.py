@@ -81,8 +81,24 @@ def svg_initials_filter(value):
         value = "?"
     return get_svg_initials(str(value))
 
+def min_filter(value1, value2):
+    """Return the minimum of two values."""
+    try:
+        return min(float(value1), float(value2))
+    except (ValueError, TypeError):
+        return value1
+
+def max_filter(value1, value2):
+    """Return the maximum of two values."""
+    try:
+        return max(float(value1), float(value2))
+    except (ValueError, TypeError):
+        return value1
+
 # Register filters with Jinja2 environment
 templates.env.filters["tojson"] = tojson_filter
 templates.env.filters["round"] = round_filter
 templates.env.filters["int"] = int_filter
 templates.env.filters["svg_initials"] = svg_initials_filter
+templates.env.filters["min"] = min_filter
+templates.env.filters["max"] = max_filter

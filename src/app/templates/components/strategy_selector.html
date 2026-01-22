@@ -1,0 +1,68 @@
+<div id="strategy-selector-container">
+    <!-- Loading indicator -->
+    <div class="htmx-indicator absolute inset-0 flex items-center justify-center bg-gray-900/50 rounded-lg z-10 pointer-events-none">
+        <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-purple-400"></i>
+    </div>
+    
+    <button 
+        type="button"
+        hx-get="/api/strategy-selector-modal"
+        hx-target="#modal-container"
+        hx-swap="innerHTML"
+        class="p-2 rounded-lg hover:bg-white/5 transition-colors text-white/70 hover:text-white"
+        title="{% if active_strategy %}{{ active_strategy.name }}{% else %}Strategy{% endif %}">
+        <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+    </button>
+</div>
+
+<script>
+// Initialize Lucide icons when component loads or updates
+(function() {
+    function initLucide() {
+        if (typeof lucide !== 'undefined' && lucide.createIcons) {
+            lucide.createIcons();
+        }
+    }
+    
+    // Initialize Lucide icons on load
+    initLucide();
+    
+    // Re-initialize Lucide icons after HTMX swaps
+    document.addEventListener('htmx:afterSwap', function(event) {
+        if (event.detail.target && event.detail.target.id === 'strategy-selector-container') {
+            setTimeout(() => {
+                initLucide();
+            }, 10);
+        }
+    });
+    
+    // Handle strategy activation - refresh watchlist and close modal
+    document.addEventListener('htmx:afterRequest', function(event) {
+        // Check if this was a strategy activation request
+        const requestPath = event.detail.pathInfo?.requestPath || '';
+        if (requestPath.includes('/api/strategies/') && requestPath.includes('/activate')) {
+            if (event.detail.successful) {
+                // Trigger watchlist refresh
+                setTimeout(() => {
+                    if (typeof htmx !== 'undefined') {
+                        htmx.trigger('#watch-list', 'refresh');
+                        htmx.get('/api/watch-list', {
+                            target: '#watch-list',
+                            swap: 'innerHTML'
+                        });
+                    }
+                    // Show success notification
+                    if (typeof htmx !== 'undefined') {
+                        htmx.trigger('body', 'showToast', {
+                            detail: {
+                                message: 'Strategy activated successfully',
+                                type: 'success'
+                            }
+                        });
+                    }
+                }, 100);
+            }
+        }
+    });
+})();
+</script>

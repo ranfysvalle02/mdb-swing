@@ -210,7 +210,7 @@ class SymbolDiscoveryService:
         
         for attempt in range(max_retries):
             try:
-                logger.info(f"🔍 [SCOUTING] Using Firecrawl Search to discover stocks...")
+                logger.info(f"[SCOUTING] Using Firecrawl Search to discover stocks...")
                 logger.info(f"   Query: {query[:100]}...")
                 
                 # Use Firecrawl Search API (faster than Agent)
@@ -222,7 +222,7 @@ class SymbolDiscoveryService:
                 # Firecrawl search returns SearchData object with data attribute
                 # data contains: web, images, news arrays
                 if not search_response:
-                    logger.warning("⚠️ [SCOUTING] Search returned no response")
+                    logger.warning("[SCOUTING] Search returned no response")
                     if attempt < max_retries - 1:
                         await asyncio.sleep(2)
                         continue
@@ -241,7 +241,7 @@ class SymbolDiscoveryService:
                     web_results = search_data
                 
                 if not web_results:
-                    logger.warning("⚠️ [SCOUTING] No web results found in search response")
+                    logger.warning("[SCOUTING] No web results found in search response")
                     if attempt < max_retries - 1:
                         await asyncio.sleep(2)
                         continue
@@ -265,7 +265,7 @@ class SymbolDiscoveryService:
                         search_texts.append(f"Title: {title}\nDescription: {description}\nURL: {url}")
                 
                 if not search_texts:
-                    logger.warning("⚠️ [SCOUTING] No text extracted from search results")
+                    logger.warning("[SCOUTING] No text extracted from search results")
                     if attempt < max_retries - 1:
                         await asyncio.sleep(2)
                         continue
@@ -300,7 +300,7 @@ class SymbolDiscoveryService:
                                 opp = StockOpportunity(**stock)
                                 opportunities.append(opp)
                             except Exception as e:
-                                logger.warning(f"⚠️ [SCOUTING] Invalid stock data: {e}")
+                                logger.warning(f"[SCOUTING] Invalid stock data: {e}")
                         elif isinstance(stock, StockOpportunity):
                             opportunities.append(stock)
                 elif isinstance(result, dict) and 'stocks' in result:
@@ -309,13 +309,13 @@ class SymbolDiscoveryService:
                             opp = StockOpportunity(**stock) if isinstance(stock, dict) else stock
                             opportunities.append(opp)
                         except Exception as e:
-                            logger.warning(f"⚠️ [SCOUTING] Invalid stock data: {e}")
+                            logger.warning(f"[SCOUTING] Invalid stock data: {e}")
                 
                 if opportunities:
-                    logger.info(f"✅ [SCOUTING] Search + LLM discovered {len(opportunities)} stocks: {[s.ticker for s in opportunities[:10]]}")
+                    logger.info(f"[SCOUTING] Search + LLM discovered {len(opportunities)} stocks: {[s.ticker for s in opportunities[:10]]}")
                     return opportunities
                 else:
-                    logger.warning("⚠️ [SCOUTING] LLM extraction returned no stocks")
+                    logger.warning("[SCOUTING] LLM extraction returned no stocks")
                     if attempt < max_retries - 1:
                         await asyncio.sleep(2)
                         continue
@@ -324,10 +324,10 @@ class SymbolDiscoveryService:
             except Exception as e:
                 if attempt < max_retries - 1:
                     wait_time = 2 * (attempt + 1)
-                    logger.warning(f"⚠️ [SCOUTING] Search attempt {attempt + 1} failed, retrying in {wait_time}s: {e}")
+                    logger.warning(f"[SCOUTING] Search attempt {attempt + 1} failed, retrying in {wait_time}s: {e}")
                     await asyncio.sleep(wait_time)
                 else:
-                    logger.error(f"❌ [SCOUTING] All search attempts failed: {e}", exc_info=True)
+                    logger.error(f"[SCOUTING] All search attempts failed: {e}", exc_info=True)
         
         return []
     
@@ -395,7 +395,7 @@ class SymbolDiscoveryService:
                     # Sort by rank and extract tickers
                     rankings.sort(key=lambda x: x.rank)
                     top_tickers = [r.ticker for r in rankings[:5]]
-                    logger.info(f"✅ [SCOUTING] Ranked and selected top {len(top_tickers)} tickers: {top_tickers}")
+                    logger.info(f"[SCOUTING] Ranked and selected top {len(top_tickers)} tickers: {top_tickers}")
                     for r in rankings[:5]:
                         logger.info(f"   {r.rank}. {r.ticker} (score: {r.match_score:.1f}) - {r.reasoning[:80]}")
                     return top_tickers
@@ -410,10 +410,10 @@ class SymbolDiscoveryService:
             except Exception as e:
                 if attempt < max_retries - 1:
                     wait_time = 2 ** attempt
-                    logger.warning(f"⚠️ [SCOUTING] Ranking attempt {attempt + 1} failed, retrying in {wait_time}s: {e}")
+                    logger.warning(f"[SCOUTING] Ranking attempt {attempt + 1} failed, retrying in {wait_time}s: {e}")
                     await asyncio.sleep(wait_time)
                 else:
-                    logger.error(f"❌ [SCOUTING] All ranking attempts failed: {e}", exc_info=True)
+                    logger.error(f"[SCOUTING] All ranking attempts failed: {e}", exc_info=True)
                     # Fallback: return top tickers by relevance score
                     sorted_opps = sorted(opportunities, key=lambda x: x.relevance_score, reverse=True)
                     return [o.ticker for o in sorted_opps[:5]]
@@ -446,7 +446,7 @@ class SymbolDiscoveryService:
             if strategy_config is None:
                 strategy_config = {}
             
-            logger.info(f"🔍 [SCOUTING] Starting intelligent symbol discovery for strategy: {strategy_name}")
+            logger.info(f"[SCOUTING] Starting intelligent symbol discovery for strategy: {strategy_name}")
             
             # Step 1: Generate search query
             search_query = self._generate_search_query(strategy_name, strategy_config)
@@ -456,20 +456,20 @@ class SymbolDiscoveryService:
             # Search API is much faster and doesn't freeze the system
             opportunities = await self._discover_stocks_with_search(search_query)
             if not opportunities:
-                logger.warning("⚠️ [SCOUTING] Agent found no stocks, returning empty list")
+                logger.warning("[SCOUTING] Agent found no stocks, returning empty list")
                 return []
             
             # Step 3: Rank opportunities based on strategy and select top 5
             top_tickers = await self._rank_tickers_by_strategy(opportunities, strategy_name, strategy_config)
             if not top_tickers:
-                logger.warning("⚠️ [SCOUTING] No tickers ranked, returning empty list")
+                logger.warning("[SCOUTING] No tickers ranked, returning empty list")
                 return []
             
             # Step 5: Limit and return
             final_symbols = top_tickers[:max_symbols]
-            logger.info(f"✅ [SCOUTING] Discovered {len(final_symbols)} symbols: {final_symbols}")
+            logger.info(f"[SCOUTING] Discovered {len(final_symbols)} symbols: {final_symbols}")
             return final_symbols
             
         except Exception as e:
-            logger.error(f"❌ [SCOUTING] Error in discover_symbols: {e}", exc_info=True)
+            logger.error(f"[SCOUTING] Error in discover_symbols: {e}", exc_info=True)
             return []

@@ -1,29 +1,3 @@
-# Docker Compose setup for FLUX - Swing Trading Evolved
-#
-# Quick Start:
-#   1. Copy env.example to .env and fill in your API keys:
-#      cp env.example .env
-#      # Edit .env with your Alpaca and Azure OpenAI credentials
-#
-#   2. Start all services:
-#      docker-compose up -d
-#
-#   3. Access the application:
-#      - Web UI: http://localhost:5000
-#      - MongoDB: mongodb://admin:secret@localhost:27017/
-#
-#   4. View logs:
-#      docker-compose logs -f app
-#
-#   5. Stop services:
-#      docker-compose down
-#
-# Services:
-#   - atlas-local: MongoDB Atlas Local instance with Search capabilities
-#   - app: FastAPI application with trading bot and web dashboard
-
-version: '3.8'
-
 services:
   atlas-local:
     image: mongodb/mongodb-atlas-local:latest

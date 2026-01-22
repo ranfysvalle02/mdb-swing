@@ -59,13 +59,7 @@
                 <span>Recommendation</span>
             </div>
             <span class="font-bold text-base {{ action_color }} uppercase" aria-label="Action: {{ verdict.action }}">
-                {% if verdict.action == "AVOID" %}
-                    AVOID
-                {% elif verdict.action == "SELL_NOW" %}
-                    SELL NOW
-                {% else %}
-                    {{ verdict.action }}
-                {% endif %}
+                {{ verdict.action }}
             </span>
         </div>
         <p class="text-xs text-gray-200 italic mb-2" role="note">"{{ verdict.reason|e }}"</p>
@@ -103,19 +97,50 @@
         const containerId = {{ tradingview_id|tojson }};
         const symbol = {{ symbol|tojson }};
         
-        setTimeout(() => {
-            new TradingView.widget({
-                "autosize": true,
-                "symbol": symbol,
-                "interval": "D",
-                "timezone": "Etc/UTC",
-                "theme": "dark",
-                "style": "1",
-                "container_id": containerId,
-                "locale": "en"
-            });
-        }, 100);
+        function initTradingView() {
+            if (typeof TradingView !== 'undefined' && TradingView.widget) {
+                new TradingView.widget({
+                    "autosize": true,
+                    "symbol": symbol,
+                    "interval": "D",
+                    "timezone": "Etc/UTC",
+                    "theme": "dark",
+                    "style": "1",
+                    "container_id": containerId,
+                    "locale": "en"
+                });
+            } else {
+                console.warn('TradingView widget not available - chart will not be displayed');
+                const container = document.getElementById(containerId);
+                if (container) {
+                    container.innerHTML = '<div class="flex items-center justify-center h-full text-gray-400 text-sm">Chart unavailable - TradingView script not loaded</div>';
+                }
+            }
+        }
         
-        setTimeout(() => lucide.createIcons(), 50);
+        // Try to initialize immediately, or wait for TradingView to load
+        if (typeof TradingView !== 'undefined' && TradingView.widget) {
+            setTimeout(initTradingView, 100);
+        } else {
+            // Wait for TradingView script to load (check every 100ms for up to 5 seconds)
+            let attempts = 0;
+            const maxAttempts = 50;
+            const checkInterval = setInterval(() => {
+                attempts++;
+                if (typeof TradingView !== 'undefined' && TradingView.widget) {
+                    clearInterval(checkInterval);
+                    setTimeout(initTradingView, 100);
+                } else if (attempts >= maxAttempts) {
+                    clearInterval(checkInterval);
+                    initTradingView(); // Will show error message
+                }
+            }, 100);
+        }
+        
+        setTimeout(() => {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        }, 50);
     })();
 </script>

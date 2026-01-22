@@ -73,29 +73,121 @@
                 
                 // Re-initialize Alpine.js for newly swapped content
                 if (typeof Alpine !== 'undefined') {
-                    Alpine.initTree(event.detail.target);
+                    try {
+                        const target = event.detail.target;
+                        if (!target) return;
+                        
+                        // CRITICAL: Signal Hunter section needs immediate initialization
+                        // to prevent "collapsed is not defined" errors
+                        if (target.id === 'signal-hunter-section-wrapper' || target.closest('#signal-hunter-section-wrapper')) {
+                            // Initialize immediately - find the x-data element
+                            const alpineElement = target.querySelector('[x-data]') || target.querySelector('.glass-panel[x-data]');
+                            if (alpineElement && typeof Alpine.initTree === 'function') {
+                                try {
+                                    Alpine.initTree(alpineElement);
+                                } catch (e) {
+                                    console.warn('Error initializing Alpine on signal hunter section:', e);
+                                    // Fallback to initializing on target
+                                    Alpine.initTree(target);
+                                }
+                            }
+                            return; // Early return - don't use setTimeout for signal hunter
+                        }
+                        
+                        // For other swaps, use setTimeout for DOM readiness
+                        setTimeout(() => {
+                            if (typeof Alpine.initTree === 'function') {
+                                // If modal-container, initialize Alpine on the dialog content
+                                if (target && target.id === 'modal-container') {
+                                    const dialog = target.querySelector('dialog.htmx-modal');
+                                    if (dialog) {
+                                        // Initialize Alpine on the modal body content
+                                        const modalBody = dialog.querySelector('.htmx-modal-body');
+                                        if (modalBody) {
+                                            // Check for strategy builder wizard specifically
+                                            const wizard = modalBody.querySelector('.strategy-builder-wizard');
+                                            if (wizard) {
+                                                try {
+                                                    Alpine.initTree(wizard);
+                                                } catch (e) {
+                                                    console.error('Error initializing strategy builder wizard:', e);
+                                                    // Fallback to initializing the whole modal body
+                                                    Alpine.initTree(modalBody);
+                                                }
+                                            } else {
+                                                // Check if there's an element with x-data - initialize that first
+                                                const alpineElement = modalBody.querySelector('[x-data]');
+                                                if (alpineElement) {
+                                                    try {
+                                                        Alpine.initTree(alpineElement);
+                                                    } catch (e) {
+                                                        console.warn('Error initializing Alpine on x-data element:', e);
+                                                        // Fallback to modal body
+                                                        Alpine.initTree(modalBody);
+                                                    }
+                                                } else {
+                                                    // No x-data element, initialize on modal body
+                                                    Alpine.initTree(modalBody);
+                                                }
+                                            }
+                                        } else {
+                                            Alpine.initTree(dialog);
+                                        }
+                                    } else {
+                                        // No dialog found, try initializing directly on target
+                                        Alpine.initTree(target);
+                                    }
+                                } else {
+                                    // Normal swap - initialize on target
+                                    // Check for x-data elements first
+                                    const alpineElement = target.querySelector('[x-data]');
+                                    if (alpineElement) {
+                                        try {
+                                            Alpine.initTree(alpineElement);
+                                        } catch (e) {
+                                            console.warn('Error initializing Alpine on x-data element:', e);
+                                            Alpine.initTree(target);
+                                        }
+                                    } else {
+                                        Alpine.initTree(target);
+                                    }
+                                }
+                            }
+                        }, 100); // Increased delay to ensure DOM is ready
+                    } catch (e) {
+                        console.error('Alpine.js initialization error:', e);
+                    }
                 }
             });
             
-            // Prevent duplicate toasts - remove existing toasts with same message before adding new one
-            document.addEventListener('htmx:beforeSwap', function(event) {
-                // Check if response contains a toast
-                const responseText = event.detail.xhr?.responseText || event.detail.serverResponse || '';
-                if (responseText.includes('data-toast-message')) {
-                    const messageMatch = responseText.match(/data-toast-message="([^"]+)"/);
-                    if (messageMatch) {
-                        const newMessage = messageMatch[1];
-                        // Remove existing toasts with same message
-                        const existingToasts = document.querySelectorAll('.toast[data-toast-message="' + newMessage.replace(/"/g, '\\"') + '"]');
-                        existingToasts.forEach(toast => {
-                            toast.classList.add('fade-out');
-                            setTimeout(() => {
-                                if (toast && toast.parentNode) {
-                                    toast.remove();
-                                }
-                            }, 100);
-                        });
-                    }
+            // Prevent duplicate toasts - check after swap completes (safer approach)
+            document.addEventListener('htmx:afterSwap', function(event) {
+                // After swap, check for duplicate toasts by comparing data attributes
+                // This avoids CSS selector issues with special characters in messages
+                try {
+                    const allToasts = document.querySelectorAll('.toast[data-toast-message]');
+                    const messageMap = new Map();
+                    
+                    allToasts.forEach((toast, index) => {
+                        const message = toast.getAttribute('data-toast-message');
+                        if (message) {
+                            const normalizedMessage = message.replace(/\s+/g, ' ').trim();
+                            if (messageMap.has(normalizedMessage)) {
+                                // Duplicate found - remove the older one
+                                const olderToast = messageMap.get(normalizedMessage);
+                                olderToast.classList.add('fade-out');
+                                setTimeout(() => {
+                                    if (olderToast && olderToast.parentNode) {
+                                        olderToast.remove();
+                                    }
+                                }, 100);
+                            }
+                            messageMap.set(normalizedMessage, toast);
+                        }
+                    });
+                } catch (e) {
+                    // If anything fails, just skip duplicate check - toasts will still work
+                    // This is non-critical functionality
                 }
             });
             
@@ -110,11 +202,11 @@
                 // Add closing class for exit animation
                 dialog.classList.add('closing');
                 
-                // Wait for exit animation to complete
+                // Close immediately (removes backdrop)
+                dialog.close();
+                
+                // Wait for exit animation to complete, then remove from DOM
                 setTimeout(() => {
-                    // Close the dialog
-                    dialog.close();
-                    
                     // Remove closing class
                     dialog.classList.remove('closing');
                     
@@ -128,96 +220,172 @@
                     if (remainingModals.length === 0 && document.body) {
                         document.body.style.overflow = '';
                     }
-                }, 250); // Match exit animation duration
+                }, 200); // Match exit animation duration
             }
             
             // Make function globally available
             window.closeHtmxModal = closeHtmxModal;
             
             // Show loading state during HTMX request
-            document.addEventListener('htmx:beforeRequest', function(event) {
-                const target = event.detail.target;
-                // Check if request is targeting modal-container
-                if (target && (target.id === 'modal-container' || target.closest('#modal-container'))) {
-                    const modalContainer = document.getElementById('modal-container');
-                    if (modalContainer) {
-                        // Show loading indicator
-                        const existingDialog = modalContainer.querySelector('dialog.htmx-modal');
-                        if (existingDialog) {
-                            existingDialog.classList.add('htmx-modal-loading');
-                        }
-                    }
-                }
-            });
+            // Removed duplicate loading handler - handled by the main beforeRequest handler below
             
             // When HTMX inserts a modal dialog, open it automatically
             document.addEventListener('htmx:afterSwap', function(event) {
                 const target = event.detail.target;
+                const modalContainer = document.getElementById('modal-container');
+                let dialog = null;
                 
-                // Check if modal-container received a new modal
-                if (target && target.id === 'modal-container') {
-                    // Find the newly inserted dialog element
-                    const dialog = target.querySelector('dialog.htmx-modal');
-                    if (dialog) {
-                        // Remove loading state if present
-                        dialog.classList.remove('htmx-modal-loading');
-                        
-                        // Function to safely show modal
-                        const showModalSafely = () => {
-                            // Verify dialog is in document before showing
-                            if (!document.contains(dialog)) {
-                                // If not attached, wait for next frame and retry
-                                requestAnimationFrame(() => {
-                                    if (document.contains(dialog)) {
-                                        try {
-                                            dialog.showModal();
-                                            if (document.body) {
-                                                document.body.style.overflow = 'hidden';
+                // Check if target is the dialog itself (happens with beforeend swap)
+                if (target && target.tagName === 'DIALOG' && target.classList.contains('htmx-modal')) {
+                    dialog = target;
+                }
+                // Check if target is modal-container (direct swap)
+                else if (target && target.id === 'modal-container') {
+                    dialog = target.querySelector('dialog.htmx-modal:not([open])');
+                }
+                // Check if target is inside modal-container (beforeend swap into container)
+                else if (target && target.closest && target.closest('#modal-container')) {
+                    dialog = modalContainer ? modalContainer.querySelector('dialog.htmx-modal:not([open])') : null;
+                }
+                // Fallback: always check modal-container for any new unopened dialogs
+                if (!dialog && modalContainer) {
+                    // Find the most recent dialog that's not the loading one
+                    const allDialogs = Array.from(modalContainer.querySelectorAll('dialog.htmx-modal'));
+                    // Filter out loading modal and already-open dialogs, get the last one
+                    const unopenedDialogs = allDialogs.filter(d => !d.open && d.id !== 'loading-modal');
+                    dialog = unopenedDialogs.length > 0 ? unopenedDialogs[unopenedDialogs.length - 1] : null;
+                }
+                
+                // Always remove loading dialog when real modal arrives
+                const loadingDialog = document.getElementById('loading-modal');
+                if (loadingDialog) {
+                    loadingDialog.remove();
+                }
+                
+                if (dialog) {
+                    
+                    // Close any other existing dialogs to prevent conflicts
+                    const existingDialogs = document.querySelectorAll('dialog.htmx-modal[open]');
+                    existingDialogs.forEach(existingDialog => {
+                        try {
+                            if (existingDialog.open && existingDialog !== dialog && existingDialog.id !== 'loading-modal') {
+                                existingDialog.close();
+                            }
+                        } catch (e) {
+                            // Ignore errors when closing
+                        }
+                    });
+                    
+                    // Remove loading state if present
+                    dialog.classList.remove('htmx-modal-loading');
+                    
+                    // Function to safely show modal
+                    const showModalSafely = () => {
+                        // Verify dialog is in document before showing
+                        if (!document.contains(dialog)) {
+                            // If not attached, wait for next frame and retry
+                            requestAnimationFrame(() => {
+                                if (document.contains(dialog)) {
+                                    try {
+                                        // Ensure no other dialogs are open
+                                        const otherDialogs = document.querySelectorAll('dialog.htmx-modal[open]');
+                                        otherDialogs.forEach(d => {
+                                            if (d !== dialog && d.open) {
+                                                d.close();
                                             }
-                                        } catch (e) {
-                                            console.error('Failed to show modal:', e);
+                                        });
+                                        dialog.showModal();
+                                        if (document.body) {
+                                            document.body.style.overflow = 'hidden';
                                         }
-                                    } else {
-                                        // Still not attached, try one more time after a small delay
-                                        setTimeout(() => {
-                                            if (document.contains(dialog)) {
-                                                try {
-                                                    dialog.showModal();
-                                                    if (document.body) {
-                                                        document.body.style.overflow = 'hidden';
+                                    } catch (e) {
+                                        console.error('Failed to show modal:', e);
+                                    }
+                                } else {
+                                    // Still not attached, try one more time after a small delay
+                                    setTimeout(() => {
+                                        if (document.contains(dialog)) {
+                                            try {
+                                                // Ensure no other dialogs are open
+                                                const otherDialogs = document.querySelectorAll('dialog.htmx-modal[open]');
+                                                otherDialogs.forEach(d => {
+                                                    if (d !== dialog && d.open) {
+                                                        d.close();
                                                     }
-                                                } catch (e) {
-                                                    console.error('Failed to show modal after retry:', e);
+                                                });
+                                                dialog.showModal();
+                                                if (document.body) {
+                                                    document.body.style.overflow = 'hidden';
                                                 }
+                                            } catch (e) {
+                                                console.error('Failed to show modal after retry:', e);
                                             }
-                                        }, 50);
-                                    }
-                                });
-                                return;
-                            }
-                            
-                            // Dialog is attached, show it
-                            try {
-                                dialog.showModal();
-                                
-                                // Lock body scroll
-                                if (document.body) {
-                                    document.body.style.overflow = 'hidden';
+                                        }
+                                    }, 50);
                                 }
-                                
-                                // Initialize Lucide icons in the modal
-                                setTimeout(() => {
-                                    if (typeof lucide !== 'undefined') {
-                                        lucide.createIcons();
-                                    }
-                                }, 50);
-                            } catch (e) {
-                                console.error('Failed to show modal:', e);
-                            }
-                        };
+                            });
+                            return;
+                        }
                         
-                        // Use requestAnimationFrame to ensure smooth animation start
-                        requestAnimationFrame(showModalSafely);
+                        // Dialog is attached, ensure no other dialogs are open, then show it
+                        try {
+                            // Close any other open dialogs
+                            const otherDialogs = document.querySelectorAll('dialog.htmx-modal[open]');
+                            otherDialogs.forEach(d => {
+                                if (d !== dialog && d.open) {
+                                    d.close();
+                                }
+                            });
+                            
+                            // Small delay to ensure other dialogs are closed
+                            setTimeout(() => {
+                                if (document.contains(dialog) && !dialog.open) {
+                                    dialog.showModal();
+                                    
+                                    // Lock body scroll
+                                    if (document.body) {
+                                        document.body.style.overflow = 'hidden';
+                                    }
+                                    
+                                    // Initialize Lucide icons in the modal
+                                    setTimeout(() => {
+                                        if (typeof lucide !== 'undefined') {
+                                            lucide.createIcons();
+                                        }
+                                    }, 50);
+                                }
+                            }, 50);
+                        } catch (e) {
+                            console.error('Failed to show modal:', e);
+                        }
+                    };
+                    
+                    // Use requestAnimationFrame to ensure smooth animation start
+                    requestAnimationFrame(showModalSafely);
+                }
+            });
+            
+            // Additional handler for afterSettle to ensure Alpine initializes in modals
+            document.addEventListener('htmx:afterSettle', function(event) {
+                const target = event.detail.target;
+                
+                // If modal-container, ensure Alpine initializes on modal content
+                if (target && target.id === 'modal-container') {
+                    if (typeof Alpine !== 'undefined' && typeof Alpine.initTree === 'function') {
+                        setTimeout(() => {
+                            try {
+                                const dialog = target.querySelector('dialog.htmx-modal');
+                                if (dialog) {
+                                    const modalBody = dialog.querySelector('.htmx-modal-body');
+                                    if (modalBody) {
+                                        // Initialize Alpine on modal body content
+                                        Alpine.initTree(modalBody);
+                                    }
+                                }
+                            } catch (e) {
+                                console.debug('Alpine init error in modal:', e);
+                            }
+                        }, 150);
                     }
                 }
             });
@@ -565,18 +733,28 @@
     </script>
     <!-- Alpine.js App State - MUST be defined BEFORE Alpine.js initializes -->
     <script>
+        // Helper function to safely check if Alpine.js is ready
+        function isAlpineReady() {
+            return typeof Alpine !== 'undefined' && 
+                   (typeof Alpine.start === 'function' || typeof Alpine.initTree === 'function');
+        }
+        
         // Helper function to get Alpine.js app state (defined early for use in other functions)
         function getAlpineState() {
-            if (typeof Alpine === 'undefined') return null;
+            if (!isAlpineReady()) return null;
             const bodyEl = document.body;
             if (bodyEl?._x_dataStack?.[0]) {
                 return bodyEl._x_dataStack[0];
             }
             try {
-                return Alpine.$data(bodyEl);
+                if (typeof Alpine.$data === 'function') {
+                    return Alpine.$data(bodyEl);
+                }
             } catch (e) {
+                // Silently fail - Alpine may not be ready
                 return null;
             }
+            return null;
         }
         
         // Removed analyzeStockFromWatchlist - cards now use pure HTMX attributes
@@ -624,7 +802,7 @@
                      * @type {string[]} tabs - Available tab IDs
                      */
                     activeTab: 'positions',
-                    tabs: ['positions', 'transactions', 'strategy'],
+                    tabs: ['positions', 'strategy'],
                     canAnalyze: true, // Enable analyze button by default
                     
                     mainView: 'watchlist',
@@ -800,7 +978,6 @@
                     switchTab(tabId) {
                         const tabMap = {
                             'positions-tab': 'positions',
-                            'transactions-tab': 'transactions',
                             'strategy-tab': 'strategy'
                         };
                         this.activeTab = tabMap[tabId] || tabId;
@@ -934,7 +1111,70 @@
         };
     </script>
     <!-- Alpine.js - Reactive state management (MIT License) -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js"></script>
+    <!-- Load Alpine.js without defer to ensure it initializes before DOMContentLoaded -->
+    <script>
+        // Global error handler for Alpine.js to prevent uncaught promise rejections
+        window.addEventListener('unhandledrejection', function(event) {
+            // Check if error is from Alpine.js transitions
+            const errorSource = event.reason?.stack || event.reason?.toString() || '';
+            const errorMessage = event.reason?.message || '';
+            
+            if (errorSource.includes('cdn.min.js') || 
+                errorSource.includes('Alpine') || 
+                errorMessage.includes('is not a function') ||
+                errorMessage.includes('_x_toggleAndCascadeWithTransitions')) {
+                // Suppress Alpine.js transition errors - they're non-critical
+                // These happen when transitions are interrupted or elements are removed
+                console.debug('Alpine.js transition error suppressed:', event.reason);
+                event.preventDefault();
+                return false;
+            }
+        });
+        
+        // Catch synchronous errors from Alpine.js
+        window.addEventListener('error', function(event) {
+            if (event.filename && event.filename.includes('cdn.min.js')) {
+                // Only suppress transition-related errors
+                if (event.message && (
+                    event.message.includes('is not a function') || 
+                    event.message.includes('transition') || 
+                    event.message.includes('_x_toggleAndCascadeWithTransitions'))) {
+                    console.debug('Alpine.js transition error suppressed:', event.message);
+                    event.preventDefault();
+                    return false;
+                }
+            }
+        }, true);
+        
+        /**
+         * Alpine.js Cleanup Utility
+         * Safely destroys Alpine.js components before DOM removal to prevent transition errors
+         */
+        window.cleanupAlpineElement = function(element) {
+            if (typeof Alpine === 'undefined' || !element) return;
+            
+            try {
+                // Check if element has Alpine.js instance
+                if (element.__x && typeof Alpine.destroyTree === 'function') {
+                    Alpine.destroyTree(element);
+                }
+                // Also check child elements with Alpine.js instances
+                const alpineElements = element.querySelectorAll('[x-data]');
+                alpineElements.forEach(el => {
+                    if (el.__x && typeof Alpine.destroyTree === 'function') {
+                        try {
+                            Alpine.destroyTree(el);
+                        } catch (e) {
+                            console.debug('Alpine.js cleanup error on child element (non-critical):', e);
+                        }
+                    }
+                });
+            } catch (e) {
+                console.debug('Alpine.js cleanup error (non-critical):', e);
+            }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js" defer></script>
     <!-- Lucide Icons - Modern, beautiful icons perfect for dark mode (MIT License) -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -1031,6 +1271,56 @@
         
         .pulse-glow {
             animation: pulse-glow 2s ease-in-out infinite;
+        }
+        
+        /* Transaction highlight animation */
+        @keyframes highlight-transaction {
+            0% { 
+                background-color: rgba(34, 197, 94, 0.3);
+                border-color: rgba(34, 197, 94, 0.6);
+                box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+                transform: scale(1.02);
+            }
+            50% { 
+                background-color: rgba(34, 197, 94, 0.5);
+                border-color: rgba(34, 197, 94, 0.8);
+                box-shadow: 0 0 30px rgba(34, 197, 94, 0.6);
+                transform: scale(1.03);
+            }
+            100% { 
+                background-color: transparent;
+                border-color: rgba(34, 197, 94, 0.3);
+                box-shadow: none;
+                transform: scale(1);
+            }
+        }
+        
+        .highlight-transaction {
+            animation: highlight-transaction 2s ease-out forwards;
+        }
+        
+        /* Cancel fade-out animation - fast and smooth */
+        @keyframes fade-out-cancel {
+            0% {
+                opacity: 1;
+                transform: translateX(0) scale(1);
+                max-height: 200px;
+                margin-bottom: 0.5rem;
+            }
+            100% {
+                opacity: 0;
+                transform: translateX(-30px) scale(0.95);
+                max-height: 0;
+                margin-bottom: 0;
+                padding-top: 0;
+                padding-bottom: 0;
+                overflow: hidden;
+            }
+        }
+        
+        .fade-out-cancel {
+            animation: fade-out-cancel 0.25s ease-out forwards;
+            pointer-events: none;
         }
         
         @keyframes fadeIn {
@@ -1512,6 +1802,12 @@
             margin-bottom: 8px;
         }
         
+        /* Inside modals, tooltips need fixed positioning and higher z-index */
+        .htmx-modal .tooltip .tooltip-text {
+            position: fixed !important;
+            z-index: 99999 !important;
+        }
+        
         .tooltip .tooltip-text::after {
             content: '';
             position: absolute;
@@ -1840,9 +2136,16 @@
             animation: modalBackdropFadeOut 0.25s ease-in forwards;
         }
         
-        /* Ensure tooltips appear above modals */
-        .htmx-modal .tooltip-text {
-            z-index: 10001 !important;
+        /* Ensure tooltips appear above modals - use fixed positioning to escape stacking contexts */
+        .htmx-modal .tooltip .tooltip-text {
+            position: fixed !important;
+            z-index: 99999 !important;
+        }
+        
+        /* Ensure tooltip buttons are clickable */
+        .htmx-modal .tooltip button {
+            position: relative;
+            z-index: 1;
         }
         
         /* Modal styles for info modals */
@@ -1982,6 +2285,40 @@
         
         .scrollbar-hide::-webkit-scrollbar {
             display: none;
+        }
+        
+        /* Custom scrollbar for headlines section */
+        .custom-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(34, 197, 94, 0.3) rgba(34, 197, 94, 0.1);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(34, 197, 94, 0.1);
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(34, 197, 94, 0.3);
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(34, 197, 94, 0.5);
+        }
+        
+        /* Gray scrollbar for non-candidate cards */
+        .watchlist-card-non-candidate .custom-scrollbar {
+            scrollbar-color: rgba(156, 163, 175, 0.3) rgba(156, 163, 175, 0.1);
+        }
+        .watchlist-card-non-candidate .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(156, 163, 175, 0.1);
+        }
+        .watchlist-card-non-candidate .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.3);
+        }
+        .watchlist-card-non-candidate .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(156, 163, 175, 0.5);
         }
         
         /* Smooth scrolling */
@@ -2350,9 +2687,11 @@
             animation: spin 10s linear infinite;
         }
         
-        /* Navigation z-index fix */
+        /* Navigation z-index fix - sticky header */
         nav {
             z-index: 100;
+            position: sticky;
+            top: 0;
         }
         
         /* Main content spacing */
@@ -2373,7 +2712,7 @@
     </div>
     
     <!-- Toast Container - Alpine.js Component -->
-    <div class="fixed top-4 right-4 z-50 space-y-2 pointer-events-none">
+    <div class="fixed top-4 right-4 space-y-2 pointer-events-none" style="z-index: 150;">
         <template x-for="toast in toasts" :key="toast.id">
             <div x-show="toast.visible"
                  x-transition:enter="transition ease-out duration-300"
@@ -2413,10 +2752,10 @@
     </div>
     
     <!-- Toast Container (for HTMX hx-swap-oob compatibility) -->
-    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2 pointer-events-none"></div>
+    <div id="toast-container" class="fixed top-4 right-4 space-y-2 pointer-events-none" style="z-index: 150;"></div>
     
     <!-- Navigation Bar -->
-    <nav>
+    <nav class="sticky top-0 z-[100]">
         <div class="glass-panel nav-glass-morph">
             <a href="#" class="flex items-center gap-3 font-heading font-bold text-xl tracking-tight text-white no-underline">
                 <!-- Logo SVG -->
@@ -2432,37 +2771,111 @@
                 </svg>
                 <span class="flux-text">FLUX</span>
             </a>
-            <div class="flex items-center gap-6">
-                <div class="text-right hidden md:block">
-                    <div class="text-xs text-muted mb-1 uppercase tracking-wider font-semibold">Account Balance</div>
-                    <!-- HTMX Pattern: Optimized polling with visibility check -->
-                    <div id="account-info" 
-                         hx-get="/api/balance" 
-                         hx-trigger="load, every 10s[document.visibilityState === 'visible']" 
-                         hx-swap="innerHTML" 
-                         hx-indicator="#account-info"
-                         class="text-2xl font-bold text-white">
-                        <span class="animate-pulse text-muted">Connecting...</span>
+            <!-- Top Right Corner: Minimal Modern Design -->
+            <div class="flex items-center gap-2" 
+                 x-data="{ userMenuOpen: false }"
+                 @keydown.escape.window="userMenuOpen = false">
+                
+                <!-- Strategy Selector - Minimal Icon Button -->
+                <div id="strategy-selector-container"
+                     hx-get="/api/strategy-selector"
+                     hx-trigger="load"
+                     hx-swap="innerHTML">
+                    <div class="p-2 rounded-lg">
+                        <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-white/50"></i>
                     </div>
                 </div>
+                
+                <!-- Minimal Account Balance - Inline -->
+                <div id="account-info" 
+                     hx-get="/api/balance-compact" 
+                     hx-trigger="load, every 10s[document.visibilityState === 'visible']" 
+                     hx-swap="innerHTML" 
+                     hx-indicator="#account-info"
+                     hx-on::htmx:response-error="console.error('Balance fetch error:', event.detail)"
+                     class="hidden md:flex items-center">
+                    <div class="flex items-center justify-center py-1">
+                        <i data-lucide="loader-2" class="w-3 h-3 animate-spin text-primary"></i>
+                    </div>
+                </div>
+                
+                <!-- User Menu Button - Minimal -->
+                <button 
+                    @click="userMenuOpen = !userMenuOpen"
+                    class="p-2 rounded-lg hover:bg-white/5 transition-colors text-white/70 hover:text-white relative"
+                    aria-label="Account menu"
+                    :aria-expanded="userMenuOpen"
+                    type="button">
+                    <i data-lucide="user" class="w-4 h-4"></i>
+                </button>
+                    
+                <!-- User Menu Dropdown -->
+                <div 
+                    x-show="userMenuOpen"
+                    x-transition:enter="transition ease-out duration-150"
+                    x-transition:enter-start="opacity-0 scale-95"
+                    x-transition:enter-end="opacity-100 scale-100"
+                    x-transition:leave="transition ease-in duration-100"
+                    x-transition:leave-start="opacity-100 scale-100"
+                    x-transition:leave-end="opacity-0 scale-95"
+                    @click.away="userMenuOpen = false"
+                    @keydown.escape="userMenuOpen = false"
+                    class="absolute top-full right-0 mt-2 w-80 glass-panel rounded-lg border border-white/10 shadow-xl z-50 overflow-hidden"
+                    style="display: none;">
+                    
+                    <!-- Account Balance Section -->
+                    <div class="px-4 py-4 border-b border-white/10">
+                        <div class="text-xs text-white/60 mb-2 uppercase tracking-wider">Account Balance</div>
+                        <div id="account-info-menu" 
+                             hx-get="/api/balance" 
+                             hx-trigger="load, every 10s[document.visibilityState === 'visible']" 
+                             hx-swap="innerHTML" 
+                             hx-indicator="#account-info-menu">
+                            <div class="flex items-center justify-center py-4">
+                                <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-primary"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Menu Items -->
+                    <div class="py-2">
+                        <button 
+                            @click="userMenuOpen = false; if (typeof showAccountManager === 'function') showAccountManager();"
+                            class="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-white/5 transition-colors text-sm text-white/90"
+                            type="button">
+                            <i data-lucide="settings" class="w-4 h-4 text-white/60"></i>
+                            <span>Manage Accounts</span>
+                        </button>
+                        <button 
+                            hx-get="/api/balance"
+                            hx-target="#account-info-menu, #account-info"
+                            hx-swap="innerHTML"
+                            @click="userMenuOpen = false"
+                            class="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-white/5 transition-colors text-sm text-white/90"
+                            type="button">
+                            <i data-lucide="refresh-cw" class="w-4 h-4 text-white/60"></i>
+                            <span>Refresh</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
             </div>
         </div>
     </nav>
 
     <!-- Main Content Container -->
-    <div class="max-w-[1400px] mx-auto pt-24 pb-12 px-4 md:px-6" style="position: relative; z-index: 1; width: 100%;">
+    <div class="max-w-[1400px] mx-auto pb-12 px-4 md:px-6" style="position: relative; z-index: 1; width: 100%;">
     <!-- Account balance shown only on mobile (hidden on desktop since nav has it) -->
     <div class="md:hidden block mb-6">
         <div class="glass-panel rounded-xl p-4">
-            <div class="text-right">
-                <div class="text-xs text-muted mb-1 uppercase tracking-wider font-semibold">Account Balance</div>
-                <div id="account-info-mobile" 
-                     hx-get="/api/balance" 
-                     hx-trigger="load, every 10s[document.visibilityState === 'visible']" 
-                     hx-swap="innerHTML" 
-                     hx-indicator="#account-info-mobile"
-                     class="text-2xl font-bold text-white">
-                    <span class="animate-pulse text-muted">Connecting...</span>
+            <div id="account-info-mobile" 
+                 hx-get="/api/balance" 
+                 hx-trigger="load, every 10s[document.visibilityState === 'visible']" 
+                 hx-swap="innerHTML" 
+                 hx-indicator="#account-info-mobile">
+                <div class="flex items-center justify-center py-2">
+                    <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-primary"></i>
+                    <span class="ml-2 text-xs text-muted">Loading...</span>
                 </div>
             </div>
         </div>
@@ -2621,6 +3034,18 @@
         </div>
     </div>
 
+    <!-- Signal Hunter Section - Above Dashboard -->
+    <div id="signal-hunter-section-wrapper" 
+         hx-get="/api/signal-hunter-section" 
+         hx-trigger="load" 
+         hx-swap="innerHTML"
+         class="mb-6">
+        <div class="glass-panel rounded-2xl p-8 border border-purple-500/30 text-center">
+            <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-purple-400 mx-auto mb-2"></i>
+            <p class="text-gray-400">Loading Signal Hunter...</p>
+        </div>
+    </div>
+
     <!-- Main Dashboard Layout: Watchlist + Positions/Strategy -->
     <div class="dashboard-container mb-6">
         
@@ -2729,9 +3154,6 @@
                     <button @click="switchTab('positions-tab')" id="tab-positions-btn" class="tab-btn flex-1 px-2 py-2 text-xs font-semibold text-white bg-purple-500/20 border-b-2 border-purple-500 transition-all">
                         <i data-lucide="briefcase" class="mr-1.5 text-xs w-3 h-3"></i>Positions
                     </button>
-                    <button @click="switchTab('transactions-tab')" id="tab-transactions-btn" class="tab-btn flex-1 px-2 py-2 text-xs font-semibold text-gray-200 hover:text-white transition-all">
-                        <i data-lucide="receipt" class="mr-1.5 text-xs w-3 h-3"></i>Transactions
-                    </button>
                     <button @click="switchTab('strategy-tab')" id="tab-strategy-btn" class="tab-btn flex-1 px-2 py-2 text-xs font-semibold text-gray-200 hover:text-white transition-all">
                         <i data-lucide="settings" class="mr-1.5 text-xs w-3 h-3"></i>Strategy
                     </button>
@@ -2778,52 +3200,6 @@
                              hx-on::after-settle="
                                 const listEl = document.getElementById('positions-list');
                                 const loadingEl = document.getElementById('positions-loading');
-                                listEl.setAttribute('data-loaded', 'true');
-                                if (loadingEl) {
-                                    loadingEl.style.display = 'none';
-                                }
-                             "></div>
-                    </div>
-                    
-                    <!-- Transactions Tab -->
-                    <div x-show="activeTab === 'transactions'" x-transition class="tab-content">
-                        <h2 class="text-lg font-bold text-white mb-3">Transactions</h2>
-                        <p class="text-xs text-gray-100 mb-3 font-medium">Pending orders and transaction history</p>
-                        <!-- HTMX Pattern: Optimized polling - only when tab is active and visible -->
-                        <!-- Transactions list refreshes every 5 seconds when transactions tab is active -->
-                        <!-- Beautiful Loading State - Only shows on initial load -->
-                        <div id="transactions-loading" class="mb-4" style="display: none;">
-                            <div class="glass rounded-xl p-6 border border-yellow-500/30 animate-fade-in">
-                                <div class="flex items-center justify-center gap-4">
-                                    <div class="relative">
-                                        <div class="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-500/20 via-orange-500/20 to-red-500/20 flex items-center justify-center border-2 border-yellow-500/40 shadow-lg shadow-yellow-500/20">
-                                            <i data-lucide="loader-2" class="text-yellow-400 w-8 h-8 lucide-spin" style="animation-duration: 2s;"></i>
-                                            <div class="absolute inset-0 rounded-full bg-yellow-500/20 blur-sm"></div>
-                                        </div>
-                                        <div class="absolute inset-0 rounded-full border-2 border-yellow-500/30 animate-ping"></div>
-                                    </div>
-                                    <div class="text-center">
-                                        <div class="text-base font-semibold text-white mb-1">Loading Transactions...</div>
-                                        <div class="text-xs text-gray-100">Fetching pending orders and history</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <script>if (typeof lucide !== 'undefined') lucide.createIcons();</script>
-                        </div>
-                        <div id="transactions-list" 
-                             hx-get="/api/transactions" 
-                             :hx-trigger="activeTab === 'transactions' ? 'load, every 5s[document.visibilityState === \'visible\']' : 'load'"
-                             hx-swap="innerHTML"
-                             hx-on::before-request="
-                                const listEl = document.getElementById('transactions-list');
-                                const loadingEl = document.getElementById('transactions-loading');
-                                if (!listEl.hasAttribute('data-loaded') && loadingEl) {
-                                    loadingEl.style.display = 'block';
-                                }
-                             "
-                             hx-on::after-settle="
-                                const listEl = document.getElementById('transactions-list');
-                                const loadingEl = document.getElementById('transactions-loading');
                                 listEl.setAttribute('data-loaded', 'true');
                                 if (loadingEl) {
                                     loadingEl.style.display = 'none';
@@ -5839,20 +6215,6 @@
 
         // setupRejectionCardListeners and handleRejectionCardClick removed - watchlist cards now use HTMX directly
         
-        // Helper function to get Alpine.js app state
-        function getAlpineState() {
-            if (typeof Alpine === 'undefined') return null;
-            const bodyEl = document.body;
-            if (bodyEl?._x_dataStack?.[0]) {
-                return bodyEl._x_dataStack[0];
-            }
-            try {
-                return Alpine.$data(bodyEl);
-            } catch (e) {
-                return null;
-            }
-        }
-        
         // Helper function to open Alpine.js modals from global scope
         function openAlpineModal(modalId) {
             const appState = getAlpineState();
@@ -5950,21 +6312,6 @@
 
         // All rejection modal functions removed - now handled by HTMX modal system in watchlist_card.html
         
-        // Duplicate appState function removed - using the one defined in <head> section
-        // Helper function to get Alpine.js app state
-        function getAlpineState() {
-            if (typeof Alpine === 'undefined') return null;
-            const bodyEl = document.body;
-            if (bodyEl?._x_dataStack?.[0]) {
-                return bodyEl._x_dataStack[0];
-            }
-            try {
-                return Alpine.$data(bodyEl);
-            } catch (e) {
-                return null;
-            }
-        }
-        
         // Make updateFirecrawlQuery available globally for onclick handlers
         window.updateFirecrawlQuery = function() {
             const appState = getAlpineState();
@@ -6048,22 +6395,27 @@
                 
                 // Check if this is targeting the modal container
                 if (target && target.id === 'modal-container') {
-                    // Show minimal loading indicator in modal container
+                    // Clear any existing modals and show loading indicator
                     const container = document.getElementById('modal-container');
                     if (container) {
-                        container.innerHTML = `
-                            <dialog class="htmx-modal" open>
+                        // Remove any existing dialogs first
+                        container.querySelectorAll('dialog.htmx-modal').forEach(d => d.remove());
+                        // Insert loading dialog (will be removed when real modal arrives)
+                        container.insertAdjacentHTML('beforeend', `
+                            <dialog class="htmx-modal" open id="loading-modal">
                                 <div class="htmx-modal-content">
                                     <div class="htmx-modal-body flex items-center justify-center py-16">
                                         <i data-lucide="loader-2" class="w-8 h-8 lucide-spin text-blue-400"></i>
                                     </div>
                                 </div>
                             </dialog>
-                        `;
+                        `);
                         // Initialize Lucide icons for loading spinner
-                        if (typeof lucide !== 'undefined') {
-                            lucide.createIcons();
-                        }
+                        setTimeout(() => {
+                            if (typeof lucide !== 'undefined') {
+                                lucide.createIcons();
+                            }
+                        }, 10);
                     }
                 }
             } catch (error) {
@@ -6225,6 +6577,24 @@
             }
         }, true);
         
+        // HTMX Best Practice: Handle HX-Trigger events for watchlist refresh
+        document.body.addEventListener('refreshWatchlist', function(event) {
+            const watchlistContent = document.getElementById('watchlist-content');
+            if (watchlistContent && typeof htmx !== 'undefined') {
+                // Trigger refresh - watchlist-content has hx-get="/api/watch-list" with hx-trigger="load"
+                htmx.trigger(watchlistContent, 'load');
+            }
+        });
+        
+        // HTMX Best Practice: Handle HX-Trigger events for positions refresh
+        // Positions list refreshes automatically via hx-trigger attribute
+        
+        // HTMX Best Practice: Handle strategy activation events
+        document.body.addEventListener('strategyActivated', function(event) {
+            // Strategy selector is already updated via hx-swap-oob
+            // This event can be used for additional side effects if needed
+        });
+        
         // Catch HTMX syntax errors specifically
         document.body.addEventListener('htmx:syntax:error', function(event) {
             console.error('HTMX syntax error detected:', event.detail);
@@ -6338,10 +6708,208 @@
         });
         
         // Handle HTMX after request events
+        // Account Manager Modal
+        window.showAccountManager = function() {
+            let accountModal = document.getElementById('account-manager-modal');
+            if (!accountModal) {
+                // Create modal if it doesn't exist
+                const modalHTML = `
+                    <dialog id="account-manager-modal" class="htmx-modal">
+                        <div class="glass-panel rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                            <div class="flex items-center justify-between mb-4">
+                                <h2 class="text-xl font-bold text-white font-heading">Alpaca Account Management</h2>
+                                <button onclick="this.closest('dialog').close()" class="text-muted hover:text-white">
+                                    <i data-lucide="x" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                            <div id="alpaca-accounts-container" 
+                                 hx-get="/api/alpaca-accounts"
+                                 hx-trigger="load"
+                                 hx-swap="innerHTML">
+                                <div class="flex items-center justify-center py-8">
+                                    <i data-lucide="loader-2" class="w-6 h-6 animate-spin text-primary"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </dialog>
+                `;
+                document.body.insertAdjacentHTML('beforeend', modalHTML);
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+                accountModal = document.getElementById('account-manager-modal');
+            }
+            if (accountModal) {
+                accountModal.showModal();
+                // Trigger load if container exists
+                const container = document.getElementById('alpaca-accounts-container');
+                if (container) htmx.trigger(container, 'load');
+            }
+        };
+        
         document.body.addEventListener('htmx:afterRequest', function(event) {
             // Refresh Alpine.js state if needed after HTMX requests
             // State updates happen automatically via Alpine.js reactivity
             getAlpineState();
+        });
+        
+        // Handle buy form completion - update toast and switch tab
+        document.body.addEventListener('htmx:afterSwap', function(event) {
+            const form = event.detail.elt;
+            if (!form || form.tagName !== 'FORM' || !form.id || !form.id.startsWith('buy-form-')) return;
+            
+            const xhr = event.detail.xhr;
+            const status = xhr ? xhr.status : (event.detail.successful !== false ? 200 : 0);
+            const buyingToastId = form.getAttribute('data-buying-toast-id');
+            if (!buyingToastId) return;
+            
+            const buyingToast = document.getElementById(buyingToastId);
+            if (!buyingToast) return;
+            
+            if (status >= 200 && status < 300) {
+                // Update toast to BOUGHT
+                buyingToast.className = buyingToast.className.replace('border-blue-500/30 bg-blue-500/10', 'border-green-500/30 bg-green-500/10');
+                const symbol = form.getAttribute('data-symbol') || '';
+                buyingToast.innerHTML = '<div class="flex items-start gap-3"><div class="flex-shrink-0 w-5 h-5 text-green-400"><i data-lucide="check-circle-2" class="w-5 h-5"></i></div><div class="flex-1"><div class="text-sm font-semibold text-white">BOUGHT ' + symbol.toUpperCase() + '</div></div><button class="text-gray-400 hover:text-white toast-close-btn"><i data-lucide="x" class="w-4 h-4"></i></button></div>';
+                const closeBtn = buyingToast.querySelector('.toast-close-btn');
+                if (closeBtn) {
+                    closeBtn.onclick = function() {
+                        const toast = this.closest('.toast');
+                        if (toast) {
+                            toast.classList.add('fade-out');
+                            setTimeout(function() { if (toast.parentNode) toast.remove(); }, 300);
+                        }
+                    };
+                }
+                if (typeof lucide !== 'undefined') setTimeout(function() { lucide.createIcons(); }, 50);
+                setTimeout(function() {
+                    if (buyingToast && buyingToast.parentNode) {
+                        buyingToast.classList.add('fade-out');
+                        setTimeout(function() { if (buyingToast.parentNode) buyingToast.remove(); }, 300);
+                    }
+                }, 5000);
+                
+                // Switch to positions tab (pending orders now show there)
+                try {
+                    let appState = null;
+                    if (document.body._x_dataStack && document.body._x_dataStack[0]) {
+                        appState = document.body._x_dataStack[0];
+                    } else if (typeof Alpine !== 'undefined' && Alpine.$data) {
+                        appState = Alpine.$data(document.body);
+                    }
+                    if (appState && typeof appState.switchTab === 'function') {
+                        appState.switchTab('positions-tab');
+                    } else {
+                        const positionsBtn = document.getElementById('tab-positions-btn');
+                        if (positionsBtn) positionsBtn.click();
+                    }
+                } catch (e) {
+                    // Fallback: switch to positions tab
+                    const positionsBtn = document.getElementById('tab-positions-btn');
+                    if (positionsBtn) positionsBtn.click();
+                }
+            } else {
+                // Error - update toast
+                buyingToast.className = buyingToast.className.replace('border-blue-500/30 bg-blue-500/10', 'border-red-500/30 bg-red-500/10');
+                const symbol = form.getAttribute('data-symbol') || '';
+                buyingToast.innerHTML = '<div class="flex items-start gap-3"><div class="flex-shrink-0 w-5 h-5 text-red-400"><i data-lucide="x-circle" class="w-5 h-5"></i></div><div class="flex-1"><div class="text-sm font-semibold text-white">Buy order failed for ' + symbol.toUpperCase() + '</div></div><button class="text-gray-400 hover:text-white toast-close-btn"><i data-lucide="x" class="w-4 h-4"></i></button></div>';
+                const closeBtn = buyingToast.querySelector('.toast-close-btn');
+                if (closeBtn) {
+                    closeBtn.onclick = function() {
+                        const toast = this.closest('.toast');
+                        if (toast) {
+                            toast.classList.add('fade-out');
+                            setTimeout(function() { if (toast.parentNode) toast.remove(); }, 300);
+                        }
+                    };
+                }
+                if (typeof lucide !== 'undefined') setTimeout(function() { lucide.createIcons(); }, 50);
+            }
+        });
+        
+        // Close buy confirmation modal when purchase completes and enhance UX
+        document.body.addEventListener('buyOrderPlaced', function(event) {
+            // Extract data from event detail (passed via HX-Trigger JSON)
+            const symbol = event.detail?.symbol || null;
+            const isPending = event.detail?.isPending || false;
+            const orderId = event.detail?.orderId || null;
+            
+            // Find and close any open buy confirmation modals
+            const openBuyModals = document.querySelectorAll('dialog.htmx-modal[open][id^="buy-modal-"]');
+            openBuyModals.forEach(function(modal) {
+                if (typeof window.closeHtmxModal === 'function') {
+                    window.closeHtmxModal(modal);
+                } else if (modal) {
+                    // Fallback if closeHtmxModal not available
+                    modal.close();
+                    document.body.style.overflow = '';
+                }
+            });
+            
+            // Smart UX: Show positions tab and highlight order/position
+            if (symbol) {
+                try {
+                    // Get Alpine.js app state using existing helper function
+                    const appState = typeof getAlpineState === 'function' ? getAlpineState() : null;
+                    
+                    // Always switch to positions tab (pending orders now show there)
+                    if (appState && typeof appState.switchTab === 'function') {
+                        appState.switchTab('positions-tab');
+                    } else {
+                        const positionsBtn = document.getElementById('tab-positions-btn');
+                        if (positionsBtn) positionsBtn.click();
+                    }
+                    
+                    // Highlight pending order or position after positions settle
+                    setTimeout(function() {
+                        let targetElement = null;
+                        
+                        if (isPending) {
+                            // Try to find pending order by order ID first (most accurate)
+                            if (orderId) {
+                                const pendingOrders = document.querySelectorAll('[data-pending-order-id]');
+                                for (let i = 0; i < pendingOrders.length; i++) {
+                                    const id = pendingOrders[i].getAttribute('data-pending-order-id');
+                                    if (id && id.startsWith(orderId.substring(0, 8))) {
+                                        targetElement = pendingOrders[i];
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            // Fallback: find pending order by symbol
+                            if (!targetElement) {
+                                const pendingOrders = document.querySelectorAll('[data-pending-symbol="' + symbol + '"]');
+                                if (pendingOrders.length > 0) {
+                                    targetElement = pendingOrders[0];
+                                }
+                            }
+                        } else {
+                            // Order is filled: find position by symbol
+                            const positions = document.querySelectorAll('[data-position-symbol="' + symbol + '"]');
+                            if (positions.length > 0) {
+                                targetElement = positions[0];
+                            }
+                        }
+                        
+                        if (targetElement) {
+                            // Add highlight animation
+                            targetElement.classList.add('highlight-transaction');
+                            
+                            // Scroll into view smoothly
+                            targetElement.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'center'
+                            });
+                            
+                            // Remove highlight class after animation completes
+                            setTimeout(function() {
+                                targetElement.classList.remove('highlight-transaction');
+                            }, 2000);
+                        }
+                    }, 300);
+                } catch (e) {
+                    console.error('Error enhancing UX after purchase:', e);
+                }
+            }
         });
         
         // Handle HTMX response errors
@@ -6396,6 +6964,54 @@
         document.addEventListener('DOMContentLoaded', function() {
             refreshLucideIcons();
         });
+        
+        // Handle buy form submit - close modal and show BUYING toast
+        window.handleBuySubmit = function(event, symbolLower, symbol) {
+            // Find modal
+            const modalId = 'buy-modal-' + symbolLower;
+            let modal = document.getElementById(modalId);
+            if (!modal) {
+                const modalContainer = document.getElementById('modal-container');
+                if (modalContainer) {
+                    modal = modalContainer.querySelector('dialog.htmx-modal');
+                }
+            }
+            
+            // Clean up Alpine.js before closing modal to prevent transition errors
+            if (modal && modal.tagName === 'DIALOG' && modal.open) {
+                // Clean up Alpine.js components in modal before closing
+                if (typeof window.cleanupAlpineElement === 'function') {
+                    window.cleanupAlpineElement(modal);
+                }
+                
+                // Close modal
+                modal.close();
+                document.body.style.overflow = '';
+            }
+            
+            // Show BUYING toast
+            const toastContainer = document.getElementById('toast-container');
+            if (toastContainer) {
+                const existingToast = toastContainer.querySelector('[data-buying-symbol="' + symbolLower + '"]');
+                if (existingToast) existingToast.remove();
+                
+                const buyingToast = document.createElement('div');
+                buyingToast.id = 'buying-toast-' + symbolLower + '-' + Date.now();
+                buyingToast.setAttribute('data-buying-symbol', symbolLower);
+                buyingToast.className = 'toast glass rounded-lg p-4 border pointer-events-auto shadow-lg min-w-[300px] max-w-[400px] border-blue-500/30 bg-blue-500/10 animate-fade-in';
+                buyingToast.innerHTML = '<div class="flex items-start gap-3"><div class="flex-shrink-0 w-5 h-5 text-blue-400"><i data-lucide="loader-2" class="w-5 h-5 lucide-spin"></i></div><div class="flex-1"><div class="text-sm font-semibold text-white">BUYING ' + symbol + '....</div></div></div>';
+                toastContainer.appendChild(buyingToast);
+                
+                if (typeof lucide !== 'undefined') {
+                    setTimeout(function() { lucide.createIcons(); }, 50);
+                }
+                
+                const form = event.target.closest('form');
+                if (form) {
+                    form.setAttribute('data-buying-toast-id', buyingToast.id);
+                }
+            }
+        };
     </script>
 
     <!-- Premium Navigation with Mouse Tracking Micro-Interactions -->

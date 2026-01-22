@@ -52,11 +52,13 @@ CURRENT_STRATEGY = os.getenv("CURRENT_STRATEGY", "balanced_low")
 
 # Strategy Configuration - Default values
 # Actual config loaded from MongoDB via get_strategy_config() or get_strategy_from_db()
+# 
+# Swing trading strategy: RSI oversold (20-35) + uptrend (price > SMA-200) + news filter
 STRATEGY_CONFIG: Dict[str, Any] = {
     "name": "Balanced Low",
-    "description": "High probability bounce-back opportunities - find stocks that are low but ready to ride the wave back up (buy low, sell high)",
+    "description": "Swing trading: oversold stocks in uptrends. RSI 20-35, price > SMA-200, near support (<3%), clean news.",
     "rsi_threshold": 35,  # Maximum oversold level
-    "rsi_min": 20,  # Minimum RSI - avoid extreme oversold (sweet spot: 20-35)
+    "rsi_min": 20,  # Minimum RSI - avoid extreme oversold
     "sma_proximity_pct": 3.0,  # Maximum percentage above SMA-200 for entry (0-5%, default 3%)
     "ai_score_required": 7,
     "color": "green",
@@ -85,7 +87,7 @@ async def get_strategy_from_db(db) -> Optional[Dict[str, Any]]:
                 "sma_proximity_pct": active_config.get("sma_proximity_pct", 3.0),
                 "ai_score_required": active_config.get("ai_score_required", 7),
                 "name": active_config.get("name", "Balanced Low"),
-                "description": active_config.get("description", "High probability bounce-back opportunities - buy low, sell high"),
+                "description": active_config.get("description", "Safety First swing trading - oversold stocks in uptrends with clean news"),
                 "color": active_config.get("color", "green"),
                 "preset": active_config.get("preset", "Custom"),
             }
@@ -125,7 +127,7 @@ async def get_strategy_config(db=None, budget: Optional[float] = None) -> Dict[s
                     "ai_min_score": db_config.get("ai_score_required", 7),
                     "ai_score_required": db_config.get("ai_score_required", 7),  # Alias for compatibility
                     "name": db_config.get("name", "Balanced Low"),
-                    "description": db_config.get("description", "High probability bounce-back opportunities - buy low, sell high"),
+                    "description": db_config.get("description", "Safety First swing trading - oversold stocks in uptrends with clean news"),
                     "color": db_config.get("color", "green")
                 }
         except Exception as e:
@@ -139,7 +141,7 @@ async def get_strategy_config(db=None, budget: Optional[float] = None) -> Dict[s
         "ai_min_score": STRATEGY_CONFIG.get("ai_score_required", 7),
         "ai_score_required": STRATEGY_CONFIG.get("ai_score_required", 7),  # Alias for compatibility
         "name": STRATEGY_CONFIG.get("name", "Balanced Low"),
-        "description": STRATEGY_CONFIG.get("description", "High probability bounce-back opportunities - buy low, sell high"),
+        "description": STRATEGY_CONFIG.get("description", "Safety First swing trading - oversold stocks in uptrends with clean news"),
         "color": STRATEGY_CONFIG.get("color", "green")
     }
 
@@ -252,4 +254,49 @@ def calculate_watchlist_config_hash(config: Dict[str, Any]) -> str:
     }
     # Sort keys for deterministic hash
     param_str = json.dumps(relevant_params, sort_keys=True)
+    return hashlib.md5(param_str.encode()).hexdigest()
+
+
+async def get_active_custom_strategy(db) -> Optional[Dict[str, Any]]:
+    """Get the currently active custom strategy from MongoDB.
+    
+    Args:
+        db: MongoDB database instance (scoped via mdb-engine)
+        
+    Returns:
+        Dictionary with custom strategy config or None if not found
+    """
+    try:
+        active_strategy = await db.custom_strategies.find_one({"is_active": True})
+        if active_strategy:
+            # Remove MongoDB-specific fields
+            strategy = {
+                "name": active_strategy.get("name"),
+                "label": active_strategy.get("label"),
+                "conditions": active_strategy.get("conditions", []),
+                "description": active_strategy.get("description", ""),
+                "created_at": active_strategy.get("created_at"),
+                "updated_at": active_strategy.get("updated_at"),
+            }
+            return strategy
+        return None
+    except Exception as e:
+        logger.warning(f"Could not load active custom strategy from database: {e}")
+        return None
+
+
+def calculate_custom_strategy_hash(strategy_config: Dict[str, Any]) -> str:
+    """Calculate hash of custom strategy conditions for cache invalidation.
+    
+    Args:
+        strategy_config: Custom strategy configuration dictionary
+        
+    Returns:
+        MD5 hash as hex string
+    """
+    # Hash the conditions array
+    conditions = strategy_config.get('conditions', [])
+    # Sort conditions by metric name for deterministic hash
+    sorted_conditions = sorted(conditions, key=lambda x: x.get('metric', ''))
+    param_str = json.dumps(sorted_conditions, sort_keys=True)
     return hashlib.md5(param_str.encode()).hexdigest()

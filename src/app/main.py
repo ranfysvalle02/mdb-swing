@@ -68,14 +68,14 @@ async def on_startup(app, engine, manifest):
         # Drop old conflicting index if it exists
         try:
             await db.strategy_config.drop_index("flux_active_idx")
-            logger.info("✅ Dropped old conflicting index: flux_active_idx")
+            logger.info("Dropped old conflicting index: flux_active_idx")
         except Exception as e:
             # Index doesn't exist or already dropped - that's fine
             logger.debug(f"Old index cleanup: {e}")
         
         try:
             await db.strategies.drop_index("flux_active_idx")
-            logger.info("✅ Dropped old conflicting index from strategies: flux_active_idx")
+            logger.info("Dropped old conflicting index from strategies: flux_active_idx")
         except Exception as e:
             # Index doesn't exist or already dropped - that's fine
             logger.debug(f"Old strategies index cleanup: {e}")
@@ -85,7 +85,15 @@ async def on_startup(app, engine, manifest):
     # Register WebSocket message handlers (for incoming messages if needed)
     register_websocket_message_handlers()
     
-    logger.info("✅ Startup complete - WebSocket handler registered")
+    # Register WebSocket routes (required for WebSocket endpoints to work)
+    # This must be called AFTER app is created but routes are registered during startup
+    try:
+        engine.register_websocket_routes(app, APP_SLUG)
+        logger.info("✅ WebSocket routes registered")
+    except Exception as e:
+        logger.warning(f"Failed to register WebSocket routes: {e}", exc_info=True)
+    
+    logger.info("Startup complete - WebSocket handler registered")
     
     # Log startup information
     logger.info("⚡ FLUX IS ACTIVE...")
@@ -200,7 +208,7 @@ async def websocket_endpoint(websocket: WebSocket, symbols: str = None):
     This handler streams stock analysis data to connected clients.
     We register this here to override mdb-engine's default handler.
     """
-    logger.info(f"🔌 [MAIN] Custom WebSocket handler called for /ws (symbols: {symbols or 'auto'})")
+    logger.info(f"[MAIN] Custom WebSocket handler called for /ws (symbols: {symbols or 'auto'})")
     try:
         # MDB-Engine: Get scoped database - connection managed automatically
         db = engine.get_scoped_db(APP_SLUG)
@@ -209,16 +217,16 @@ async def websocket_endpoint(websocket: WebSocket, symbols: str = None):
             custom_symbols = [s.strip().upper() for s in symbols.split(',') if s.strip()]
         await routes._get_trending_stocks_with_analysis_streaming(websocket, db, custom_symbols=custom_symbols)
     except Exception as e:
-        logger.error(f"❌ [MAIN] WebSocket handler error: {e}", exc_info=True)
+        logger.error(f"[MAIN] WebSocket handler error: {e}", exc_info=True)
         raise
 
-logger.info("✅ Custom WebSocket handler registered for /ws (registered after app creation)")
+logger.info("Custom WebSocket handler registered for /ws (registered after app creation)")
 
 # Mount static files
 frontend_static_path = Path(__file__).parent.parent.parent / "frontend" / "static"
 if frontend_static_path.exists():
     app.mount("/static", StaticFiles(directory=str(frontend_static_path)), name="static")
-    logger.info(f"✅ Static files mounted from {frontend_static_path}")
+    logger.info(f"Static files mounted from {frontend_static_path}")
 
 # Register routes
 @app.get("/", response_class=HTMLResponse)
@@ -231,8 +239,10 @@ async def root():
 
 # Core routes for Balanced Low Buy System
 app.get("/api/balance", response_class=HTMLResponse)(routes.get_balance)
+app.get("/api/balance-compact", response_class=HTMLResponse)(routes.get_balance_compact)
 app.post("/api/analyze", response_class=HTMLResponse)(routes.analyze_symbol)
 app.post("/api/analyze-preview", response_class=HTMLResponse)(routes.analyze_preview)
+app.post("/api/all-stats", response_class=HTMLResponse)(routes.get_all_stats)
 app.post("/api/analyze-rejection", response_class=HTMLResponse)(routes.analyze_rejection)
 app.post("/api/trade", response_class=HTMLResponse)(routes.execute_trade)
 app.post("/api/panic", response_class=HTMLResponse)(routes.panic_close)
@@ -240,6 +250,10 @@ app.get("/api/positions", response_class=HTMLResponse)(routes.get_positions)
 app.get("/api/transactions", response_class=HTMLResponse)(routes.get_transactions)
 app.post("/api/quick-buy", response_class=HTMLResponse)(routes.quick_buy)
 app.post("/api/quick-sell", response_class=HTMLResponse)(routes.quick_sell)
+app.post("/api/buy-confirmation", response_class=HTMLResponse)(routes.show_buy_confirmation_modal)
+app.post("/api/buy-confirm", response_class=HTMLResponse)(routes.confirm_buy_order)
+app.post("/api/buy-order-details")(routes.get_buy_order_details)
+app.post("/api/inline-buy-interface", response_class=HTMLResponse)(routes.get_inline_buy_interface)
 app.post("/api/cancel-order", response_class=HTMLResponse)(routes.cancel_order)
 app.get("/api/strategy-display", response_class=HTMLResponse)(routes.get_strategy_display_html)
 app.get("/api/strategy")(routes.get_strategy_api)
@@ -249,12 +263,33 @@ app.get("/api/firecrawl-query")(routes.get_firecrawl_query)
 app.get("/api/timeout-error", response_class=HTMLResponse)(routes.get_timeout_error)
 app.post("/api/firecrawl-query")(routes.update_firecrawl_query)
 app.get("/api/watch-list", response_class=HTMLResponse)(routes.get_watch_list)
-app.post("/api/watch-list")(routes.update_watch_list)
+app.get("/api/signal-hunter-section", response_class=HTMLResponse)(routes.get_signal_hunter_section)
+app.post("/api/watch-list", response_model=None)(routes.update_watch_list)
 app.get("/api/tickers/search")(routes.search_tickers)
 app.get("/api/logo/{ticker}", response_class=HTMLResponse)(routes.get_logo)
 app.post("/api/explanation")(routes.get_explanation)
 app.get("/api/latest-scan")(routes.get_latest_scan)
 app.get("/api/analysis-preview")(routes.get_analysis_preview)
+# Custom Strategy Routes
+app.get("/api/strategies")(routes.get_strategies)
+app.get("/api/strategies/{label}")(routes.get_strategy)
+app.post("/api/strategies")(routes.create_strategy)
+app.put("/api/strategies/{label}")(routes.update_strategy)
+app.delete("/api/strategies/{label}")(routes.delete_strategy)
+app.post("/api/strategies/{label}/activate")(routes.activate_strategy)
+app.get("/api/strategy-builder", response_class=HTMLResponse)(routes.get_strategy_builder)
+app.get("/api/strategy-list", response_class=HTMLResponse)(routes.get_strategy_list)
+app.get("/api/strategy-selector", response_class=HTMLResponse)(routes.get_strategy_selector)
+app.get("/api/strategy-selector-modal", response_class=HTMLResponse)(routes.get_strategy_selector_modal)
+app.get("/api/signal-hunter-modal", response_class=HTMLResponse)(routes.get_signal_hunter_modal)
+app.post("/api/signal-hunter", response_class=HTMLResponse)(routes.search_signal_hunter)
+app.get("/api/finviz-filters")(routes.get_finviz_filters_api)
+# Alpaca Account Management Routes
+app.get("/api/alpaca-accounts", response_class=HTMLResponse)(routes.get_alpaca_accounts)
+app.post("/api/alpaca-accounts/create", response_class=HTMLResponse)(routes.create_alpaca_account)
+app.post("/api/alpaca-accounts/set-active", response_class=HTMLResponse)(routes.set_active_alpaca_account)
+app.post("/api/alpaca-accounts/delete", response_class=HTMLResponse)(routes.delete_alpaca_account)
+app.post("/api/alpaca-accounts/test", response_class=HTMLResponse)(routes.test_alpaca_account)
 
 # MDB-Engine Pattern: Built-in Observability Endpoints
 # These endpoints are automatically available via mdb-engine:

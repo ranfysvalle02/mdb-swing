@@ -44,25 +44,48 @@
             </div>
         </div>
         
+        {# CNN Market Data Summary - Compact #}
+        {% if cnn_data is defined and cnn_data %}
+        <div class="glass rounded-lg p-3 mb-4 border border-blue-500/30 bg-blue-500/5">
+            <div class="flex items-center gap-2 mb-2">
+                <i data-lucide="trending-up" class="w-3.5 h-3.5 text-blue-400"></i>
+                <span class="text-xs font-semibold text-blue-400 uppercase tracking-wider">CNN Market Data</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                {% if cnn_data.analyst_ratings and cnn_data.analyst_ratings.buy %}
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] text-gray-400">Analyst:</span>
+                    <span class="text-xs font-bold {% if cnn_data.analyst_ratings.buy >= 60 %}text-green-400{% else %}text-white{% endif %}">
+                        {{ cnn_data.analyst_ratings.buy }}% Buy
+                    </span>
+                </div>
+                {% endif %}
+                {% if cnn_data.price_targets and cnn_data.price_targets.median and techs.price %}
+                {% set upside_median = ((cnn_data.price_targets.median - techs.price) / techs.price * 100) %}
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] text-gray-400">Target:</span>
+                    <span class="text-xs font-bold {% if upside_median >= 20 %}text-blue-400{% else %}text-white{% endif %}">
+                        ${{ cnn_data.price_targets.median|round(2) }} (+{{ upside_median|round(1) }}%)
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        
         {# Enhanced Recommendation Section #}
         <div class="mb-4 space-y-3">
             {# Primary Recommendation #}
-            <div class="flex items-start justify-between p-4 rounded-lg bg-gradient-to-r {% if verdict.action == 'BUY' %}from-green-500/20 to-emerald-500/10{% elif verdict.action in ['WAIT', 'AVOID'] %}from-yellow-500/20 to-orange-500/10{% else %}from-red-500/20 to-pink-500/10{% endif %} border {% if verdict.action == 'BUY' %}border-green-500/40{% elif verdict.action in ['WAIT', 'AVOID'] %}border-yellow-500/40{% else %}border-red-500/40{% endif %}">
+            <div class="flex items-start justify-between p-4 rounded-lg bg-gradient-to-r {% if verdict.action == 'BUY' %}from-green-500/20 to-emerald-500/10{% else %}from-red-500/20 to-pink-500/10{% endif %} border {% if verdict.action == 'BUY' %}border-green-500/40{% else %}border-red-500/40{% endif %}">
                 <div class="flex items-start gap-3 flex-1">
-                    <div class="w-10 h-10 rounded-lg {% if verdict.action == 'BUY' %}bg-green-500/20{% elif verdict.action in ['WAIT', 'AVOID'] %}bg-yellow-500/20{% else %}bg-red-500/20{% endif %} flex items-center justify-center flex-shrink-0 border {% if verdict.action == 'BUY' %}border-green-500/40{% elif verdict.action in ['WAIT', 'AVOID'] %}border-yellow-500/40{% else %}border-red-500/40{% endif %}">
-                        <i data-lucide="{% if verdict.action == 'BUY' %}trending-up{% elif verdict.action in ['WAIT', 'AVOID'] %}pause-circle{% else %}trending-down{% endif %}" class="w-5 h-5 {% if verdict.action == 'BUY' %}text-green-400{% elif verdict.action in ['WAIT', 'AVOID'] %}text-yellow-400{% else %}text-red-400{% endif %}"></i>
+                    <div class="w-10 h-10 rounded-lg {% if verdict.action == 'BUY' %}bg-green-500/20{% else %}bg-red-500/20{% endif %} flex items-center justify-center flex-shrink-0 border {% if verdict.action == 'BUY' %}border-green-500/40{% else %}border-red-500/40{% endif %}">
+                        <i data-lucide="{% if verdict.action == 'BUY' %}trending-up{% else %}trending-down{% endif %}" class="w-5 h-5 {% if verdict.action == 'BUY' %}text-green-400{% else %}text-red-400{% endif %}"></i>
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2 mb-1.5">
                             <span class="text-xs text-gray-400 uppercase tracking-wider">Recommendation</span>
-                            <span class="text-sm font-bold {% if verdict.action == 'BUY' %}text-green-400{% elif verdict.action in ['WAIT', 'AVOID'] %}text-yellow-400{% else %}text-red-400{% endif %}">
-                                {% if verdict.action == "AVOID" %}
-                                    AVOID
-                                {% elif verdict.action == "SELL_NOW" %}
-                                    SELL NOW
-                                {% else %}
-                                    {{ verdict.action }}
-                                {% endif %}
+                            <span class="text-sm font-bold {% if verdict.action == 'BUY' %}text-green-400{% else %}text-red-400{% endif %}">
+                                {{ verdict.action }}
                             </span>
                         </div>
                         <p class="text-sm text-gray-200 leading-relaxed">"{{ verdict.reason|e }}"</p>
@@ -176,19 +199,14 @@
                 x-init="
                     $watch('expanded', value => {
                         if (value) {
-                            // Initialize TradingView widget when expanded
-                            setTimeout(() => {
-                                new TradingView.widget({
-                                    'autosize': true,
-                                    'symbol': {{ symbol|tojson }},
-                                    'interval': 'D',
-                                    'timezone': 'Etc/UTC',
-                                    'theme': 'dark',
-                                    'style': '1',
-                                    'container_id': {{ tradingview_id|tojson }},
-                                    'locale': 'en'
-                                });
-                            }, 300);
+                            // Trigger TradingView initialization via custom event
+                            const event = new CustomEvent('init-tradingview', {
+                                detail: {
+                                    containerId: {{ tradingview_id|tojson }},
+                                    symbol: {{ symbol|tojson }}
+                                }
+                            });
+                            document.dispatchEvent(event);
                         }
                     });
                 ">
@@ -229,6 +247,175 @@
                 </div>
             </div>
             
+            {# CNN Market Data Section #}
+            {% if cnn_data is defined and cnn_data %}
+            <div class="glass rounded-xl p-4 border border-blue-500/40 bg-blue-500/5">
+                <h4 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                    <i data-lucide="trending-up" class="w-4 h-4 text-blue-400"></i>
+                    <span>CNN Market Data</span>
+                </h4>
+                
+                {# Analyst Ratings #}
+                {% if cnn_data.analyst_ratings and (cnn_data.analyst_ratings.buy or cnn_data.analyst_ratings.hold or cnn_data.analyst_ratings.sell) %}
+                <div class="mb-4">
+                    <div class="text-xs text-gray-400 mb-2 uppercase tracking-wider">Analyst Consensus</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        {% if cnn_data.analyst_ratings.buy %}
+                        <div class="glass rounded-lg p-2.5 text-center border {% if cnn_data.analyst_ratings.buy >= 60 %}border-green-500/50 bg-green-500/10{% else %}border-gray-700/50{% endif %}">
+                            <div class="text-[10px] text-gray-400 mb-0.5">Buy</div>
+                            <div class="text-base font-bold {% if cnn_data.analyst_ratings.buy >= 60 %}text-green-400{% else %}text-white{% endif %}">{{ cnn_data.analyst_ratings.buy }}%</div>
+                        </div>
+                        {% endif %}
+                        {% if cnn_data.analyst_ratings.hold %}
+                        <div class="glass rounded-lg p-2.5 text-center border border-gray-700/50">
+                            <div class="text-[10px] text-gray-400 mb-0.5">Hold</div>
+                            <div class="text-base font-bold text-white">{{ cnn_data.analyst_ratings.hold }}%</div>
+                        </div>
+                        {% endif %}
+                        {% if cnn_data.analyst_ratings.sell %}
+                        <div class="glass rounded-lg p-2.5 text-center border {% if cnn_data.analyst_ratings.sell >= 50 %}border-red-500/50 bg-red-500/10{% else %}border-gray-700/50{% endif %}">
+                            <div class="text-[10px] text-gray-400 mb-0.5">Sell</div>
+                            <div class="text-base font-bold {% if cnn_data.analyst_ratings.sell >= 50 %}text-red-400{% else %}text-white{% endif %}">{{ cnn_data.analyst_ratings.sell }}%</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% if cnn_data.analyst_ratings.buy and cnn_data.analyst_ratings.buy >= 60 %}
+                    <div class="mt-2 text-xs text-green-400 flex items-center gap-1">
+                        <i data-lucide="check-circle" class="w-3 h-3"></i>
+                        <span>Strong Buy Consensus</span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                {# Price Targets #}
+                {% if cnn_data.price_targets and (cnn_data.price_targets.high or cnn_data.price_targets.median or cnn_data.price_targets.low) %}
+                <div class="mb-4">
+                    <div class="text-xs text-gray-400 mb-2 uppercase tracking-wider">Price Targets</div>
+                    <div class="space-y-2">
+                        {% if cnn_data.price_targets.high and techs.price %}
+                        {% set upside_high = ((cnn_data.price_targets.high - techs.price) / techs.price * 100) %}
+                        <div class="glass rounded-lg p-2.5 border border-green-500/30 bg-green-500/5">
+                            <div class="flex items-center justify-between">
+                                <div class="text-[10px] text-gray-400">High Target</div>
+                                <div class="text-sm font-bold text-green-400">${{ cnn_data.price_targets.high|round(2) }}</div>
+                            </div>
+                            <div class="text-xs text-green-400 mt-0.5">+{{ upside_high|round(1) }}% upside</div>
+                        </div>
+                        {% endif %}
+                        {% if cnn_data.price_targets.median and techs.price %}
+                        {% set upside_median = ((cnn_data.price_targets.median - techs.price) / techs.price * 100) %}
+                        <div class="glass rounded-lg p-2.5 border {% if upside_median >= 20 %}border-blue-500/50 bg-blue-500/10{% else %}border-gray-700/50{% endif %}">
+                            <div class="flex items-center justify-between">
+                                <div class="text-[10px] text-gray-400">Median Target</div>
+                                <div class="text-sm font-bold {% if upside_median >= 20 %}text-blue-400{% else %}text-white{% endif %}">${{ cnn_data.price_targets.median|round(2) }}</div>
+                            </div>
+                            <div class="text-xs {% if upside_median >= 20 %}text-blue-400{% else %}text-gray-400{% endif %} mt-0.5">
+                                {% if upside_median >= 20 %}
+                                <i data-lucide="trending-up" class="w-3 h-3 inline"></i>
+                                {% endif %}
+                                +{{ upside_median|round(1) }}% upside
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if cnn_data.price_targets.low and techs.price %}
+                        {% set upside_low = ((cnn_data.price_targets.low - techs.price) / techs.price * 100) %}
+                        <div class="glass rounded-lg p-2.5 border border-gray-700/50">
+                            <div class="flex items-center justify-between">
+                                <div class="text-[10px] text-gray-400">Low Target</div>
+                                <div class="text-sm font-bold text-white">${{ cnn_data.price_targets.low|round(2) }}</div>
+                            </div>
+                            <div class="text-xs text-gray-400 mt-0.5">{{ upside_low|round(1) }}% {% if upside_low < 0 %}downside{% else %}upside{% endif %}</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {# Financial Metrics #}
+                {% if cnn_data.financials and (cnn_data.financials.revenue or cnn_data.financials.net_income or cnn_data.financials.eps) %}
+                <div>
+                    <div class="text-xs text-gray-400 mb-2 uppercase tracking-wider">Financial Metrics</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        {% if cnn_data.financials.revenue %}
+                        <div class="glass rounded-lg p-2.5 text-center border border-gray-700/50">
+                            <div class="text-[10px] text-gray-400 mb-0.5">Revenue</div>
+                            <div class="text-xs font-bold text-white">${{ (cnn_data.financials.revenue / 1000000000)|round(2) }}B</div>
+                        </div>
+                        {% endif %}
+                        {% if cnn_data.financials.net_income %}
+                        <div class="glass rounded-lg p-2.5 text-center border border-gray-700/50">
+                            <div class="text-[10px] text-gray-400 mb-0.5">Net Income</div>
+                            <div class="text-xs font-bold text-white">${{ (cnn_data.financials.net_income / 1000000000)|round(2) }}B</div>
+                        </div>
+                        {% endif %}
+                        {% if cnn_data.financials.eps %}
+                        <div class="glass rounded-lg p-2.5 text-center border border-gray-700/50">
+                            <div class="text-[10px] text-gray-400 mb-0.5">EPS</div>
+                            <div class="text-xs font-bold text-white">${{ cnn_data.financials.eps|round(2) }}</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+            
+            {# News Articles Section #}
+            {% if news_objects is defined and news_objects|length > 0 %}
+            <div class="glass rounded-xl p-4 border border-gray-700/50">
+                <h4 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                    <i data-lucide="newspaper" class="w-4 h-4 text-blue-400"></i>
+                    <span>Recent News Articles (Analyzed by AI)</span>
+                </h4>
+                <div class="space-y-3">
+                    {% for news in news_objects %}
+                    <div class="glass rounded-lg p-3 border border-gray-700/50 hover:border-blue-500/50 transition-colors">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="flex-1 min-w-0">
+                                <h5 class="text-sm font-semibold text-white mb-1.5 leading-snug">
+                                    {{ news.headline|e }}
+                                </h5>
+                                {% if news.article_content %}
+                                <p class="text-xs text-gray-300 leading-relaxed mb-2 line-clamp-3">
+                                    {{ news.article_content|e }}
+                                </p>
+                                {% elif news.summary %}
+                                <p class="text-xs text-gray-400 leading-relaxed mb-2 line-clamp-2">
+                                    {{ news.summary|e }}
+                                </p>
+                                {% endif %}
+                                <div class="flex items-center gap-3 text-[10px] text-gray-500">
+                                    {% if news.author and news.author != "Unknown" %}
+                                    <span class="flex items-center gap-1">
+                                        <i data-lucide="user" class="w-2.5 h-2.5"></i>
+                                        <span>{{ news.author|e }}</span>
+                                    </span>
+                                    {% endif %}
+                                    {% if news.created_at %}
+                                    <span class="flex items-center gap-1">
+                                        <i data-lucide="calendar" class="w-2.5 h-2.5"></i>
+                                        <span>{{ news.created_at|e }}</span>
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if news.url %}
+                            <a href="{{ news.url|e }}" 
+                               target="_blank" 
+                               rel="noopener noreferrer"
+                               class="flex-shrink-0 glass-strong rounded-lg p-2 border border-blue-500/40 hover:bg-blue-500/20 transition-colors group"
+                               aria-label="Read full article: {{ news.headline|e }}">
+                                <i data-lucide="external-link" class="w-4 h-4 text-blue-400 group-hover:text-blue-300"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
             {# Strategy Context #}
             <div class="glass rounded-lg p-3 border border-gray-700/50">
                 <div class="text-[10px] text-gray-500 border-t border-gray-700/50 pt-2 mt-2">
@@ -264,3 +451,67 @@
         </div>
     </div>
 </div>
+
+<script>
+    // TradingView widget initialization - executes after HTMX swap
+    (function() {
+        const containerId = {{ tradingview_id|tojson|safe }};
+        const symbol = {{ symbol|tojson|safe }};
+        
+        function initTradingView() {
+            if (typeof TradingView !== 'undefined' && TradingView.widget) {
+                const container = document.getElementById(containerId);
+                if (container && !container.dataset.initialized) {
+                    container.dataset.initialized = 'true';
+                    new TradingView.widget({
+                        "autosize": true,
+                        "symbol": symbol,
+                        "interval": "D",
+                        "timezone": "Etc/UTC",
+                        "theme": "dark",
+                        "style": "1",
+                        "container_id": containerId,
+                        "locale": "en"
+                    });
+                }
+            } else {
+                console.warn('TradingView widget not available - chart will not be displayed');
+                const container = document.getElementById(containerId);
+                if (container && !container.dataset.initialized) {
+                    container.dataset.initialized = 'true';
+                    container.innerHTML = '<div class="flex items-center justify-center h-full text-gray-400 text-sm">Chart unavailable - TradingView script not loaded</div>';
+                }
+            }
+        }
+        
+        // Listen for custom event from Alpine.js
+        document.addEventListener('init-tradingview', function(event) {
+            if (event.detail.containerId === containerId) {
+                // Try to initialize immediately, or wait for TradingView to load
+                if (typeof TradingView !== 'undefined' && TradingView.widget) {
+                    setTimeout(initTradingView, 300);
+                } else {
+                    let attempts = 0;
+                    const maxAttempts = 50;
+                    const checkInterval = setInterval(() => {
+                        attempts++;
+                        if (typeof TradingView !== 'undefined' && TradingView.widget) {
+                            clearInterval(checkInterval);
+                            setTimeout(initTradingView, 300);
+                        } else if (attempts >= maxAttempts) {
+                            clearInterval(checkInterval);
+                            initTradingView();
+                        }
+                    }, 100);
+                }
+            }
+        });
+        
+        // Also initialize lucide icons
+        setTimeout(() => {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        }, 50);
+    })();
+</script>

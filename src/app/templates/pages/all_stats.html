@@ -1,0 +1,323 @@
+
+<div class="stats-content animate-stats-enter space-y-4 max-h-[70vh] overflow-y-auto">
+    {# Header Section #}
+    <header class="flex items-center justify-between mb-4 sticky top-0 bg-gray-900/95 backdrop-blur-sm py-3 z-10 -mx-4 px-4 border-b border-gray-700/50">
+        <div class="flex items-center gap-3">
+            <h2 class="text-xl font-bold text-white flex items-center gap-2 animate-fade-in">
+                <i data-lucide="bar-chart-3" class="text-blue-400 w-5 h-5 animate-pulse-slow"></i>
+                <span>{{ symbol|e }} - All Stats</span>
+            </h2>
+        </div>
+        <div class="text-xs text-gray-500 animate-fade-in-delay" aria-label="Analysis type">Comprehensive Analysis</div>
+    </header>
+    
+    {# Quick Guide Section #}
+    <section class="glass rounded-lg p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/30 animate-slide-up mb-4" aria-labelledby="guide-title">
+        <div class="flex items-start gap-3">
+            <i data-lucide="lightbulb" class="text-yellow-400 w-5 h-5 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
+            <div class="flex-1">
+                <h3 id="guide-title" class="text-sm font-semibold text-yellow-300 mb-2">How to Use These Stats</h3>
+                <p class="text-xs text-gray-300 leading-relaxed mb-2">
+                    <strong>Look for convergence:</strong> Multiple indicators pointing the same direction = stronger signal. 
+                    Example: RSI &lt;30 (oversold) + Price near lower Bollinger Band + MACD turning positive = strong buy signal.
+                </p>
+                <p class="text-xs text-gray-300 leading-relaxed">
+                    <strong>Each metric includes helpful labels</strong> explaining what it means and how to use it.
+                </p>
+            </div>
+        </div>
+    </section>
+    
+    {# Price & Basic Info #}
+    <section class="grid grid-cols-2 gap-3 animate-slide-up" style="animation-delay: 0.1s;" aria-label="Price and volume information">
+        <div class="glass rounded-lg p-4 border border-blue-500/30 hover:border-blue-400/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-500/20">
+            <div class="text-xs text-gray-400 mb-1">
+                <div class="flex items-center gap-1 mb-0.5">
+                    <i data-lucide="dollar-sign" class="w-3 h-3" aria-hidden="true"></i>
+                    <span class="font-medium">Price</span>
+                </div>
+                <div class="text-[10px] text-gray-500 leading-relaxed">Latest closing price. Compare to moving averages and support levels. Green = up today, Red = down today.</div>
+            </div>
+            <div class="text-2xl font-bold text-white">${{ stats.price|round(2) }}</div>
+            {% if stats.change_pct is not none %}
+            <div class="text-xs mt-1 {% if stats.change_pct >= 0 %}text-green-400{% else %}text-red-400{% endif %}">
+                {% if stats.change_pct >= 0 %}+{% endif %}{{ stats.change_pct|round(2) }}%
+            </div>
+            {% endif %}
+        </div>
+        <div class="glass rounded-lg p-4 border border-gray-700/50 hover:border-gray-600/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg">
+            <div class="text-xs text-gray-400 mb-1">
+                <div class="flex items-center gap-1 mb-0.5">
+                    <i data-lucide="activity" class="w-3 h-3" aria-hidden="true"></i>
+                    <span class="font-medium">Volume</span>
+                </div>
+                <div class="text-[10px] text-gray-500 leading-relaxed">Shares traded. High (&gt;1.5x avg) = strong move. Low (&lt;0.5x avg) = weak move, may reverse.</div>
+            </div>
+            <div class="text-xl font-bold text-white">{{ "{:,}".format(stats.volume) }}</div>
+            {% if stats.volume_ratio %}
+            <div class="text-xs mt-1 {% if stats.volume_ratio >= 1.5 %}text-green-400{% elif stats.volume_ratio <= 0.5 %}text-yellow-400{% else %}text-gray-500{% endif %}">
+                {{ stats.volume_ratio }}x avg {% if stats.volume_ratio >= 1.5 %}(High){% elif stats.volume_ratio <= 0.5 %}(Low){% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </section>
+    
+    {# Momentum Indicators #}
+    <section class="glass rounded-lg p-4 border border-purple-500/30 hover:border-purple-400/50 transition-all duration-300 hover:scale-[1.01] animate-slide-up" style="animation-delay: 0.2s;" aria-labelledby="momentum-title">
+        <div class="mb-3">
+            <h3 id="momentum-title" class="text-sm font-semibold text-purple-300 mb-1 flex items-center gap-2">
+                <i data-lucide="activity" class="w-4 h-4" aria-hidden="true"></i>
+                <span>Momentum Indicators</span>
+            </h3>
+            <p class="text-[10px] text-gray-400 leading-relaxed">Measure how fast price is moving. RSI &lt;30 = oversold (buy), &gt;70 = overbought (sell). Stochastic &lt;20 = oversold, &gt;80 = overbought. Combine both for stronger signals.</p>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+            <div>
+                <div class="text-xs text-gray-400">
+                    <div class="font-medium mb-0.5">RSI (14)</div>
+                    <div class="text-[10px] text-gray-500">0-100 scale. &lt;30 = oversold (buy), &gt;70 = overbought (sell)</div>
+                </div>
+                <div class="text-lg font-bold {% if stats.rsi and stats.rsi < 30 %}text-green-400{% elif stats.rsi and stats.rsi > 70 %}text-red-400{% else %}text-white{% endif %}">
+                    {{ stats.rsi|round(1) if stats.rsi else 'N/A' }}
+                </div>
+                {% if stats.rsi %}
+                <div class="text-[10px] text-gray-500 mt-0.5" aria-label="RSI status">
+                    {% if stats.rsi < 30 %}Oversold{% elif stats.rsi > 70 %}Overbought{% else %}Neutral{% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% if stats.stoch_k is not none %}
+            <div>
+                <div class="text-xs text-gray-400">
+                    <div class="font-medium mb-0.5">Stoch %K</div>
+                    <div class="text-[10px] text-gray-500">Momentum oscillator. &lt;20 = oversold, &gt;80 = overbought</div>
+                </div>
+                <div class="text-lg font-bold {% if stats.stoch_k < 20 %}text-green-400{% elif stats.stoch_k > 80 %}text-red-400{% else %}text-white{% endif %}">
+                    {{ stats.stoch_k|round(1) }}
+                </div>
+                {% if stats.stoch_k < 20 or stats.stoch_k > 80 %}
+                <div class="text-[10px] text-gray-500 mt-0.5" aria-label="Stochastic status">
+                    {% if stats.stoch_k < 20 %}Oversold{% else %}Overbought{% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% if stats.stoch_d is not none %}
+            <div>
+                <div class="text-xs text-gray-400">
+                    <div class="font-medium mb-0.5">Stoch %D</div>
+                    <div class="text-[10px] text-gray-500">Smoothed %K. %K crosses above %D = bullish</div>
+                </div>
+                <div class="text-lg font-bold {% if stats.stoch_d < 20 %}text-green-400{% elif stats.stoch_d > 80 %}text-red-400{% else %}text-white{% endif %}">
+                    {{ stats.stoch_d|round(1) }}
+                </div>
+                {% if stats.stoch_d < 20 or stats.stoch_d > 80 %}
+                <div class="text-[10px] text-gray-500 mt-0.5" aria-label="Stochastic D status">
+                    {% if stats.stoch_d < 20 %}Oversold{% else %}Overbought{% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </section>
+    
+    {# MACD #}
+    {% if stats.macd is not none %}
+    <section class="glass rounded-lg p-4 border border-yellow-500/30 hover:border-yellow-400/50 transition-all duration-300 hover:scale-[1.01] animate-slide-up" style="animation-delay: 0.3s;" aria-labelledby="macd-title">
+        <div class="mb-3">
+            <h3 id="macd-title" class="text-sm font-semibold text-yellow-300 mb-1 flex items-center gap-2">
+                <i data-lucide="trending-up" class="w-4 h-4" aria-hidden="true"></i>
+                <span>MACD</span>
+            </h3>
+            <p class="text-[10px] text-gray-400 leading-relaxed">Shows momentum by comparing fast vs slow moving averages. MACD &gt; Signal = buy signal. Positive histogram = momentum increasing.</p>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+            <div>
+                <div class="text-xs text-gray-400">
+                    <div class="font-medium mb-0.5">MACD Line</div>
+                    <div class="text-[10px] text-gray-500">Fast (12) - slow (26) EMAs. Positive = bullish</div>
+                </div>
+                <div class="text-lg font-bold {% if stats.macd >= 0 %}text-green-400{% else %}text-red-400{% endif %}">
+                    {{ stats.macd|round(2) }}
+                </div>
+                {% if stats.macd_signal is not none %}
+                <div class="text-[10px] text-gray-500 mt-0.5" aria-label="MACD position">
+                    {% if stats.macd > stats.macd_signal %}Above Signal{% else %}Below Signal{% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% if stats.macd_signal is not none %}
+            <div>
+                <div class="text-xs text-gray-400">
+                    <div class="font-medium mb-0.5">Signal</div>
+                    <div class="text-[10px] text-gray-500">9-period EMA of MACD</div>
+                </div>
+                <div class="text-lg font-bold text-white">{{ stats.macd_signal|round(2) }}</div>
+            </div>
+            {% endif %}
+            {% if stats.macd_histogram is not none %}
+            <div>
+                <div class="text-xs text-gray-400">
+                    <div class="font-medium mb-0.5">Histogram</div>
+                    <div class="text-[10px] text-gray-500">MACD - Signal. Positive = momentum ↑</div>
+                </div>
+                <div class="text-lg font-bold {% if stats.macd_histogram >= 0 %}text-green-400{% else %}text-red-400{% endif %}">
+                    {{ stats.macd_histogram|round(2) }}
+                </div>
+                <div class="text-[10px] text-gray-500 mt-0.5" aria-label="Momentum direction">
+                    {% if stats.macd_histogram >= 0 %}Momentum ↑{% else %}Momentum ↓{% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+    
+    {# Moving Averages #}
+    <section class="glass rounded-lg p-4 border border-green-500/30 hover:border-green-400/50 transition-all duration-300 hover:scale-[1.01] animate-slide-up" style="animation-delay: 0.4s;" aria-labelledby="ma-title">
+        <div class="mb-3">
+            <h3 id="ma-title" class="text-sm font-semibold text-green-300 mb-1 flex items-center gap-2">
+                <i data-lucide="line-chart" class="w-4 h-4" aria-hidden="true"></i>
+                <span>Moving Averages</span>
+            </h3>
+            <p class="text-[10px] text-gray-400 leading-relaxed">Smooth price trends. Price above MA = uptrend. SMA-200 = long-term trend. EMA = more responsive to recent changes.</p>
+        </div>
+        <div class="space-y-2">
+            {% for period in [20, 50, 100, 200] %}
+            {% set sma_key = 'sma_' ~ period %}
+            {% set pct_key = 'price_vs_sma_' ~ period ~ '_pct' %}
+            {% if stats[sma_key] %}
+            <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-400">SMA-{{ period }}</span>
+                <div class="text-right">
+                    <span class="text-sm font-bold text-white">${{ stats[sma_key]|round(2) }}</span>
+                    {% if stats[pct_key] is not none %}
+                    <span class="text-xs ml-2 {% if stats[pct_key] >= 0 %}text-green-400{% else %}text-red-400{% endif %}">
+                        {% if stats[pct_key] >= 0 %}+{% endif %}{{ stats[pct_key]|round(1) }}%
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+            {% if stats.ema_12 %}
+            <div class="flex items-center justify-between pt-2 border-t border-gray-700/50">
+                <span class="text-xs text-gray-400">
+                    <span class="font-medium">EMA-12</span>
+                    <span class="text-[10px] text-gray-500 block">12-day Exponential MA. More responsive than SMA</span>
+                </span>
+                <span class="text-sm font-bold text-white">${{ stats.ema_12|round(2) }}</span>
+            </div>
+            {% endif %}
+            {% if stats.ema_26 %}
+            <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-400">
+                    <span class="font-medium">EMA-26</span>
+                    <span class="text-[10px] text-gray-500 block">26-day Exponential MA. Used in MACD</span>
+                </span>
+                <span class="text-sm font-bold text-white">${{ stats.ema_26|round(2) }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+    
+    {# Bollinger Bands #}
+    {% if stats.bb_upper %}
+    <section class="glass rounded-lg p-4 border border-cyan-500/30 hover:border-cyan-400/50 transition-all duration-300 hover:scale-[1.01] animate-slide-up" style="animation-delay: 0.5s;" aria-labelledby="bb-title">
+        <div class="mb-3">
+            <h3 id="bb-title" class="text-sm font-semibold text-cyan-300 mb-1 flex items-center gap-2">
+                <i data-lucide="maximize-2" class="w-4 h-4" aria-hidden="true"></i>
+                <span>Bollinger Bands</span>
+            </h3>
+            <p class="text-[10px] text-gray-400 leading-relaxed">Show volatility and overbought/oversold levels. Upper = overbought (sell), Lower = oversold (buy). %B &lt;20% = oversold, &gt;80% = overbought.</p>
+        </div>
+        <div class="space-y-2">
+            <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-400">Upper</span>
+                <span class="text-sm font-bold text-white">${{ stats.bb_upper|round(2) }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-400">Middle (SMA-20)</span>
+                <span class="text-sm font-bold text-white">${{ stats.bb_middle|round(2) }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-400">Lower</span>
+                <span class="text-sm font-bold text-white">${{ stats.bb_lower|round(2) }}</span>
+            </div>
+            {% if stats.bb_percent_b is not none %}
+            <div class="flex items-center justify-between pt-2 border-t border-gray-700/50">
+                <span class="text-xs text-gray-400">
+                    <span class="font-medium">%B Position</span>
+                    <span class="text-[10px] text-gray-500 block">0% = lower (oversold), 100% = upper (overbought)</span>
+                </span>
+                <span class="text-sm font-bold {% if stats.bb_percent_b < 20 %}text-green-400{% elif stats.bb_percent_b > 80 %}text-red-400{% else %}text-white{% endif %}">
+                    {{ stats.bb_percent_b|round(1) }}%
+                </span>
+            </div>
+            {% endif %}
+            {% if stats.bb_width_pct is not none %}
+            <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-400">
+                    <span class="font-medium">Band Width</span>
+                    <span class="text-[10px] text-gray-500 block">Narrow (&lt;3%) = low vol, expect breakout. Wide (&gt;5%) = high vol</span>
+                </span>
+                <span class="text-sm font-bold text-white">{{ stats.bb_width_pct|round(2) }}%</span>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+    
+    {# Volatility & Range #}
+    <section class="glass rounded-lg p-4 border border-orange-500/30 hover:border-orange-400/50 transition-all duration-300 hover:scale-[1.01] animate-slide-up" style="animation-delay: 0.6s;" aria-labelledby="volatility-title">
+        <div class="mb-3">
+            <h3 id="volatility-title" class="text-sm font-semibold text-orange-300 mb-1 flex items-center gap-2">
+                <i data-lucide="shield" class="w-4 h-4" aria-hidden="true"></i>
+                <span>Volatility & Range</span>
+            </h3>
+            <p class="text-[10px] text-gray-400 leading-relaxed">ATR = average price movement (higher = wider stops needed). Price Position &lt;30% = near bottom (buy), &gt;70% = near top (sell).</p>
+        </div>
+        <div class="space-y-2">
+            {% if stats.atr %}
+            <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-400">
+                    <span class="font-medium">ATR (14)</span>
+                    <span class="text-[10px] text-gray-500 block">Average True Range. Use for stop-loss: Entry - (2×ATR)</span>
+                </span>
+                <div class="text-right">
+                    <span class="text-sm font-bold text-white">${{ stats.atr|round(2) }}</span>
+                    {% if stats.atr_pct %}
+                    <span class="text-xs ml-2 text-gray-500">({{ stats.atr_pct|round(1) }}%)</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            {% if stats.recent_high %}
+            <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-400">20-Day High</span>
+                <span class="text-sm font-bold text-white">${{ stats.recent_high|round(2) }}</span>
+            </div>
+            {% endif %}
+            {% if stats.recent_low %}
+            <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-400">20-Day Low</span>
+                <span class="text-sm font-bold text-white">${{ stats.recent_low|round(2) }}</span>
+            </div>
+            {% endif %}
+            {% if stats.price_position_in_range is not none %}
+            <div class="flex items-center justify-between pt-2 border-t border-gray-700/50">
+                <span class="text-xs text-gray-400">
+                    <span class="font-medium">Price Position</span>
+                    <span class="text-[10px] text-gray-500 block">In 20-day range. 0% = low (support), 100% = high (resistance)</span>
+                </span>
+                <span class="text-sm font-bold {% if stats.price_position_in_range < 30 %}text-green-400{% elif stats.price_position_in_range > 70 %}text-red-400{% else %}text-white{% endif %}">
+                    {{ stats.price_position_in_range|round(1) }}%
+                </span>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+</div>
+
+{% include "scripts/lucide_init.html" %}
+

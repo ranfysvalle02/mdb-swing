@@ -7,17 +7,15 @@
    - logo_svg: Pre-generated SVG string (optional, falls back to filter if not provided)
 #}
 <div class="logo-container flex-shrink-0 {{ size_class|default('w-14 h-14') }} flex items-center justify-center">
-    <div class="logo-initials {{ size_class|default('w-14 h-14') }} flex items-center justify-center" data-ticker="{{ symbol|e }}">
-        {% if logo_svg is defined and logo_svg %}
-            {{ logo_svg|safe }}
-        {% elif symbol %}
-            {{ symbol|svg_initials|safe }}
-        {% else %}
-            <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="20" cy="20" r="18" fill="#00f0ff" opacity="0.2"/>
-                <circle cx="20" cy="20" r="18" stroke="#00f0ff" stroke-width="1.5" fill="none" opacity="0.4"/>
-                <text x="20" y="20" font-family="monospace" font-size="18" font-weight="bold" fill="#00f0ff" text-anchor="middle" dominant-baseline="central">?</text>
-            </svg>
-        {% endif %}
-    </div>
+    {% if logo_svg is defined and logo_svg %}
+        {{ logo_svg|safe }}
+    {% elif symbol %}
+        {{ symbol|svg_initials|safe }}
+    {% else %}
+        <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="20" cy="20" r="18" fill="#00f0ff" opacity="0.2"/>
+            <circle cx="20" cy="20" r="18" stroke="#00f0ff" stroke-width="1.5" fill="none" opacity="0.4"/>
+            <text x="20" y="20" font-family="monospace" font-size="18" font-weight="bold" fill="#00f0ff" text-anchor="middle" dominant-baseline="central">?</text>
+        </svg>
+    {% endif %}
 </div>

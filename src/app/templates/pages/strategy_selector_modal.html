@@ -1,0 +1,133 @@
+<div class="strategy-selector-modal-content space-y-4 max-h-[85vh] overflow-y-auto">
+    {# Default Strategy Option #}
+    <section class="glass rounded-lg p-4 border transition-all duration-200 hover:scale-[1.01] {% if not active_strategy %}border-green-500/50 bg-green-500/10{% else %}border-gray-700/50{% endif %}">
+        <div class="flex items-start justify-between">
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-2">
+                    <h3 class="text-base font-semibold text-white">Default</h3>
+                    {% if not active_strategy %}
+                    <span class="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-semibold rounded border border-green-500/50 flex items-center gap-1">
+                        <i data-lucide="check-circle" class="w-3 h-3"></i>
+                        Active
+                    </span>
+                    {% endif %}
+                </div>
+                <p class="text-sm text-gray-400 mb-3">Balanced Low RSI Strategy - The default strategy for balanced low buys</p>
+            </div>
+            <div class="ml-4 flex-shrink-0">
+                {% if not active_strategy %}
+                <span class="px-3 py-1.5 bg-green-500/20 text-green-400 text-xs font-semibold rounded border border-green-500/50 flex items-center gap-1">
+                    <i data-lucide="check-circle" class="w-3 h-3"></i>
+                    Active
+                </span>
+                {% else %}
+                <button
+                    hx-post="/api/strategies/default/activate"
+                    hx-target="#strategy-selector-container"
+                    hx-swap="innerHTML"
+                    hx-on::after-request="
+                        if(event.detail.successful) {
+                            htmx.trigger('#watch-list', 'refresh');
+                            htmx.trigger('body', 'showToast', {message: 'Strategy activated', type: 'success'});
+                            const modal = document.querySelector('dialog.htmx-modal[open]');
+                            if(modal) modal.close();
+                        }
+                    "
+                    class="px-3 py-1.5 bg-green-500/20 hover:bg-green-500/30 text-green-400 text-xs font-semibold rounded border border-green-500/50 transition-all duration-200 flex items-center gap-1">
+                    <i data-lucide="play" class="w-3 h-3"></i>
+                    Activate
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+    
+    {# Create New Strategy Section #}
+    <section class="glass rounded-lg p-6 border-2 border-dashed border-purple-500/30 hover:border-purple-500/50 transition-all duration-200">
+        <div class="text-center">
+            <div class="mb-3">
+                <i data-lucide="plus-circle" class="w-12 h-12 text-purple-400 mx-auto"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-white mb-2">Create Custom Strategy</h3>
+            <p class="text-sm text-gray-400 mb-4">Build a custom strategy with your own metrics and conditions</p>
+            <button
+                hx-get="/api/strategy-builder"
+                hx-target="#modal-container"
+                hx-swap="innerHTML"
+                class="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white font-semibold rounded-lg transition-all duration-200 inline-flex items-center gap-2 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>Create New Strategy</span>
+            </button>
+        </div>
+    </section>
+    
+    {# Custom Strategies List #}
+    {% if strategies %}
+    <section>
+        <div class="flex items-center gap-2 mb-3">
+            <h3 class="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                <i data-lucide="layers" class="w-4 h-4 text-purple-400"></i>
+                <span>Custom Strategies</span>
+            </h3>
+            <span class="text-xs text-gray-500">({{ strategies|length }})</span>
+        </div>
+        <div class="space-y-3">
+            {% for strategy in strategies %}
+            <div class="glass rounded-lg p-4 border transition-all duration-200 hover:scale-[1.01] {% if strategy.is_active %}border-green-500/50 bg-green-500/10{% else %}border-gray-700/50{% endif %}">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-2">
+                            <h3 class="text-base font-semibold text-white">{{ strategy.name }}</h3>
+                            {% if strategy.is_active %}
+                            <span class="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-semibold rounded border border-green-500/50 flex items-center gap-1">
+                                <i data-lucide="check-circle" class="w-3 h-3"></i>
+                                Active
+                            </span>
+                            {% endif %}
+                        </div>
+                        
+                        {% if strategy.description %}
+                        <p class="text-sm text-gray-400 mb-3">{{ strategy.description }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="ml-4 flex flex-col gap-2">
+                        {% if not strategy.is_active %}
+                        <button
+                            hx-post="/api/strategies/{{ strategy.label }}/activate"
+                            hx-target="#strategy-selector-container"
+                            hx-swap="innerHTML"
+                            hx-on::after-request="
+                                if(event.detail.successful) {
+                                    htmx.trigger('#watch-list', 'refresh');
+                                    htmx.trigger('body', 'showToast', {message: 'Strategy activated', type: 'success'});
+                                    const modal = document.querySelector('dialog.htmx-modal[open]');
+                                    if(modal) modal.close();
+                                }
+                            "
+                            class="px-3 py-1.5 bg-green-500/20 hover:bg-green-500/30 text-green-400 text-xs font-semibold rounded border border-green-500/50 transition-all duration-200 flex items-center gap-1">
+                            <i data-lucide="play" class="w-3 h-3"></i>
+                            Activate
+                        </button>
+                        {% else %}
+                        <span class="px-3 py-1.5 bg-green-500/20 text-green-400 text-xs font-semibold rounded border border-green-500/50 flex items-center gap-1">
+                            <i data-lucide="check-circle" class="w-3 h-3"></i>
+                            Active
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% else %}
+    <section class="glass rounded-lg p-6 border border-gray-700/50 text-center">
+        <i data-lucide="layers" class="w-12 h-12 text-gray-600 mx-auto mb-3"></i>
+        <p class="text-gray-400 mb-2">No custom strategies yet</p>
+        <p class="text-xs text-gray-500">Create your first custom strategy above</p>
+    </section>
+    {% endif %}
+</div>
+
+{% include "scripts/lucide_init.html" %}

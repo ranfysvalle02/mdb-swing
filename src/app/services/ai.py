@@ -31,7 +31,7 @@ logger = get_logger(__name__)
 class TradeVerdict(BaseModel):
     """AI verdict for a trading opportunity with detailed insights."""
     score: int = Field(description="Bullish score 0-10.")
-    action: str = Field(description="One of: 'BUY', 'WAIT', 'SELL_NOW'. Note: SELL_NOW means 'avoid buying' for stocks without positions.")
+    action: str = Field(description="One of: 'BUY' or 'NOT BUY'. NOT BUY means avoid buying this stock (not a sell signal - sells come from positions, stop loss, or take profit).")
     reason: str = Field(description="Concise strategic reasoning (max 20 words).")
     risk_level: str = Field(description="Low, Medium, or High based on volatility.")
     key_factors: List[str] = Field(default_factory=list, description="List of 3-5 key factors supporting the bounce-back opportunity (e.g., 'RSI 28 in sweet spot', 'Price 2% above SMA-200 support', 'Earnings catalyst in 5 days'). Each factor should be a concise bullet point (max 15 words).")
@@ -69,7 +69,8 @@ class EyeAI:
         )
         
     def analyze(self, ticker: str, techs: Dict[str, Any], headlines: str, 
-                strategy_prompt: str) -> TradeVerdict:
+                strategy_prompt: str, strategy_config: Optional[Dict[str, Any]] = None,
+                cnn_data: Optional[Dict[str, Any]] = None) -> TradeVerdict:
         """Analyze a trading opportunity using strategy-specific prompt.
         
         Args:
@@ -77,6 +78,8 @@ class EyeAI:
             techs: Dictionary with technical indicators (price, rsi, atr, trend, sma)
             headlines: Recent news headlines
             strategy_prompt: Strategy-specific system prompt
+            strategy_config: Optional dictionary with strategy parameters (rsi_threshold, rsi_min, sma_proximity_pct, ai_score_required)
+            cnn_data: Optional CNN market data (analyst ratings, price targets, financials)
             
         Returns:
             TradeVerdict with score, action, reason, and risk_level
@@ -86,13 +89,72 @@ class EyeAI:
         atr = techs.get('atr', 0)
         trend = techs.get('trend', 'UNKNOWN')
         
-        # Build context string
         context_parts = [
             f"Ticker: {ticker} | Price: ${price:.2f}",
-            f"RSI: {rsi:.1f} (oversold if < 35)",
+            f"RSI: {rsi:.1f} (oversold if < 35, extreme oversold if < 20)",
             f"Trend: {trend} (UP = uptrend, DOWN = downtrend)",
             f"ATR: ${atr:.2f} (volatility measure)"
         ]
+        
+        # Add CNN market data if available (analyst ratings, price targets)
+        if cnn_data:
+            cnn_parts = []
+            
+            # Analyst ratings
+            ratings = cnn_data.get("analyst_ratings", {})
+            if ratings:
+                buy_pct = ratings.get("buy", 0)
+                hold_pct = ratings.get("hold", 0)
+                sell_pct = ratings.get("sell", 0)
+                if buy_pct or hold_pct or sell_pct:
+                    cnn_parts.append(f"\nANALYST CONSENSUS (CNN Markets):")
+                    if buy_pct:
+                        cnn_parts.append(f"- Buy: {buy_pct}%")
+                    if hold_pct:
+                        cnn_parts.append(f"- Hold: {hold_pct}%")
+                    if sell_pct:
+                        cnn_parts.append(f"- Sell: {sell_pct}%")
+                    if buy_pct >= 60:
+                        cnn_parts.append(f"  → Strong Buy consensus ({buy_pct}% buy) - bullish signal")
+                    elif buy_pct >= 40:
+                        cnn_parts.append(f"  → Moderate Buy consensus ({buy_pct}% buy)")
+            
+            # Price targets
+            targets = cnn_data.get("price_targets", {})
+            if targets and price:
+                cnn_parts.append(f"\nPRICE TARGETS (CNN Markets):")
+                if targets.get("high"):
+                    high_target = targets["high"]
+                    upside_high = ((high_target - price) / price) * 100
+                    cnn_parts.append(f"- High: ${high_target:.2f} ({upside_high:+.1f}% upside)")
+                if targets.get("median"):
+                    median_target = targets["median"]
+                    upside_median = ((median_target - price) / price) * 100
+                    cnn_parts.append(f"- Median: ${median_target:.2f} ({upside_median:+.1f}% upside)")
+                if targets.get("low"):
+                    low_target = targets["low"]
+                    upside_low = ((low_target - price) / price) * 100
+                    cnn_parts.append(f"- Low: ${targets['low']:.2f} ({upside_low:+.1f}% upside)")
+                
+                # Highlight significant upside potential
+                if targets.get("median") and ((targets["median"] - price) / price) * 100 > 20:
+                    cnn_parts.append(f"  → Significant upside potential: median target {((targets['median'] - price) / price) * 100:.1f}% above current price")
+            
+            # Financial metrics
+            financials = cnn_data.get("financials", {})
+            if financials:
+                if financials.get("revenue"):
+                    revenue_b = financials["revenue"] / 1_000_000_000
+                    cnn_parts.append(f"\nFINANCIALS (CNN Markets):")
+                    cnn_parts.append(f"- Revenue: ${revenue_b:.2f}B")
+                if financials.get("net_income"):
+                    income_b = financials["net_income"] / 1_000_000_000
+                    cnn_parts.append(f"- Net Income: ${income_b:.2f}B")
+                if financials.get("eps"):
+                    cnn_parts.append(f"- EPS: ${financials['eps']:.2f}")
+            
+            if cnn_parts:
+                context_parts.extend(cnn_parts)
         
         # Add enrichment data if available
         analyst_rec = techs.get("analyst_recommendation")
@@ -120,8 +182,25 @@ class EyeAI:
             market_cap_m = market_cap / 1_000_000
             context_parts.append(f"Market Cap: ${market_cap_m:.0f}M")
         
+        # Add SMA proximity calculation if available
+        sma_val = techs.get('sma') or techs.get('sma_200')
+        if sma_val and price:
+            price_vs_sma_pct = ((price - sma_val) / sma_val) * 100
+            context_parts.append(f"Price vs SMA-200: {price_vs_sma_pct:.2f}% ({'above' if price_vs_sma_pct > 0 else 'below'} SMA-200)")
+        
         context_parts.append(f"\nRecent News Headlines:\n{headlines}")
-        context_parts.append("\nAnalyze this opportunity according to the strategy focus.")
+        context_parts.append("\nAnalyze this opportunity according to the strategy focus. Use the strategy configuration parameters to weight your analysis.")
+        
+        # Include strategy config in context if provided
+        if strategy_config:
+            config_context = [
+                "\nSTRATEGY CONFIGURATION (use these to weight your analysis):",
+                f"- RSI Threshold: {strategy_config.get('rsi_threshold', 'N/A')}",
+                f"- RSI Minimum: {strategy_config.get('rsi_min', 'N/A')}",
+                f"- SMA Proximity: {strategy_config.get('sma_proximity_pct', 'N/A')}%",
+                f"- AI Score Required: {strategy_config.get('ai_score_required', 'N/A')}/10"
+            ]
+            context_parts.extend(config_context)
         
         prompt = ChatPromptTemplate.from_messages([
             ("system", strategy_prompt),
@@ -180,9 +259,6 @@ class EyeAI:
         return chain.invoke({})
 
 
-# Module-level AI engine instance
-# Initialized on module import, used by routes that need direct AI access
-# Most code should use EyeAI instances created via Eye class instead
 _ai_engine = None
 try:
     _ai_engine = EyeAI()

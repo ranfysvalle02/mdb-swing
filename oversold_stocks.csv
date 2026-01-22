@@ -1,0 +1,345 @@
+Ticker,Company,Sector,Industry,Country,Market Cap,P/E,Price,Change,Volume
+AAPB,GraniteShares 2x Long AAPL Daily ETF,Financial,Exchange Traded Fund,USA,,,26.44,0.0048,344235.0
+AAPL,Apple Inc,Technology,Consumer Electronics,USA,3639940000000.0,33.2,247.65,0.0039000000000000003,54139306.0
+AAPU,Direxion Daily AAPL Bull 2X Shares,Financial,Exchange Traded Fund,USA,,,27.7,0.008,4040072.0
+AAPW,Roundhill AAPL WeeklyPay ETF,Financial,Exchange Traded Fund,USA,,,35.67,0.0068000000000000005,23006.0
+AAPX,T-Rex 2X Long Apple Daily Target ETF,Financial,Exchange Traded Fund,USA,,,25.05,0.0052,395515.0
+AAPY,Kurv Yield Premium Strategy Apple (AAPL) ETF,Financial,Exchange Traded Fund,USA,,,22.24,-0.0074,9018.0
+ABOT,Abacus FCF Innovation Leaders ETF,Financial,Exchange Traded Fund,USA,,,36.68,0.009000000000000001,508.0
+ABTC,American Bitcoin Corp,Financial,Capital Markets,USA,1460000000.0,,1.57,0.0064,10548012.0
+ACCL,Acco Group Holdings Ltd,Industrials,Consulting Services,Hong Kong,20640000.0,157.45,1.48,-0.1494,515438.0
+ADBE,Adobe Inc,Technology,Software - Application,USA,120780000000.0,17.61,294.23,0.013300000000000001,5622367.0
+ADBG,Leverage Shares 2X Long ADBE Daily ETF,Financial,Exchange Traded Fund,USA,,,7.12,0.0259,1311054.0
+ADSK,Autodesk Inc,Technology,Software - Application,USA,54580000000.0,49.98,257.44,0.0141,2342221.0
+AEYE,AudioEye Inc,Technology,Software - Application,USA,110400000.0,,8.89,-0.0155,192919.0
+AIG,American International Group Inc,Financial,Insurance - Diversified,USA,38790000000.0,12.89,71.89,-0.0076,3790508.0
+AIIO,Robo.ai Inc,Consumer Cyclical,Auto Manufacturers,United Arab Emirates,89220000.0,,0.24,-0.0538,1274793.0
+AIXI,Xiao-I Corp ADR,Technology,Software - Application,China,4320000.0,,0.32,-0.0406,262716.0
+ALIT,Alight Inc,Technology,Software - Application,USA,831800000.0,,1.56,0.0196,13373838.0
+ALKT,Alkami Technology Inc,Technology,Software - Application,USA,2060000000.0,,19.62,-0.005600000000000001,1603905.0
+AMCX,AMC Networks Inc,Communication Services,Entertainment,USA,338200000.0,,7.77,-0.0115,489274.0
+AMDD,Direxion Daily AMD Bear 1X Shares,Financial,Exchange Traded Fund,USA,,,7.97,-0.077,25170852.0
+ANEB,Anebulo Pharmaceuticals Inc,Healthcare,Biotechnology,USA,44780000.0,,1.09,0.0,72620.0
+ANY,Sphere 3D Corp,Financial,Capital Markets,USA,9200000.0,,0.27,-0.068,504175.0
+AON,Aon plc,Financial,Insurance Brokers,Ireland,71520000000.0,26.65,332.76,-0.0199,1592731.0
+AOTS,AOT Software Platform ETF,Financial,Exchange Traded Fund,USA,,,23.43,0.0018,12500.0
+APLT,Applied Therapeutics Inc,Healthcare,Biotechnology,USA,14630000.0,,0.1,0.013999999999999999,5212531.0
+APLY,YieldMax AAPL Option Income Strategy ETF,Financial,Exchange Traded Fund,USA,,,12.12,0.0017000000000000001,167793.0
+APPN,Appian Corp,Technology,Software - Infrastructure,USA,2100000000.0,,28.41,0.0028000000000000004,827768.0
+AQST,Aquestive Therapeutics Inc,Healthcare,Drug Manufacturers - Specialty & Generic,USA,409930000.0,,3.36,-0.0345,5451547.0
+ARBK,Argo Blockchain Plc ADR,Financial,Capital Markets,United Kingdom,1430000.0,,4.32,-0.057699999999999994,70376.0
+AREB,American Rebel Holdings Inc,Consumer Cyclical,Footwear & Accessories,USA,3470000.0,,0.44,-0.0768,882552.0
+ASAN,Asana Inc,Technology,Software - Application,USA,2530000000.0,,10.68,-0.006500000000000001,2898513.0
+ASMB,Assembly Biosciences Inc,Healthcare,Biotechnology,USA,416780000.0,,26.35,-0.0168,116287.0
+ASNS,Actelis Networks Inc,Technology,Communication Equipment,USA,3530000.0,,0.44,0.0066,293451.0
+ATPC,Agape ATP Corp,Consumer Defensive,Packaged Foods,Malaysia,4099999.9999999995,,0.08,-0.0421,2992609.0
+ATRA,Atara Biotherapeutics Inc,Healthcare,Biotechnology,USA,33170000.0,2.1,4.6,0.06480000000000001,418412.0
+AUDC,Audiocodes,Technology,Communication Equipment,Israel,225560000.0,17.72,8.21,-0.015600000000000001,168412.0
+AZYY,GraniteShares YieldBoost AMZN ETF,Financial,Exchange Traded Fund,USA,,,18.55,0.0011,8507.0
+BANL,CBL International Ltd,Energy,Oil & Gas Midstream,Malaysia,9590000.0,,0.35,-0.0478,21734.0
+BBNX,Beta Bionics Inc,Healthcare,Medical Devices,USA,725080000.0,,16.47,-0.1063,1748733.0
+BCAB,BioAtla Inc,Healthcare,Biotechnology,USA,19210000.0,,0.3,-0.0643,2073766.0
+BCKT,LifeX 2030 Income Bucket ETF,Financial,Exchange Traded Fund,USA,,,45.74,0.0,0.0
+BDMD,Baird Medical Investment Holdings Limited,Healthcare,Medical Devices,China,41870000.0,,1.14,0.0,229377.0
+BETZ,Roundhill Sports Betting & iGaming ETF,Financial,Exchange Traded Fund,USA,,,19.14,-0.0016,16500.0
+BGLC,BioNexus Gene Lab Corp,Basic Materials,Specialty Chemicals,Malaysia,5510000.0,,3.07,-0.07339999999999999,12799.0
+BGLD,FT Vest Gold Strategy Quarterly Buffer ETF,Financial,Exchange Traded Fund,USA,,,18.03,0.0,47224.0
+BILL,BILL Holdings Inc,Technology,Software - Application,USA,4450000000.0,,44.39,-0.013600000000000001,3286447.0
+BNGE,First Trust S-Network Streaming and Gaming ETF,Financial,Exchange Traded Fund,USA,,,36.08,-0.001,814.0
+BOED,Direxion Daily BA Bear 1X Shares,Financial,Exchange Traded Fund,USA,,,15.54,-0.0046,25400.0
+BOX,Box Inc,Technology,Software - Infrastructure,USA,3730000000.0,20.98,26.02,0.0054,2274465.0
+BR,"Broadridge Financial Solutions, Inc",Technology,Information Technology Services,USA,24150000000.0,26.45,206.85,-0.0116,1227092.0
+BRCB,Black Rock Coffee Bar Inc,Consumer Cyclical,Restaurants,USA,891500000.0,,17.81,-0.022000000000000002,383993.0
+BRKC,YieldMax BRK.B Option Income Strategy ETF,Financial,Exchange Traded Fund,USA,,,43.33,-0.0016,11095.0
+BRKU,Direxion Daily BRKB Bull 2X Shares,Financial,Exchange Traded Fund,USA,,,22.88,-0.0060999999999999995,193741.0
+BRKW,Roundhill BRKB WeeklyPay ETF,Financial,Exchange Traded Fund,USA,,,42.23,-0.0012,20338.0
+BRSL,Brightstar Lottery PLC,Consumer Cyclical,Gambling,United Kingdom,2640000000.0,12.5,13.95,0.0022,2139160.0
+BRZE,Braze Inc,Technology,Software - Application,USA,2710000000.0,,24.14,-0.0029,2006540.0
+BTF,CoinShares Bitcoin and Ether ETF,Financial,Exchange Traded Fund,USA,,,5.34,0.0087,74290.0
+BTOG,Bit Origin Ltd,Financial,Financial Data & Stock Exchanges,Singapore,7160000.0,,4.81,-0.049400000000000006,180417.0
+BTRN,Global X Bitcoin Trend Strategy ETF,Financial,Exchange Traded Fund,USA,,,27.6,0.0006,162.0
+BZQ,ProShares UltraShort MSCI Brazil Capped ETF -2x Shares,Financial,Exchange Traded Fund,USA,,,12.55,-0.0833,25277.0
+CABO,Cable One Inc,Communication Services,Telecom Services,USA,475780000.0,,84.43,0.0102,168566.0
+CARG,CarGurus Inc,Consumer Cyclical,Auto & Truck Dealerships,USA,3210000000.0,22.81,33.66,0.0033,675092.0
+CBZ,Cbiz Inc,Industrials,Specialty Business Services,USA,2450000000.0,29.61,44.97,-0.026000000000000002,927846.0
+CCTG,CCSC Technology International Holdings Ltd,Industrials,Electrical Equipment & Parts,Hong Kong,2280000.0,,0.1,-0.11789999999999999,3212149.0
+CHOW,ChowChow Cloud International Holdings Ltd,Technology,Software - Infrastructure,Hong Kong,23870000.0,10.09,0.68,-0.0029,194024.0
+CISS,C3is Inc,Industrials,Marine Shipping,Greece,630000.0,,0.14,0.0837,4078949.0
+CLBT,Cellebrite DI Ltd,Technology,Software - Infrastructure,Israel,3770000000.0,51.3,15.74,-0.0391,3768946.0
+CLDI,Calidi Biotherapeutics Inc,Healthcare,Biotechnology,USA,7170000.0,,1.0,-0.009899999999999999,51515.0
+CLOD,Themes Cloud Computing ETF,Financial,Exchange Traded Fund,USA,,,30.25,0.0013,542.0
+CLOU,Global X Cloud Computing ETF,Financial,Exchange Traded Fund,USA,,,20.82,0.0058,311478.0
+CLVT,Clarivate Plc,Technology,Information Technology Services,United Kingdom,1860000000.0,,2.81,-0.0377,6699581.0
+CMRC,Commerce.com Inc,Technology,Software - Application,USA,271420000.0,,3.34,-0.0147,1095925.0
+CNEY,CN Energy Group Inc,Basic Materials,Specialty Chemicals,China,1510000.0,,0.48,-0.0533,2013724.0
+COE,51 Talk Online Education Group ADR,Consumer Defensive,Education & Training Services,Singapore,103700000.0,,25.11,-0.026699999999999998,8844.0
+COIO,Leverage Shares 2x Capped Accelerated COIN Monthly ETF,Financial,Exchange Traded Fund,USA,,,8.97,-0.003,89.0
+CORT,Corcept Therapeutics Inc,Healthcare,Biotechnology,USA,3820000000.0,41.49,36.31,0.028900000000000002,1411284.0
+COUR,Coursera Inc,Consumer Defensive,Education & Training Services,USA,1070000000.0000001,,6.35,0.0,3089188.0
+COYY,GraniteShares YieldBOOST COIN ETF,Financial,Exchange Traded Fund,USA,,,7.03,-0.0042,336298.0
+CPNG,Coupang Inc,Consumer Cyclical,Internet Retail,USA,36970000000.0,95.79,20.24,-0.011699999999999999,18772974.0
+CRCT,Cricut Inc,Technology,Computer Hardware,USA,902030000.0,11.31,4.26,0.0070999999999999995,438668.0
+CRM,Salesforce Inc,Technology,Software - Application,USA,207620000000.0,29.56,221.58,0.0069,12593145.0
+CRMG,Leverage Shares 2X Long CRM Daily ETF,Financial,Exchange Traded Fund,USA,,,9.41,0.0129,351968.0
+CXAI,CXApp Inc,Technology,Software - Application,USA,8250000.0,,0.26,-0.058899999999999994,1303704.0
+CXM,Sprinklr Inc,Technology,Software - Application,USA,1640000000.0,15.74,6.66,0.0076,1683425.0
+DAIC,CID Holdco Inc,Technology,Information Technology Services,USA,11530000.0,,0.42,-0.0233,178009.0
+DAT,ProShares Big Data Refiners ETF,Financial,Exchange Traded Fund,USA,,,41.79,0.0008,1368.0
+DCBO,Docebo Inc,Technology,Software - Application,Canada,524900000.0,24.63,18.27,-0.038900000000000004,90569.0
+DCX,Digital Currency X Technology Inc,Consumer Cyclical,Auto Manufacturers,Cayman Islands,1570000.0,,0.36,-0.025099999999999997,362453.0
+DGNX,Diginex Ltd,Industrials,Consulting Services,United Kingdom,290810000.0,,1.44,-0.16760000000000003,6039095.0
+DOCU,DocuSign Inc,Technology,Software - Application,USA,11220000000.0,39.21,56.03,0.0038,4138955.0
+DOMO,Domo Inc,Technology,Software - Application,USA,253300000.0,,6.06,0.0669,1834783.0
+DQ,Daqo New Energy Corp ADR,Technology,Solar,China,1640000000.0,,24.54,-0.005699999999999999,602770.0
+DRCT,Direct Digital Holdings Inc,Communication Services,Advertising Agencies,USA,2200000.0,,1.78,-0.0326,844616.0
+DSWL,"Deswell Industries, Inc",Technology,Electronic Components,China,48760000.0,3.91,3.06,-0.1207,54111.0
+DTST,Data Storage Corp,Technology,Information Technology Services,USA,31040000.0,,4.14,-0.0461,25835.0
+DULL,MicroSectors Gold -3X Inverse Leveraged ETNs,Financial,Exchange Traded Fund,USA,,,1.19,-0.0325,653537.0
+DUNK,Dana Unconstrained Equity ETF,Financial,Exchange Traded Fund,USA,,,23.2,0.0051,10426.0
+DUOG,Leverage Shares 2X Long DUOL Daily ETF,Financial,Exchange Traded Fund,USA,,,7.93,-0.0241,139599.0
+DUOL,Duolingo Inc,Technology,Software - Application,USA,6770000000.0,18.67,146.81,-0.011899999999999999,2645776.0
+DUST,Direxion Daily Gold Miners Index Bear -2X Shares,Financial,Exchange Traded Fund,USA,,,5.25,0.0274,91454274.0
+EDHL,Everbright Digital Holding Ltd,Communication Services,Advertising Agencies,USA,,,0.24,-0.1374,253876.0
+ELAB,PMGC Holdings Inc,Healthcare,Biotechnology,USA,4010000.0,,3.38,0.0432,136921.0
+EMPB,Efficient Market Portfolio Plus ETF,Financial,Exchange Traded Fund,USA,,,27.9,-0.0013,1728.0
+EOLS,Evolus Inc,Healthcare,Drug Manufacturers - Specialty & Generic,USA,317620000.0,,4.9,-0.0316,857826.0
+ESGL,ESGL Holdings Ltd,Industrials,Waste Management,Singapore,160570000.0,,3.84,-0.0327,8585.0
+ETOR,Etoro Group Ltd,Financial,Capital Markets,Israel,2560000000.0,13.0,30.56,-0.008100000000000001,839331.0
+ETRL,GraniteShares 2x Long ETOR Daily ETF,Financial,Exchange Traded Fund,USA,,,9.24,-0.0067,3219.0
+EXTR,Extreme Networks Inc,Technology,Communication Equipment,USA,2020000000.0,237.95,15.11,0.006,1618748.0
+FBYD,Falcon's Beyond Global Inc,Industrials,Conglomerates,USA,333040000.0,,6.06,-0.050199999999999995,203841.0
+FBYY,GraniteShares YieldBOOST META ETF,Financial,Exchange Traded Fund,USA,,,17.74,0.013000000000000001,769.0
+FCUV,Focus Universal Inc,Technology,Scientific & Technical Instruments,USA,5910000.0,,0.72,0.045599999999999995,38964.0
+FDND,FT Vest Dow Jones Internet & Target Income ETF,Financial,Exchange Traded Fund,USA,,,21.32,-0.002,720.0
+FDRS,Founder-Led ETF,Financial,Exchange Traded Fund,USA,,,23.3,0.0073,148860.0
+FEDU,Four Seasons Education (Cayman) Inc ADR,Consumer Defensive,Education & Training Services,China,17360000.0,14.15,7.68,-0.3018,8656.0
+FEED,ENvue Medical Inc,Healthcare,Medical Devices,USA,1370000.0,,1.26,0.024399999999999998,7789120.0
+FFF,Founders 100 ETF,Financial,Exchange Traded Fund,USA,,,23.59,0.0027,2116.0
+FIG,Figma Inc,Technology,Software - Application,USA,13420000000.0,,27.07,-0.024900000000000002,11786260.0
+FIGG,Leverage Shares 2x Long FIG Daily ETF,Financial,Exchange Traded Fund,USA,,,2.34,-0.048799999999999996,872518.0
+FIS,"Fidelity National Information Services, Inc",Technology,Information Technology Services,USA,31370000000.0,190.8,60.58,0.0085,3803377.0
+FLUT,Flutter Entertainment Plc,Consumer Cyclical,Gambling,USA,31740000000.0,,181.07,-0.016399999999999998,3467624.0
+FNGG,Direxion Daily NYSE FANG+ Bull 2X Shares,Financial,Exchange Traded Fund,USA,,,186.43,0.0016,15392.0
+FNGO,MicroSectors FANG+Index 2X Leveraged ETNs,Financial,Exchange Traded Fund,USA,,,105.53,0.0004,41920.0
+FNGS,MicroSectors FANG ETNs,Financial,Exchange Traded Fund,USA,,,64.95,-0.0006,67355.0
+FNGU,MicroSectors FANG+ 3X Leveraged ETNs,Financial,Exchange Traded Fund,USA,,,21.59,0.0005,7995110.0
+FRSX,Foresight Autonomous Holdings Ltd ADR,Consumer Cyclical,Auto Parts,Israel,5010000.0,,1.03,-0.0374,828828.0
+FTFT,Future FinTech Group Inc,Technology,Software - Application,USA,10530000.0,,2.09,-0.12179999999999999,235987.0
+FVRR,Fiverr International Ltd,Communication Services,Internet Content & Information,Israel,578770000.0,26.78,15.7,-0.0051,1182388.0
+GDDY,Godaddy Inc,Technology,Software - Infrastructure,USA,14070000000.0,17.94,104.14,0.0063,1947688.0
+GDXD,MicroSectors Gold Miners -3X Inverse Leveraged ETNs,Financial,Exchange Traded Fund,USA,,,4.91,0.0337,21244991.0
+GGME,Invesco Next Gen Media and Gaming ETF,Financial,Exchange Traded Fund,USA,,,56.28,0.0053,22786.0
+GGOV,iShares Global Government Bond USD Hedged Active ETF,Financial,Exchange Traded Fund,USA,,,48.51,0.0032,8.0
+GIND,Goldman Sachs India Equity ETF,Financial,Exchange Traded Fund,USA,,,24.85,-0.0083,3966.0
+GLL,ProShares UltraShort Gold -2x Shares,Financial,Exchange Traded Fund,USA,,,20.8,-0.0285,8617879.0
+GOVX,Geovax Labs Inc,Healthcare,Biotechnology,USA,5160000.0,,2.98,0.0681,143429.0
+GPRO,GoPro Inc,Technology,Consumer Electronics,USA,211070000.0,,1.3,0.0078000000000000005,2578559.0
+GRAG,Leverage Shares 2X Long GRAB Daily ETF,Financial,Exchange Traded Fund,USA,,,10.51,-0.0478,35590.0
+GRI,GRI Bio Inc,Healthcare,Biotechnology,USA,3100000.0,,0.22,-0.0421,2238404.0
+GRND,Grindr Inc,Technology,Software - Application,USA,2210000000.0,,11.94,-0.0091,1665269.0
+GTLB,Gitlab Inc,Technology,Software - Infrastructure,USA,5580000000.0,,33.15,0.0033,3704084.0
+GTM,ZoomInfo Technologies Inc,Technology,Software - Application,USA,2730000000.0,27.65,8.76,-0.0028000000000000004,3834110.0
+GWRE,Guidewire Software Inc,Technology,Software - Application,USA,13510000000.0,150.74,158.96,0.0226,2380632.0
+HAE,Haemonetics Corp,Healthcare,Medical Devices,USA,3280000000.0,20.45,70.11,0.0001,1520782.0
+HCTI,Healthcare Triangle Inc,Healthcare,Health Information Services,USA,2350000.0,,0.4,-0.054400000000000004,1460368.0
+HDB,HDFC Bank Ltd. ADR,Financial,Banks - Regional,India,164770000000.0,19.32,32.13,-0.006500000000000001,6984658.0
+HIMS,Hims & Hers Health Inc,Healthcare,Drug Manufacturers - Specialty & Generic,USA,6580000000.0,53.41,28.89,-0.0519,27782324.0
+HIMY,Defiance Leveraged Long + Income HIMS ETF,Financial,Exchange Traded Fund,USA,,,4.93,-0.1099,59942.0
+HIMZ,Defiance Daily Target 2X Long HIMS ETF,Financial,Exchange Traded Fund,USA,,,4.46,-0.1026,7299052.0
+HIND,Vyome Holdings Inc,Healthcare,Biotechnology,USA,15130000.0,,2.68,-0.028999999999999998,17016.0
+HIYY,YieldMax HIMS Option Income Strategy ETF,Financial,Exchange Traded Fund,USA,,,21.68,-0.0483,7165.0
+HMYY,GraniteShares YieldBoost HIMS ETF,Financial,Exchange Traded Fund,USA,,,15.06,-0.055,19149.0
+HOYY,GraniteShares YieldBOOST HOOD ETF,Financial,Exchange Traded Fund,USA,,,12.09,0.0009,94947.0
+HPQ,HP Inc,Technology,Computer Hardware,USA,17930000000.0,7.36,19.53,-0.013600000000000001,18298505.0
+HSTM,Healthstream Inc,Healthcare,Health Information Services,USA,630150000.0,31.13,21.24,-0.0033,211506.0
+HTCR,HeartCore Enterprises Inc,Technology,Software - Application,Japan,6950000.0,,0.27,-0.062400000000000004,270556.0
+HTT,High Templar Tech Ltd. ADR,Financial,Credit Services,China,314070000.0,4.62,3.09,0.0098,198473.0
+HUBS,HubSpot Inc,Technology,Software - Application,USA,15840000000.0,,302.32,-0.008100000000000001,1221274.0
+HUIZ,Huize Holding Ltd ADR,Financial,Insurance Brokers,China,18960000.0,8.86,2.21,-0.030699999999999998,1971.0
+HURA,TuHURA Biosciences Inc,Healthcare,Biotechnology,USA,41710000.0,,0.69,0.009000000000000001,279256.0
+IBG,Innovation Beverage Group Ltd,Consumer Defensive,Beverages - Wineries & Distilleries,Australia,3330000.0,,0.96,-0.382,1188924.0
+IGV,iShares Expanded Tech-Software Sector ETF,Financial,Exchange Traded Fund,USA,,,95.4,-0.0055000000000000005,9490165.0
+IH,iHuman Inc ADR,Consumer Defensive,Education & Training Services,China,40140000.0,6.55,1.8,-0.0541,52834.0
+IIF,Morgan Stanley India Investment Fund Inc,Financial,Closed-End Fund - Foreign,USA,225830000.0,16.06,23.61,-0.0046,60835.0
+IINN,Inspira Technologies Oxy B.H.N. Ltd,Healthcare,Medical Devices,Israel,27950000.0,,0.78,-0.045700000000000005,600619.0
+INCO,Columbia India Consumer ETF,Financial,Exchange Traded Fund,USA,,,61.44,-0.0046,28382.0
+IND,Xtrackers Nifty 500 India ETF,Financial,Exchange Traded Fund,USA,,,23.66,-0.006999999999999999,535.0
+INDA,iShares MSCI India ETF,Financial,Exchange Traded Fund,USA,,,51.55,-0.0034999999999999996,10137391.0
+INDL,Direxion Daily MSCI India Bull 2X Shares,Financial,Exchange Traded Fund,USA,,,51.47,-0.0098,38138.0
+INDY,iShares India 50 ETF,Financial,Exchange Traded Fund,USA,,,46.96,-0.003,121210.0
+INHD,Inno Holdings Inc,Basic Materials,Steel,Hong Kong,9630000.0,,1.36,-0.0748,253327.0
+INLF,INLIF Ltd,Industrials,Specialty Industrial Machinery,China,2790000.0,,0.44,-0.056799999999999996,199191.0
+INQQ,INQQ The India Internet ETF,Financial,Exchange Traded Fund,USA,,,13.84,0.0,50235.0
+INTJ,Intelligent Group Ltd,Industrials,Consulting Services,Hong Kong,12610000.0,,0.41,-0.006999999999999999,110387.0
+INTU,Intuit Inc,Technology,Software - Application,USA,146070000000.0,35.95,524.92,-0.0076,2639010.0
+IOBT,IO Biotech Inc,Healthcare,Biotechnology,Denmark,14940000.0,,0.21,-0.5974,32428806.0
+IPST,Heritage Distilling Holding Co. Inc,Financial,Capital Markets,USA,14630000.0,,1.53,-0.0556,36479.0
+IPW,iPower Inc,Consumer Cyclical,Internet Retail,USA,5620000.0,,4.9,-0.0040999999999999995,125245.0
+IZEA,IZEA Worldwide Inc,Communication Services,Internet Content & Information,USA,67130000.0,,3.92,-0.0297,91780.0
+JBDI,JBDI Holdings Ltd,Consumer Cyclical,Specialty Retail,USA,,,0.57,-0.076,20342.0
+JDST,Direxion Daily Junior Gold Miners Index Bear -2X Shares,Financial,Exchange Traded Fund,USA,,,1.85,0.0278,53560881.0
+JL,J-Long Group Ltd,Consumer Cyclical,Apparel Manufacturing,Hong Kong,13500000.0,40.47,3.59,-0.2688,644447.0
+JPMO,YieldMax JPM Option Income Strategy ETF,Financial,Exchange Traded Fund,USA,,,14.8,0.0007000000000000001,44869.0
+JTAI,Jet.AI Inc,Technology,Software - Application,USA,5410000.0,,0.35,-0.1514,11076676.0
+JZ,Jianzhi Education Technology Group Co Ltd ADR,Technology,Information Technology Services,China,2710000.0,,0.96,0.0126,3807.0
+JZXN,Jiuzi Holdings Inc,Consumer Cyclical,Auto & Truck Dealerships,China,2630000.0,,1.89,0.010700000000000001,49352.0
+KPDD,KraneShares 2x Long PDD Daily ETF,Financial,Exchange Traded Fund,USA,,,9.88,0.0292,191748.0
+LGHL,Lion Group Holding Ltd ADR,Financial,Capital Markets,China,310000.0,,1.49,-0.20739999999999997,272680.0
+LGPS,LogProstyle Inc,Industrials,Conglomerates,Japan,20150000.0,3.43,0.85,-0.0536,67947.0
+LHAI,Linkhome Holdings Inc,Real Estate,Real Estate Services,USA,37170000.0,73.63,2.29,-0.0766,1599749.0
+LIF,Life360 Inc,Technology,Software - Application,USA,4160000000.0,150.9,53.07,-0.0187,1126483.0
+LIFT,LifeX 2028 Income Bucket ETF,Financial,Exchange Traded Fund,USA,,,28.12,0.0004,259.0
+LMTS,Direxion Daily LMT Bear 1X ETF,Financial,Exchange Traded Fund,USA,,,17.86,-0.016399999999999998,309.0
+LOGI,Logitech International S.A,Technology,Computer Hardware,Switzerland,13500000000.0,20.87,91.88,0.0076,1285675.0
+LPSN,Liveperson Inc,Technology,Software - Application,USA,36170000.0,,3.05,0.0066,163815.0
+LRHC,La Rosa Holdings Corp,Real Estate,Real Estate Services,USA,840000.0,,0.52,-0.0334,272567.0
+LVWR,LiveWire Group Inc,Consumer Cyclical,Auto Manufacturers,USA,526289999.99999994,,2.58,0.075,88599.0
+LZ,LegalZoom.com Inc,Industrials,Specialty Business Services,USA,1510000000.0,68.25,8.49,-0.0241,3214622.0
+MA,Mastercard Incorporated,Financial,Credit Services,USA,473760000000.0,33.74,527.57,-0.0078000000000000005,4936991.0
+MAAY,GraniteShares YieldBOOST MARA ETF,Financial,Exchange Traded Fund,USA,,,13.82,0.0073,26219.0
+MAGO,Tuttle Capital Magnificent 7 Income Blast ETF,Financial,Exchange Traded Fund,USA,,,23.57,-0.0087,880.0
+MAGY,Roundhill Magnificent Seven Covered Call ETF,Financial,Exchange Traded Fund,USA,,,50.69,0.0108,209277.0
+MDCX,Medicus Pharma Ltd,Healthcare,Drug Manufacturers - General,Canada,33409999.999999996,,1.33,-0.0292,212480.0
+MDXG,Mimedx Group Inc,Healthcare,Biotechnology,USA,789380000.0,19.52,5.33,-0.0111,807974.0
+MEHA,Functional Brands Inc,Consumer Defensive,Packaged Foods,USA,3290000.0,,0.2,-0.0395,425496.0
+MENS,Jyong Biotech Ltd,Healthcare,Biotechnology,Taiwan,242530000.0,,3.19,-0.0215,384885.0
+MLCO,Melco Resorts & Entertainment Ltd ADR,Consumer Cyclical,Resorts & Casinos,Hong Kong,2350000000.0,22.91,6.02,-0.0337,9160570.0
+MMYT,MakeMyTrip Ltd,Consumer Cyclical,Travel Services,India,6220000000.0,133.67,65.54,-0.1213,4963638.0
+MNDY,Monday.Com Ltd,Technology,Software - Application,Israel,6450000000.0,103.69,127.13,0.0019,1905530.0
+MNTN,MNTN Inc,Technology,Software - Application,USA,732240000.0,,10.0,-0.0225,544731.0
+MSFL,GraniteShares 2x Long MSFT Daily ETF,Financial,Exchange Traded Fund,USA,,,22.84,-0.042699999999999995,518956.0
+MSFO,YieldMax MSFT Option Income Strategy ETF,Financial,Exchange Traded Fund,USA,,,14.11,-0.0235,170422.0
+MSFT,Microsoft Corporation,Technology,Software - Infrastructure,USA,3300790000000.0,31.6,444.11,-0.0229,37767504.0
+MSFU,Direxion Daily MSFT Bull 2X Shares,Financial,Exchange Traded Fund,USA,,,34.71,-0.0464,2878353.0
+MSFW,Roundhill MSFT WeeklyPay ETF,Financial,Exchange Traded Fund,USA,,,34.92,-0.026699999999999998,11268.0
+MSFX,T-Rex 2X Long Microsoft Daily Target ETF,Financial,Exchange Traded Fund,USA,,,22.84,-0.0455,65481.0
+MSFY,Kurv Yield Premium Strategy Microsoft (MSFT) ETF,Financial,Exchange Traded Fund,USA,,,21.72,-0.025099999999999997,22629.0
+MSTQ,LHA Market State Tactical Q ETF,Financial,Exchange Traded Fund,USA,,,34.37,0.0045000000000000005,2820.0
+MTEN,Mingteng International Corporation Inc,Industrials,Metal Fabrication,China,200000.0,,0.03,-0.0575,59183265.0
+MTVA,MetaVia Inc,Healthcare,Biotechnology,USA,8420000.0,,2.88,-0.04,455370.0
+MUD,Direxion Daily MU Bear 1X Shares,Financial,Exchange Traded Fund,USA,,,4.14,-0.0676,21327145.0
+MXCT,MaxCyte Inc,Healthcare,Medical Devices,USA,131210000.00000001,,1.23,0.0165,448882.0
+NABL,N-able Inc,Technology,Information Technology Services,USA,1180000000.0,,6.31,0.008,1120254.0
+NCT,Intercont (Cayman) Ltd,Industrials,Marine Shipping,Hong Kong,6560000.0,1.84,0.22,0.0075,112398.0
+NET,Cloudflare Inc,Technology,Software - Infrastructure,USA,59540000000.0,,169.97,-0.042,5058701.0
+NETG,Leverage Shares 2X Long NET Daily ETF,Financial,Exchange Traded Fund,USA,,,9.3,-0.0815,3498.0
+NETX,Tradr 2X Long NET Daily ETF,Financial,Exchange Traded Fund,USA,,,13.92,-0.08380000000000001,6988.0
+NFLP,Kurv Yield Premium Strategy Netflix (NFLX) ETF,Financial,Exchange Traded Fund,USA,,,24.82,-0.0278,15798.0
+NFLU,T-Rex 2X Long NFLX Daily Target ETF,Financial,Exchange Traded Fund,USA,,,26.64,-0.048600000000000004,1451972.0
+NFLW,Roundhill NFLX WeeklyPay ETF,Financial,Exchange Traded Fund,USA,,,23.92,-0.024900000000000002,49842.0
+NFLX,Netflix Inc,Communication Services,Entertainment,USA,390050000000.0,33.78,85.36,-0.0218,127420674.0
+NFLY,YieldMax NFLX Option Income Strategy ETF,Financial,Exchange Traded Fund,USA,,,11.0,-0.013500000000000002,284146.0
+NFXL,Direxion Daily NFLX Bull 2X Shares,Financial,Exchange Traded Fund,USA,,,25.18,-0.045899999999999996,3953378.0
+NISN,NiSun International Enterprise Development Group Co Ltd,Financial,Credit Services,China,5070000.0,,1.1,0.027999999999999997,14151.0
+NIVF,NewGenIvf Group Ltd,Healthcare,Medical Care Facilities,Thailand,550000.0,,0.42,-0.045700000000000005,2215713.0
+NOW,ServiceNow Inc,Technology,Software - Application,USA,130110000000.00002,75.76,125.3,-0.0008,16078982.0
+NOWL,GraniteShares 2x Long NOW Daily ETF,Financial,Exchange Traded Fund,USA,,,9.32,-0.0075,347821.0
+NTGR,Netgear Inc,Technology,Communication Equipment,USA,610950000.0,,21.51,-0.0005,446207.0
+NTNX,Nutanix Inc,Technology,Software - Infrastructure,USA,11240000000.0,55.51,41.57,-0.038,5472183.0
+NXJ,Nuveen New Jersey Quality Municipal Income Fund,Financial,Closed-End Fund - Debt,USA,508400000.0,,12.33,-0.004,92616.0
+ODDS,Pacer BlueStar Digital Entertainment ETF,Financial,Exchange Traded Fund,USA,,,27.42,-0.0059,293.0
+OGIG,ALPS OShares Global Internet Giants ETF,Financial,Exchange Traded Fund,USA,,,48.74,-0.0029,18425.0
+OSG,Octave Specialty Group Inc,Financial,Insurance - Specialty,USA,276460000.0,,6.31,0.0294,754732.0
+OTEX,Open Text Corp,Technology,Software - Application,Canada,7210000000.0,15.0,28.62,-0.0060999999999999995,1640505.0
+OTLK,Outlook Therapeutics Inc,Healthcare,Biotechnology,USA,32439999.999999996,,0.51,-0.0269,2603881.0
+PAYS,PaySign Inc,Technology,Software - Infrastructure,USA,239440000.0,33.08,4.35,-0.0158,259709.0
+PCOR,Procore Technologies Inc,Technology,Software - Application,USA,9790000000.0,,62.96,-0.023,2038288.0
+PD,Pagerduty Inc,Technology,Software - Application,USA,988430000.0,6.73,10.77,-0.0182,2432139.0
+PEGA,Pegasystems Inc,Technology,Software - Application,USA,8130000000.000001,32.48,47.93,-0.060899999999999996,2888668.0
+PIII,P3 Health Partners Inc,Healthcare,Medical Care Facilities,USA,18880000.0,,2.62,-0.0966,39794.0
+PLNT,Planet Fitness Inc,Consumer Cyclical,Leisure,USA,8070000000.0,39.62,96.92,-0.0012,1549351.0
+PLOO,Leverage Shares 2x Capped Accelerated PLTR Monthly ETF,Financial,Exchange Traded Fund,USA,,,15.59,-0.0216,36.0
+PLYY,GraniteShares YieldBOOST PLTR ETF,Financial,Exchange Traded Fund,USA,,,16.66,-0.0177,14865.0
+PMVP,PMV Pharmaceuticals Inc,Healthcare,Biotechnology,USA,56410000.0,,1.06,-0.018500000000000003,682653.0
+PN,Skycorp Solar Group Ltd,Technology,Solar,China,11550000.0,4279.0,0.43,-0.2102,420083.0
+PNQI,Invesco NASDAQ Internet ETF,Financial,Exchange Traded Fund,USA,,,51.28,0.0037,116281.0
+POM,Pomdoctor Ltd. ADR,Healthcare,Pharmaceutical Retailers,China,31590000.0,,0.3,-0.0042,681943.0
+PPCB,Propanc Biopharma Inc,Healthcare,Biotechnology,Australia,3620000.0,,0.27,-0.09369999999999999,527897.0
+PSKY,Paramount Skydance Corp,Communication Services,Entertainment,USA,12800000000.0,,11.6,0.0043,5887937.0
+PSTV,Plus Therapeutics Inc,Healthcare,Biotechnology,USA,52050000.0,,0.29,0.0231,12161602.0
+PTC,PTC Inc,Technology,Software - Application,USA,19180000000.0,26.28,161.32,0.0013,785635.0
+PUBM,PubMatic Inc,Technology,Software - Application,USA,346250000.0,,7.46,-0.01,544016.0
+QBUL,TrueShares Quarterly Bull Hedge ETF,Financial,Exchange Traded Fund,USA,,,23.66,-0.0002,6006.0
+QBY,GraniteShares YieldBoost QBTS ETF,Financial,Exchange Traded Fund,USA,,,16.25,-0.0222,7085.0
+QFIN,Qfin Holdings Inc. ADR,Financial,Credit Services,China,1810000000.0,2.38,16.29,-0.015700000000000002,1648138.0
+QTR,Global X NASDAQ 100 Tail Risk ETF,Financial,Exchange Traded Fund,USA,,,30.42,0.0101,679.0
+RAMP,LiveRamp Holdings Inc,Technology,Software - Infrastructure,USA,1590000000.0,41.29,25.02,0.0097,430138.0
+RENX,RenX Enterprises Corp,Real Estate,Real Estate - Development,USA,1440000.0,,0.16,0.0292,2196907.0
+RETO,ReTo Eco-Solutions Inc,Basic Materials,Building Materials,China,3410000.0,,1.19,-0.08460000000000001,477290.0
+RKLZ,Defiance Daily Target 2x Short RKLB ETF,Financial,Exchange Traded Fund,USA,,,2.87,0.025,21475828.0
+RNW,ReNew Energy Global plc,Utilities,Utilities - Renewable,India,1950000000.0,19.14,5.35,0.0019,680070.0
+ROP,Roper Technologies Inc,Technology,Software - Application,USA,43560000000.0,27.9,404.66,0.0022,1414919.0
+RPD,Rapid7 Inc,Technology,Software - Infrastructure,USA,823090000.0,36.32,12.57,0.0048,973967.0
+RTYY,GraniteShares YieldBoost RIOT ETF,Financial,Exchange Traded Fund,USA,,,18.91,-0.0273,26599.0
+RUBI,Rubico Inc,Industrials,Marine Shipping,USA,,,0.86,0.0385,87868.0
+RVP,Retractable Technologies Inc,Healthcare,Medical Instruments & Supplies,USA,21260000.0,,0.71,-0.0161,112350.0
+SAFX,XCF Global Inc,Utilities,Utilities - Renewable,USA,28740000.0,0.28,0.14,-0.0843,5018398.0
+SAIL,Sailpoint Inc,Technology,Software - Infrastructure,USA,9620000000.0,,17.12,-0.0115,2053913.0
+SCLX,Scilex Holding Company,Healthcare,Drug Manufacturers - General,USA,90010000.0,,10.6,-0.026600000000000002,57712.0
+SGHC,Super Group (SGHC) Limited,Consumer Cyclical,Gambling,United Kingdom,4890000000.0,22.46,9.75,0.0083,2707881.0
+SGN,Signing Day Sports Inc,Technology,Software - Application,USA,2430000.0,,0.18,-0.1906,29957872.0
+SHOP,Shopify Inc,Technology,Software - Application,Canada,180360000000.0,101.46,138.54,-0.0412,15889568.0
+SHPU,Direxion Daily SHOP Bull 2X ETF,Financial,Exchange Traded Fund,USA,,,21.12,-0.0808,50830.0
+SKYU,ProShares Ultra Nasdaq Cloud Computing ETF 2x Shares,Financial,Exchange Traded Fund,USA,,,31.26,0.0043,1030.0
+SKYY,First Trust Cloud Computing ETF,Financial,Exchange Traded Fund,USA,,,120.36,0.0015,200320.0
+SLTY,YieldMax Ultra Short Option Income Strategy ETF,Financial,Exchange Traded Fund,USA,,,29.94,-0.0235,31669.0
+SMIN,iShares MSCI India Small-Cap ETF,Financial,Exchange Traded Fund,USA,,,65.03,-0.005699999999999999,329388.0
+SMN,ProShares UltraShort Materials,Financial,Exchange Traded Fund,USA,,,11.12,-0.042300000000000004,14811.0
+SMWB,Similarweb Ltd,Technology,Software - Application,Israel,478860000.0,,5.55,-0.057699999999999994,547291.0
+SOAR,Volato Group Inc,Industrials,Airports & Air Services,USA,3650000.0,0.48,0.49,-0.0622,1241836.0
+SONY,Sony Group Corporation ADR,Technology,Consumer Electronics,Japan,141540000000.0,18.24,23.68,-0.0017000000000000001,5668174.0
+SOXS,Direxion Daily Semiconductor Bear 3X Shares,Financial,Exchange Traded Fund,USA,,,1.97,-0.0922,572549097.0
+SPC,CrossingBridge Pre-Merger SPAC ETF,Financial,Exchange Traded Fund,USA,,,18.75,-0.0209,6161.0
+SPCX,The SPAC and New Issue ETF,Financial,Exchange Traded Fund,USA,,,21.97,0.0025,386.0
+SPCZ,RiverNorth Enhanced Pre-Merger SPAC ETF,Financial,Exchange Traded Fund,USA,,,25.6,-0.0004,618.0
+SPOG,Leverage Shares 2X Long SPOT Daily ETF,Financial,Exchange Traded Fund,USA,,,8.95,-0.0392,7205.0
+SPOT,Spotify Technology S.A,Communication Services,Internet Content & Information,Luxembourg,103400000000.0,78.36,502.19,-0.0179,3523280.0
+SPRC,SciSparc Ltd,Healthcare,Biotechnology,Israel,4570000.0,,1.05,-0.0455,2335264.0
+SRAD,Sportradar Group AG,Technology,Software - Application,Switzerland,5670000000.0,54.9,18.25,-0.0199,5827740.0
+SURG,Surgepays Inc,Communication Services,Telecom Services,USA,25250000.0,,1.2,-0.3583,3675462.0
+SXTC,China SXT Pharmaceuticals Inc,Healthcare,Drug Manufacturers - Specialty & Generic,China,11700000.0,,0.09,-0.046900000000000004,7723128.0
+SYBX,Synlogic Inc,Healthcare,Biotechnology,USA,7250000.0,,0.62,0.10710000000000001,347684.0
+SZK,ProShares UltraShort Consumer Staples,Financial,Exchange Traded Fund,USA,,,11.39,-0.0016,2092.0
+TARS,Tarsus Pharmaceuticals Inc,Healthcare,Biotechnology,USA,3020000000.0,,71.17,0.0034000000000000002,532771.0
+TEAM,Atlassian Corporation,Technology,Software - Application,USA,32210000000.0,,122.41,0.0368,6236056.0
+TKNO,Alpha Teknova Inc,Healthcare,Drug Manufacturers - Specialty & Generic,USA,176110000.0,,3.29,-0.023700000000000002,303321.0
+TMUS,T-Mobile US Inc,Communication Services,Telecom Services,USA,205360000000.0,17.65,183.6,-0.0003,8184913.0
+TRAK,ReposiTrak Inc,Technology,Software - Application,USA,199530000.0,30.26,10.91,-0.0009,107476.0
+TRI,Thomson-Reuters Corp,Industrials,Specialty Business Services,Canada,53430000000.0,30.88,120.11,-0.0076,1031265.0
+TRMB,Trimble Inc,Technology,Scientific & Technical Instruments,USA,16710000000.0,47.77,70.24,0.009300000000000001,2908242.0
+TRNR,Interactive Strength Inc,Consumer Cyclical,Personal Services,USA,1980000.0,,0.71,-0.0405,651477.0
+TRUP,Trupanion Inc,Financial,Insurance - Property & Casualty,USA,1370000000.0,89.06,31.75,0.017,478872.0
+TTXU,Direxion Daily Technology Top 5 Bull 2X ETF,Financial,Exchange Traded Fund,USA,,,18.67,-0.043,6154.0
+TWNP,Twin Hospitality Group Inc,Consumer Cyclical,Restaurants,USA,30380000.0,,0.53,-0.0026,65059.0
+TZOO,Travelzoo,Communication Services,Internet Content & Information,USA,63950000.0,8.96,5.85,0.0192,186666.0
+VGRO,Virtus Silvant Growth Opportunities ETF,Financial,Exchange Traded Fund,USA,,,24.09,0.0076,346.0
+VIOT,Viomi Technology Co Ltd ADR,Consumer Cyclical,"Furnishings, Fixtures & Appliances",China,47520000.0,3.93,1.41,-0.0342,422698.0
+VITL,Vital Farms Inc,Consumer Defensive,Farm Products,USA,1220000000.0,20.69,27.3,-0.0058,2859184.0
+VSA,VisionSys AI Inc ADR,Consumer Defensive,Education & Training Services,China,1850000.0,,2.34,-0.0787,50937.0
+VSNT,Versant Media Group Inc,Communication Services,Entertainment,USA,4690000000.0,4.17,32.44,-0.0064,3089949.0
+VTEX,Vtex,Technology,Software - Application,United Kingdom,573930000.0,86.83,3.23,-0.0062,771888.0
+VTGN,Vistagen Therapeutics Inc,Healthcare,Biotechnology,USA,25050000.0,,0.63,-0.017,915256.0
+WCLD,WisdomTree Cloud Computing Fund,Financial,Exchange Traded Fund,USA,,,31.42,0.0016,380114.0
+WDAY,Workday Inc,Technology,Software - Application,USA,48240000000.0,77.01,183.41,0.0023,3820655.0
+WEBL,Direxion Daily Dow Jones Internet Bull 3X Shares,Financial,Exchange Traded Fund,USA,,,23.55,0.0125,190445.0
+WETO,Webus International Ltd,Technology,Software - Application,China,15180000.0,,0.69,0.0074,5175.0
+WGS,GeneDx Holdings Corp,Healthcare,Diagnostics & Research,USA,2890000000.0,1659.04,100.04,0.0036,651643.0
+WIX,Wix.com Ltd,Technology,Software - Infrastructure,Israel,4370000000.0,34.55,79.74,0.045899999999999996,2714093.0
+WLTH,Wealthfront Corp,Technology,Software - Application,USA,1300000000.0,,8.92,0.013600000000000001,2070483.0
+WOK,Work Medical Technology Group Ltd,Healthcare,Medical Devices,China,2510000.0,,2.05,-0.0097,146857.0
+WTO,UTime Ltd,Technology,Consumer Electronics,China,2160000.0,,0.74,0.0239,146656.0
+XBTY,GraniteShares YieldBOOST Bitcoin ETF,Financial,Exchange Traded Fund,USA,,,10.4,-0.0004,49201.0
+XDAT,Franklin Exponential Data ETF,Financial,Exchange Traded Fund,USA,,,23.95,-0.0066,271.0
+XFLX,FundX Flexible ETF,Financial,Exchange Traded Fund,USA,,,22.49,0.0051,11467.0
+XGN,Exagen Inc,Healthcare,Diagnostics & Research,USA,107190000.0,,4.73,-0.0021,771841.0
+XLO,Xilio Therapeutics Inc,Healthcare,Biotechnology,USA,31350000.0,,0.6,-0.0462,598298.0
+XOMZ,Direxion Daily XOM Bear 1X Shares,Financial,Exchange Traded Fund,USA,,,19.73,-0.022099999999999998,4734.0
+XTKG,X3 Holdings Co Ltd,Technology,Software - Application,Singapore,1990000.0,,0.12,-0.1267,3611006.0
+YBST,GraniteShares YieldBoost Single Stock Universe ETF,Financial,Exchange Traded Fund,USA,,,22.15,-0.0017000000000000001,24361.0
+YBTY,GraniteShares YieldBoost TopYielders ETF,Financial,Exchange Traded Fund,USA,,,21.62,-0.0012,16429.0
+YDKG,Yueda Digital Holding,Communication Services,Advertising Agencies,China,5350000.0,,0.97,-0.0245,72945.0
+YMAG,YieldMax Magnificent 7 Fund of Option Income ETFs,Financial,Exchange Traded Fund,USA,,,13.59,0.0037,3645890.0
+ZIP,ZipRecruiter Inc,Communication Services,Internet Content & Information,USA,233570000.0,,2.73,0.0664,1266888.0
+ZJYL,Jin Medical International Ltd,Healthcare,Medical Instruments & Supplies,China,19810000.0,11.11,0.13,-0.0409,1933035.0
+ZSL,ProShares UltraShort Silver -2x Shares,Financial,Exchange Traded Fund,USA,,,2.81,0.0331,178702488.0
+ZYBT,Zhengye Biotechnology Holding Ltd,Healthcare,Drug Manufacturers - Specialty & Generic,China,51660000.0,,1.09,-0.0091,13368.0

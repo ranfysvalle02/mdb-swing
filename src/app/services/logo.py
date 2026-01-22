@@ -92,4 +92,4 @@ def get_logo_html(ticker: str, css_class: str = "company-logo") -> str:
         HTML string with <div> containing SVG element
     """
     svg = get_svg_initials(ticker)
-    return f'<div class="logo-initials {css_class}" data-ticker="{ticker}">{svg}</div>'
+    return f'<div class="{css_class}" data-ticker="{ticker}">{svg}</div>'

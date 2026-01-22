@@ -89,6 +89,21 @@
         "partialFilterExpression": {"active": true}
       }
     ],
+    "custom_strategies": [
+      {
+        "type": "regular",
+        "keys": {"label": 1},
+        "name": "label_idx",
+        "unique": true
+      },
+      {
+        "type": "regular",
+        "keys": {"is_active": 1},
+        "name": "active_idx",
+        "unique": true,
+        "partialFilterExpression": {"is_active": true}
+      }
+    ],
     "signals": [
       {
         "type": "regular",

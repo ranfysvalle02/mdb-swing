@@ -1,0 +1,12 @@
+{# Info Panel Component - Better UX than tooltips #}
+{% from "components/info_panel.html" import info_button, metric_info_button %}
+
+{# Section Info Button - For section headers #}
+{% macro tooltip(content, aria_label, icon="info", icon_size="w-3.5 h-3.5", icon_color="text-blue-400") %}
+{{ info_button(content, aria_label, icon, icon_size, icon_color) }}
+{% endmacro %}
+
+{# Metric Info Button - For inline metrics #}
+{% macro metric_tooltip(content, aria_label, icon_color="text-gray-400") %}
+{{ metric_info_button(content, aria_label, icon_color) }}
+{% endmacro %}

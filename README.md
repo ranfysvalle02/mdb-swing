@@ -1,4 +1,4 @@
-# 👁️ Sauron's Eye: Swing Trading System for Balanced Lows
+# ⚡ FLUX - Swing Trading Evolved
 
 **An AI-powered swing trading system that captures multi-day to multi-week moves in stocks at balanced lows**
 
@@ -112,15 +112,15 @@ Picture this: You're building a trading bot. You need to scan markets, analyze s
 
 But what if there was a better way?
 
-Enter **mdb-engine** — a framework that handles all the infrastructure so you can focus on what matters: building the Eye that watches markets.
+Enter **mdb-engine** — a framework that handles all the infrastructure so you can focus on what matters: building FLUX that watches markets.
 
-This is the story of how we built Sauron's Eye, a **swing trading system** that identifies stocks at **balanced lows** — those perfect moments when a stock is oversold but stable, in an uptrend, with clear upside potential for multi-day to multi-week moves. And how mdb-engine let us build it faster, cleaner, and more reliably than we ever could have imagined.
+This is the story of how we built FLUX, a **swing trading system** that identifies stocks at **balanced lows** — those perfect moments when a stock is oversold but stable, in an uptrend, with clear upside potential for multi-day to multi-week moves. And how mdb-engine let us build it faster, cleaner, and more reliably than we ever could have imagined.
 
 ---
 
 ## What Is This, Really?
 
-Sauron's Eye is a **swing trading system** focused on finding stocks at balanced lows — capturing multi-day to multi-week moves when stocks are temporarily oversold but still in an uptrend.
+FLUX is a **swing trading system** focused on finding stocks at balanced lows — capturing multi-day to multi-week moves when stocks are temporarily oversold but still in an uptrend.
 
 ### Swing Trading Characteristics
 
@@ -177,49 +177,100 @@ We're swing traders, not day traders or long-term investors. We're looking for t
 
 ---
 
-## How the Eye Watches for Swing Trading Opportunities
+## How Analysis Works: The Complete Flow
 
-The Eye of Sauron doesn't blink. When you trigger a scan, it analyzes popular stocks using **daily bars** to find swing trading opportunities — stocks temporarily oversold but still in an uptrend, perfect for multi-day to multi-week moves.
+When you click "Analyze with AI" on a stock, here's exactly what happens:
 
-### The Swing Trading Watch Cycle
+### Step 1: Cache Check (Fast Path)
+- FLUX checks MongoDB cache via `RadarService.get_cached_analysis()`
+- If fresh analysis exists (< 1 hour old), returns cached result immediately
+- **Result**: Instant response, no API calls needed
 
-**Step 1: The Scan**  
-Click "Scan Again" to trigger the Eye. It fetches 500+ days of **daily bar data** for popular stocks (swing trading uses daily bars, not intraday). The Eye checks if you already have a position (no duplicates), then checks its cache before moving to analysis.
+### Step 2: Market Data Fetching (Cache Miss)
+If cache misses or is stale, FLUX fetches fresh data:
 
-**Step 2: Technical Analysis (Swing Trading Indicators)**  
-Three key indicators tell the story for swing entries:
-- **RSI (Relative Strength Index)**: Is it oversold? (< 35 = balanced low, perfect for swing entry)
-- **SMA-200**: Is it in an uptrend? (price > SMA = foundation is solid, confirms swing direction)
-- **ATR (Average True Range)**: How volatile? (used for position sizing and stop loss/take profit)
+**Price Data** (`get_market_data()`):
+- Fetches 500+ days of historical OHLCV data from Alpaca API
+- Uses multiple fallback strategies (limit parameter, date range, 1-year lookback)
+- Requires minimum 14 days of data
+- Caches results for 5 minutes to reduce API calls
 
-**Swing Entry Signal**: RSI < 35 AND price > SMA-200. Simple. Focused. Perfect for swing trading.
+**News Data**:
+- Fetches last 5 news articles from Alpaca
+- Uses **Firecrawl** to scrape article content (first 500 characters)
+- Fetches articles concurrently for speed
+- Includes headlines, summaries, URLs, and full article content
 
-**Step 3: The AI Validates (with Historical Context)**  
-Here's where it gets interesting. The Eye checks its Radar cache first — if a recent analysis exists (within 1 hour), it uses that. Otherwise, it fetches recent news headlines and sends everything to Azure OpenAI (GPT-4o). 
+### Step 3: Technical Analysis
+Calculates indicators using `vectorbt`:
+- **RSI** (14-day window) - Identifies oversold conditions
+- **SMA-200** (or available data) - Confirms uptrend
+- **ATR** (14-day window) - Measures volatility
+- **Trend** (UP/DOWN based on price vs SMA-200)
+- **Current Price**
 
-But the Eye doesn't work in isolation. It searches its historical database for similar swing signals using vector embeddings, learning from past patterns. If similar swing signals were profitable, the Eye boosts its confidence.
+### Step 4: AI Analysis
+Uses Azure OpenAI (GPT-4o) with structured output:
 
-The AI scores the swing opportunity 0-10 based on:
-- How balanced the low is (not too extreme, not too mild) — perfect for swing entries
-- Strength of the uptrend — confirms swing direction
-- News sentiment (catastrophic news = automatic veto)
-- Upside potential (room for multi-day to multi-week swing move)
-- Historical pattern confidence (boost from similar profitable swing signals)
+**Inputs**:
+- Technical indicators (RSI, price, trend, ATR)
+- Recent news headlines + article content (from Firecrawl)
+- Strategy-specific prompt (Balanced Low strategy)
 
-**Step 4: You Decide**  
-If the adjusted AI score (base score + confidence boost) meets the threshold (≥ 7 by default), the Eye highlights the swing opportunity. You see:
-- Symbol, price, RSI, trend, risk level
-- The AI's reasoning (why it thinks this is a good swing entry)
-- The base score and confidence boost
-- Historical context (how many similar swing signals were profitable)
+**Output** (`TradeVerdict`):
+- **Score**: 0-10 (bounce-back probability)
+- **Action**: BUY or NOT BUY (NOT BUY means avoid buying - sells come from positions, stop loss, or take profit)
+- **Reason**: Concise explanation
+- **Risk Level**: LOW, MEDIUM, or HIGH
+- **Key Factors**: 3-5 supporting factors
+- **Risks**: 2-4 risk factors
+- **Opportunities**: 2-3 potential catalysts
+- **Catalyst**: Primary catalyst driving the opportunity
 
-One click: **APPROVE** or **REJECT**. You're always in control.
+**Timeout Protection**: 60-second timeout prevents hanging
 
-**Step 5: Execution (Swing Trading Style)**  
-Approved trades execute with bracket orders designed for swing trading:
-- **Stop loss**: Entry - (2 × ATR) — protects your capital during the swing hold
-- **Take profit**: Entry + (3 × ATR) — captures the swing move upside
-- **Hold Period**: Days to weeks — positions held until stop loss or take profit hit (swing trading time horizon)
+### Step 5: Context Adjustment
+- Adjusts action based on whether user has existing position
+- If user already owns stock, recommendations may differ
+
+### Step 6: Caching
+- Stores analysis in MongoDB via `RadarService.cache_analysis()`
+- TTL: 1 hour
+- Includes technicals, verdict, headlines, and news objects
+
+### Step 7: Response Rendering
+- Uses `analysis_result_summary.html` template
+- Displays AI score, action, technical indicators, risk level
+- Shows key factors, risks, opportunities
+- Includes recent news with links
+- Embeds TradingView chart widget
+
+### Data Flow Diagram
+
+```
+User clicks "Analyze" 
+  ↓
+Check Cache (RadarService)
+  ├─ Cache Hit → Return Cached Result (instant)
+  └─ Cache Miss → Full Analysis
+      ↓
+Fetch Market Data (Alpaca API)
+  ├─ Historical OHLCV bars (500 days)
+  └─ Recent News (5 articles + Firecrawl content)
+      ↓
+Calculate Technical Indicators (vectorbt)
+  ├─ RSI, SMA-200, ATR, Trend
+      ↓
+AI Analysis (Azure OpenAI GPT-4o)
+  ├─ Input: Techs + News + Strategy Prompt
+  └─ Output: TradeVerdict (score, action, insights)
+      ↓
+Cache Result (1-hour TTL)
+      ↓
+Render HTML Template
+      ↓
+Return to User
+```
 
 
 ---
@@ -244,9 +295,9 @@ from mdb_engine import MongoDBEngine
 
 engine = MongoDBEngine(mongo_uri=MONGO_URI, db_name=MONGO_DB)
 app = engine.create_app(
-    slug="sauron_eye",
+    slug="flux",
     manifest=get_manifest_path(),
-    title="Sauron's Eye - Market Watcher"
+    title="FLUX - Swing Trading Evolved"
 )
 ```
 
@@ -278,9 +329,9 @@ With mdb-engine, we declare indexes in `config/manifest.json`:
 }
 ```
 
-The Eye starts up, mdb-engine creates the indexes automatically. No migration scripts. No manual index management. No "why is this query slow?" debugging sessions at 2 AM.
+FLUX starts up, mdb-engine creates the indexes automatically. No migration scripts. No manual index management. No "why is this query slow?" debugging sessions at 2 AM.
 
-**Real impact**: When the Eye scans 50 stocks, cache lookups are instant. Without that index? You'd be waiting seconds. With it? Milliseconds.
+**Real impact**: When FLUX scans 50 stocks, cache lookups are instant. Without that index? You'd be waiting seconds. With it? Milliseconds.
 
 ### The Dependency Injection That Just Makes Sense
 
@@ -310,13 +361,13 @@ async def get_positions(db = Depends(get_scoped_db)):
 
 ### The Observability That's Built-In
 
-Every log message in Sauron's Eye uses mdb-engine's structured logging:
+Every log message in FLUX uses mdb-engine's structured logging:
 
 ```python
 from mdb_engine.observability import get_logger
 
 logger = get_logger(__name__)
-logger.info("👁️ The Eye watches... scanning markets...")
+logger.info("⚡ FLUX watches... scanning markets...")
 ```
 
 Structured logs. Correlation IDs. Request tracing. Production-ready observability from day one.
@@ -332,17 +383,18 @@ mdb-engine saved us:
 - **Days** of setting up logging and observability
 - **Weeks** of maintaining migration scripts for indexes
 
-More importantly, it let us focus on what matters: building the Eye that watches markets and finds opportunities.
+More importantly, it let us focus on what matters: building FLUX that watches markets and finds opportunities.
 
 ---
 
-## Quick Start: Get the Eye Watching
+## Quick Start: Get FLUX Running
 
 ### Prerequisites
 
 - Docker & Docker Compose
 - Alpaca Paper Trading Account ([free signup](https://alpaca.markets))
 - Azure OpenAI API key ([get one here](https://azure.microsoft.com/en-us/products/ai-services/openai-service))
+- Firecrawl API key (optional, for enhanced news analysis) ([get one here](https://firecrawl.dev))
 
 ### Installation
 
@@ -358,7 +410,7 @@ cp env.example .env
 # Edit .env with your API keys
 ```
 
-**3. Start the Eye**
+**3. Start FLUX**
 ```bash
 docker-compose up --build
 ```
@@ -367,11 +419,11 @@ docker-compose up --build
 - Web UI: http://localhost:5000
 - MongoDB: mongodb://admin:secret@localhost:27017/
 
-The Eye starts watching immediately. You control when the Eye scans via the UI — click "Scan Again" to find new opportunities.
+FLUX starts immediately. You control when FLUX scans via the UI — click "Scan Again" to find new opportunities.
 
 ---
 
-## Configuration: Tuning the Eye's Focus
+## Configuration: Tuning FLUX's Focus
 
 ### Environment Variables
 
@@ -387,6 +439,9 @@ AZURE_OPENAI_API_KEY=your_key_here
 AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o
 AZURE_OPENAI_MODEL_NAME=gpt-4o
 
+# Firecrawl Configuration (Optional - for enhanced news article scraping)
+FIRECRAWL_API_KEY=your_key_here
+
 # Trading Configuration
 TARGET_SYMBOLS=NVDA,AMD,MSFT,GOOGL,AMZN,TSLA,COIN,AAPL
 
@@ -394,7 +449,7 @@ TARGET_SYMBOLS=NVDA,AMD,MSFT,GOOGL,AMZN,TSLA,COIN,AAPL
 
 ### Strategy Configuration
 
-The Eye currently focuses on **Balanced Low** opportunities with the following default settings:
+FLUX currently focuses on **Balanced Low** opportunities with the following default settings:
 
 - **RSI threshold**: < 35 (oversold but balanced) — configurable via UI/API
 - **AI score required**: ≥ 7 (good opportunity with upside potential) — configurable via UI/API
@@ -413,11 +468,11 @@ Strategy configuration is loaded dynamically on each scan, so changes take effec
 
 ---
 
-## Features: What the Eye Sees
+## Features: What FLUX Sees
 
 ### 🤖 AI-Powered Analysis
 - **Azure OpenAI Integration**: GPT-4o analyzes every opportunity
-- **News Context**: Fetches recent headlines for sentiment analysis
+- **News Context**: Fetches recent headlines + scrapes article content via Firecrawl for deeper sentiment analysis
 - **Risk Assessment**: AI provides risk level (Low/Medium/High)
 - **Veto Power**: Catastrophic news (fraud, bankruptcy) = automatic rejection
 
@@ -445,7 +500,7 @@ Strategy configuration is loaded dynamically on each scan, so changes take effec
 - **Historical Storage**: Every analysis stored with vector embeddings for similarity search
 - **Vector Search**: Find similar signals from history using semantic similarity
 - **Confidence Boost**: Historical patterns influence AI scores — if similar signals were profitable, confidence increases
-- **Pattern Learning**: The Eye learns which patterns lead to profitable trades over time
+- **Pattern Learning**: FLUX learns which patterns lead to profitable trades over time
 
 ### ⚙️ Strategy Configuration
 - **Dynamic Configuration**: Strategy parameters stored in MongoDB, updatable via UI/API
@@ -471,12 +526,14 @@ Strategy configuration is loaded dynamically on each scan, so changes take effec
 - **Database**: MongoDB with mdb-engine — declarative indexes, scoped access
 - **AI**: Azure OpenAI (GPT-4o) — intelligent analysis
 - **Trading**: Alpaca Paper Trading API — risk-free testing
+- **News Scraping**: Firecrawl API — extracts article content for AI analysis
+- **Technical Analysis**: vectorbt — vectorized indicator calculations
 
 ---
 
 ## HTMX Integration: Declarative HTML-First Frontend
 
-Sauron's Eye demonstrates modern web development with **HTMX** — a library that extends HTML to build interactive applications without writing JavaScript.
+FLUX demonstrates modern web development with **HTMX** — a library that extends HTML to build interactive applications without writing JavaScript.
 
 ### Why HTMX?
 
@@ -560,7 +617,7 @@ return HTMLResponse(content=f"""
 
 **Benefits**: Built-in browser confirm dialog. No custom JavaScript needed.
 
-### HTMX Benefits in Sauron's Eye
+### HTMX Benefits in FLUX
 
 - **80% less JavaScript**: Removed ~200 lines of fetch/onclick handlers
 - **Server-sent HTML**: Backend returns HTML fragments, not JSON
@@ -603,7 +660,7 @@ async function quickBuy(symbol, event) {
 
 ## MDB-Engine Integration: Declarative MongoDB Framework
 
-Sauron's Eye showcases **mdb-engine** — a framework that simplifies FastAPI + MongoDB integration.
+FLUX showcases **mdb-engine** — a framework that simplifies FastAPI + MongoDB integration.
 
 ### Why MDB-Engine?
 
@@ -681,9 +738,9 @@ from mdb_engine import MongoDBEngine
 
 engine = MongoDBEngine(mongo_uri=MONGO_URI, db_name=MONGO_DB)
 app = engine.create_app(
-    slug="sauron_eye",
+    slug="flux",
     manifest=get_manifest_path(),
-    title="Sauron's Eye"
+    title="FLUX - Swing Trading Evolved"
 )
 ```
 
@@ -699,7 +756,7 @@ app = engine.create_app(
 from mdb_engine.observability import get_logger
 
 logger = get_logger(__name__)
-logger.info("👁️ The Eye watches...")
+logger.info("⚡ FLUX watches...")
 ```
 
 **Benefits**:
@@ -726,7 +783,7 @@ similar_signals = await radar_service.find_similar_signals(
 - Historical pattern matching
 - Confidence scoring based on past performance
 
-### MDB-Engine Benefits in Sauron's Eye
+### MDB-Engine Benefits in FLUX
 
 - **~200 lines saved**: No connection pooling boilerplate
 - **Zero index migrations**: Declarative index management
@@ -827,15 +884,16 @@ async def quick_buy(symbol: str = Form(...), db = Depends(get_scoped_db)) -> HTM
 
 ### The Architecture Story
 
-Sauron's Eye uses a **pluggable strategy architecture** with intelligent caching and learning:
+FLUX uses a **pluggable strategy architecture** with intelligent caching and learning:
 
-- **The Eye** (`services/eye.py`): Core watchful scanner — watches markets continuously
 - **RadarService** (`services/radar.py`): Caching and historical learning — reduces API calls, learns from patterns
-- **Strategies** (`strategies/`): Pluggable lenses — define what the Eye seeks
-- **EyeAI** (`services/ai.py`): Reusable AI engine — works with any strategy
-- **Mechanics** (`services/analysis.py`, `services/trading.py`): Reusable components
+- **Strategies** (`strategies/`): Pluggable lenses — define what FLUX seeks
+- **EyeAI** (`services/ai.py`): Reusable AI engine — works with any strategy (Azure OpenAI GPT-4o)
+- **Analysis Service** (`services/analysis.py`): Market data fetching & technical indicator calculations
+- **Trading Service** (`services/trading.py`): Trade execution & position management
+- **Position Service** (`services/positions.py`): Position metrics & progress tracking
 
-The Eye watches. Strategies focus its energy. RadarService remembers and learns. All mechanics are reusable.
+FLUX watches. Strategies focus its energy. RadarService remembers and learns. All mechanics are reusable.
 
 **RadarService Powers**:
 - **Caching**: 1-hour TTL cache prevents redundant API calls
@@ -845,7 +903,7 @@ The Eye watches. Strategies focus its energy. RadarService remembers and learns.
 
 **Current Focus**: Balanced Low Strategy — finds stocks at balanced lows with upside potential.
 
-**Future Possibilities**: Momentum Breakout, Mean Reversion, Trend Following — all reuse the same Eye engine and RadarService learning.
+**Future Possibilities**: Momentum Breakout, Mean Reversion, Trend Following — all reuse the same FLUX engine and RadarService learning.
 
 ### Project Structure
 
@@ -853,33 +911,49 @@ The Eye watches. Strategies focus its energy. RadarService remembers and learns.
 mdb-swing/
 ├── src/app/
 │   ├── api/              # API routes (HTMX + JSON endpoints)
-│   │   └── routes.py     # All route handlers (uses mdb-engine DI)
+│   │   ├── routes.py     # All route handlers (uses mdb-engine DI)
+│   │   └── templates.py  # Template rendering helpers
 │   ├── core/             # Configuration & mdb-engine setup
 │   │   ├── config.py    # App configuration (env vars, strategy configs)
-│   │   └── engine.py    # MDB-engine initialization
-│   ├── models/           # Pydantic models
-│   │   └── __init__.py  # TradeVerdict model
+│   │   ├── engine.py    # MDB-engine initialization
+│   │   ├── security.py  # CSRF protection middleware
+│   │   ├── templates.py # Jinja2 template configuration
+│   │   └── validation.py # Input validation helpers
 │   ├── services/         # Business logic (reusable components)
-│   │   ├── eye.py       # The Eye — core scanner engine
 │   │   ├── radar.py     # RadarService — caching & historical learning
-│   │   ├── ai.py        # EyeAI — reusable AI engine (Azure OpenAI)
+│   │   ├── ai.py        # EyeAI — reusable AI engine (Azure OpenAI GPT-4o)
 │   │   ├── analysis.py  # Market data fetching & technical indicators
-│   │   ├── indicators.py # Technical indicator calculations
-│   │   └── trading.py   # Trade execution & position management
+│   │   ├── trading.py   # Trade execution & position management
+│   │   ├── positions.py # Position metrics & progress tracking
+│   │   ├── ai_prompts.py # Strategy-specific AI prompts
+│   │   ├── progress.py  # Progress tracking utilities
+│   │   ├── logo.py      # Logo fetching service
+│   │   ├── symbol_discovery.py # Symbol discovery utilities
+│   │   └── watchlist_cache.py # Market data caching
 │   ├── strategies/       # Pluggable strategy lenses
-│   │   ├── base.py      # Strategy interface (abstract base class)
+│   │   ├── __init__.py  # Strategy module initialization
 │   │   └── balanced_low.py  # Balanced Low strategy implementation
+│   ├── templates/        # Jinja2 templates
+│   │   ├── components/  # Reusable UI components
+│   │   ├── pages/       # Full page templates
+│   │   ├── partials/    # Partial templates (errors, messages)
+│   │   └── scripts/      # JavaScript initialization scripts
 │   └── main.py          # Application entry point (FastAPI app creation)
 ├── frontend/            # HTMX + Tailwind CSS frontend
-│   └── index.html       # Single-page application
+│   ├── index.html       # Single-page application
+│   └── static/         # Static assets (CSS, JS)
+│       ├── css/        # Stylesheets
+│       └── js/         # JavaScript libraries (HTMX, Alpine.js, Lucide)
 ├── config/              # MongoDB manifest (mdb-engine configuration)
 │   └── manifest.json    # Indexes, CORS, WebSocket config
 ├── docs/                # Additional documentation
-│   └── htmx-patterns.md # HTMX pattern examples
+│   ├── htmx-patterns.md # HTMX pattern examples
+│   └── architecture-implementation.md # Architecture details
 ├── docker-compose.yaml  # Docker setup
 ├── Dockerfile           # Application container
 ├── requirements.txt     # Python dependencies
-└── README.md           # This file
+├── README.md           # This file
+└── STRATEGY.md         # Strategy guide (see below)
 ```
 
 **Key MongoDB Collections** (managed by mdb-engine):
@@ -892,15 +966,26 @@ See [Appendix C: Development Guide](#appendix-c-development-guide) for detailed 
 
 ---
 
-## Using the Eye: A Quick Tour
+## Using FLUX: A Quick Tour
 
 ### 1. Market Scanner
-Enter a symbol (e.g., AAPL, NVDA), click **SCAN**. The Eye analyzes it using the current strategy, shows you the AI's reasoning, technical indicators, and a TradingView chart.
+Enter a symbol (e.g., AAPL, NVDA), click **SCAN**. FLUX analyzes it using the current strategy, shows you the AI's reasoning, technical indicators, and a TradingView chart.
 
-### 2. Positions
+### 2. Comprehensive Stats
+Click **VIEW ALL STATS** to see detailed technical indicators:
+- Momentum indicators (RSI, Stochastic)
+- MACD (line, signal, histogram)
+- Moving averages (SMA-20, SMA-50, SMA-100, SMA-200, EMA-12, EMA-26)
+- Bollinger Bands (%B position, band width)
+- Volatility metrics (ATR, price position in range)
+- Volume analysis (volume ratio vs average)
+
+See [STRATEGY.md](STRATEGY.md) for detailed guide on using these metrics.
+
+### 3. Positions
 View your active positions with real-time P&L. Click **CHARTS** to see entry, stop loss, and take profit levels visualized.
 
-### 3. Monitoring
+### 4. Monitoring
 - **Positions**: See all open positions with P&L
 - **Ledger**: Complete trade history
 - **Balance**: Real-time account balance
@@ -942,7 +1027,7 @@ Same patterns across all projects. New team members? They already know how it wo
 
 ---
 
-## Troubleshooting: When the Eye Blinks
+## Troubleshooting: Common Issues
 
 ### "Insufficient Data" Error
 - **Cause**: API only returning limited data
@@ -962,17 +1047,24 @@ Same patterns across all projects. New team members? They already know how it wo
   - Are RSI conditions met?
   - Is AI score ≥ 7?
 
+### "Firecrawl Error" (Optional)
+- **Cause**: Missing or invalid Firecrawl API key
+- **Impact**: News analysis will use headlines only (no article content)
+- **Fix**: Add `FIRECRAWL_API_KEY` to `.env` or leave empty for basic news analysis
+
 ---
 
 ## The End (Or Is It?)
 
-Sauron's Eye watches markets continuously, finding balanced low swing trading opportunities and presenting them for your approval. Built with mdb-engine, it's clean, fast, and maintainable.
+FLUX watches markets continuously, finding balanced low swing trading opportunities and presenting them for your approval. Built with mdb-engine, it's clean, fast, and maintainable.
 
 **Remember**: This is swing trading — capturing multi-day to multi-week moves in stocks at balanced lows. Not day trading. Not long-term investing. Swing trading.
 
-The Eye never sleeps. The Eye never blinks. The Eye watches for swing opportunities.
+FLUX never sleeps. FLUX never blinks. FLUX watches for swing opportunities.
 
-**Ready to let the Eye watch for swing trading opportunities?** Clone the repo, set your API keys, and start scanning for balanced lows.
+**Ready to let FLUX watch for swing trading opportunities?** Clone the repo, set your API keys, and start scanning for balanced lows.
+
+**Want to learn how to use the comprehensive metrics?** Check out [STRATEGY.md](STRATEGY.md) for a detailed guide on interpreting VIEW ALL STATS and making better trading decisions.
 
 ---
 
@@ -998,9 +1090,9 @@ from mdb_engine import MongoDBEngine
 
 engine = MongoDBEngine(mongo_uri=MONGO_URI, db_name=MONGO_DB)
 app = engine.create_app(
-    slug="sauron_eye",
+    slug="flux",
     manifest=get_manifest_path(),
-    title="Sauron's Eye - Market Watcher"
+    title="FLUX - Swing Trading Evolved"
 )
 ```
 
@@ -1054,7 +1146,7 @@ The RadarService uses vector embeddings to find similar trading signals:
 pipeline = [
     {
         "$vectorSearch": {
-            "index": "sauron_eye_radar_history_vector_idx",
+            "index": "flux_radar_history_vector_idx",
             "path": "embedding",
             "queryVector": query_embedding,
             "numCandidates": 50,
@@ -1232,25 +1324,25 @@ STRATEGY_CONFIGS["my_strategy"] = {
 CURRENT_STRATEGY=my_strategy
 ```
 
-**4. Use in Eye**:
-The Eye class automatically uses the configured strategy. No code changes needed!
+**4. Use in FLUX**:
+FLUX automatically uses the configured strategy. No code changes needed!
 
-#### Extending the Eye Scanner
+#### Extending FLUX Scanner
 
 **Adding New Indicators**:
-1. Add calculation in `src/app/services/indicators.py`
-2. Include in `analyze_technicals()` return dict
-3. Use in strategy's `check_technical_signal()`
+1. Add calculation in `analyze_comprehensive_stats()` in `src/app/services/analysis.py`
+2. Include in return dict
+3. Use in strategy's `check_technical_signal()` or display in VIEW ALL STATS
 
 **Adding New Data Sources**:
 1. Extend `get_market_data()` in `src/app/services/analysis.py`
 2. Return additional data in tuple
-3. Use in Eye's `scan_symbol()` method
+3. Use in analysis routes
 
 **Custom AI Prompts**:
-- Override `get_ai_prompt()` in your strategy class
-- Include historical context if needed
-- Eye automatically uses strategy-specific prompts
+- Update `get_balanced_low_prompt()` in `src/app/services/ai_prompts.py`
+- Or create new prompt function for additional strategies
+- FLUX automatically uses strategy-specific prompts
 
 #### Database Schema Reference
 

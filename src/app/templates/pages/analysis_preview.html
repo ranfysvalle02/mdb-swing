@@ -1,7 +1,7 @@
 {# Unified Preview Modal - Shows pre-computed details for both candidates and non-candidates
    Has an "Analyze with AI" button to trigger full AI analysis on demand
 #}
-<div class="space-y-4">
+<div class="space-y-4 preview-content">
     {# Status Header #}
     <div class="flex items-center gap-3 mb-4">
         <div class="w-12 h-12 rounded-full {% if meets_criteria %}bg-green-500/20{% else %}bg-yellow-500/20{% endif %} flex items-center justify-center">
@@ -126,16 +126,39 @@
     </div>
     {% endif %}
     
+    {# VIEW ALL STATS Button #}
+    <div class="pt-2">
+        <button 
+            hx-post="/api/all-stats"
+            hx-vals='{{ {"ticker": symbol} | tojson }}'
+            hx-target="#analysis-modal-body-{{ symbol|lower }}"
+            hx-swap="innerHTML"
+            hx-disabled-elt="this"
+            hx-on::htmx:after-swap="if(typeof lucide !== 'undefined') lucide.createIcons()"
+            onclick="event.stopPropagation()"
+            class="stats-view-btn w-full glass-strong py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-blue-600/30 transition-all duration-300 bg-blue-500/30 flex items-center justify-center gap-2 border border-blue-500/50 hover:border-blue-400 hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-500/30 active:scale-[0.98] group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-lg disabled:hover:bg-blue-500/30">
+            <span class="htmx-indicator">
+                <i data-lucide="loader-2" class="w-4 h-4 lucide-spin"></i>
+            </span>
+            <i data-lucide="bar-chart-3" class="w-4 h-4 htmx-indicator-hidden group-hover:scale-110 transition-transform duration-300"></i>
+            <span class="htmx-indicator-hidden">VIEW ALL STATS</span>
+            <span class="htmx-indicator">Loading Stats...</span>
+        </button>
+    </div>
+    
     {# AI Analysis Button #}
     <div class="pt-4 border-t border-gray-700/50">
         <button 
             hx-post="/api/analyze"
             hx-vals='{{ {"ticker": symbol} | tojson }}'
-            hx-target="closest .htmx-modal-body"
+            hx-target="#analysis-modal-body-{{ symbol|lower }}"
             hx-swap="innerHTML"
             hx-timeout="65000"
-            data-timeout-error="true"
-            class="w-full glass-strong py-3 rounded-lg text-sm font-bold text-white hover:bg-purple-600/30 transition-all bg-purple-500/30 flex items-center justify-center gap-2 border border-purple-500/50 disabled:opacity-50 disabled:cursor-not-allowed">
+            hx-disabled-elt="this"
+            hx-on::htmx:after-swap="if(typeof lucide !== 'undefined') lucide.createIcons()"
+            hx-on::htmx:response-error="this.innerHTML='<div class=\'p-4 text-red-400\'><i data-lucide=\'alert-circle\' class=\'w-5 h-5 inline-block\'></i> Error: Failed to analyze. Please try again.</div>'; if(typeof lucide !== 'undefined') lucide.createIcons()"
+            onclick="event.stopPropagation()"
+            class="ai-analyze-btn w-full glass-strong py-3 rounded-lg text-sm font-bold text-white hover:bg-purple-600/30 transition-all bg-purple-500/30 flex items-center justify-center gap-2 border border-purple-500/50 disabled:opacity-50 disabled:cursor-not-allowed">
             <span class="htmx-indicator">
                 <i data-lucide="loader-2" class="w-4 h-4 lucide-spin"></i>
             </span>

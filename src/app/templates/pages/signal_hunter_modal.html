@@ -1,0 +1,393 @@
+<div class="signal-hunter-modal-content space-y-4 max-h-[85vh] overflow-y-auto">
+    {# Strategy Info Header #}
+    <section class="glass rounded-lg p-4 border border-purple-500/30 bg-purple-500/10">
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="flex items-center gap-2 mb-1">
+                    <i data-lucide="target" class="w-5 h-5 text-purple-400"></i>
+                    <span class="text-sm font-semibold text-white">Active Strategy: {{ strategy_name|default('Default') }}</span>
+                </div>
+                <div class="text-xs text-gray-400 ml-7">
+                    Results will be evaluated against this strategy to mark candidates
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    {# Preset Filter Selector #}
+    <section class="glass rounded-lg p-4 border border-gray-700/50">
+        <form 
+            hx-post="/api/signal-hunter"
+            hx-target="#modal-container"
+            hx-swap="innerHTML"
+            hx-indicator="#signal-hunter-loading-overlay"
+            class="space-y-4"
+            id="signal-hunter-form">
+            
+            {# Preset Selector - Two Buttons #}
+            <div>
+                <label class="block text-sm font-semibold text-gray-300 mb-2">
+                    <i data-lucide="zap" class="w-4 h-4 inline-block mr-1 text-purple-400"></i>
+                    Filter Strategy
+                </label>
+                <div class="grid grid-cols-2 gap-3">
+                    <button
+                        type="button"
+                        id="buy-low-btn"
+                        onclick="selectPreset('Buy Low')"
+                        class="px-4 py-3 bg-gradient-to-r {% if default_preset == 'Buy Low' %}from-green-500/30 to-green-600/30 border-green-500/60 text-green-300{% else %}from-gray-800/50 to-gray-700/50 border-gray-700/50 text-gray-300 hover:from-gray-700/60 hover:to-gray-600/60{% endif %} border rounded-lg text-sm font-semibold transition-all flex flex-col items-center gap-1">
+                        <i data-lucide="trending-down" class="w-5 h-5"></i>
+                        <span>Buy Low</span>
+                        <span class="text-[10px] opacity-75">Oversold bounce</span>
+                    </button>
+                    <button
+                        type="button"
+                        id="catch-momentum-btn"
+                        onclick="selectPreset('Catch Momentum')"
+                        class="px-4 py-3 bg-gradient-to-r {% if default_preset == 'Catch Momentum' %}from-blue-500/30 to-blue-600/30 border-blue-500/60 text-blue-300{% else %}from-gray-800/50 to-gray-700/50 border-gray-700/50 text-gray-300 hover:from-gray-700/60 hover:to-gray-600/60{% endif %} border rounded-lg text-sm font-semibold transition-all flex flex-col items-center gap-1 relative">
+                        <i data-lucide="trending-up" class="w-5 h-5"></i>
+                        <span>Catch Momentum</span>
+                        <span class="text-[10px] opacity-75 {% if default_preset == 'Catch Momentum' %}text-yellow-300{% endif %}">Uptrend continuation</span>
+                        <span class="absolute -top-1 -right-1 px-1.5 py-0.5 bg-yellow-500/80 text-yellow-900 text-[9px] font-bold rounded-full animate-pulse">⚠️ Slow</span>
+                    </button>
+                </div>
+                <input type="hidden" name="preset_name" id="preset-name-input" value="{{ default_preset }}">
+                <p class="text-xs text-gray-500 mt-2">
+                    Choose your trading strategy
+                </p>
+            </div>
+            
+            {# Active Filters Display #}
+            <div id="active-filters-display" class="space-y-2">
+                <label class="block text-sm font-semibold text-gray-300 mb-2">
+                    <i data-lucide="filter" class="w-4 h-4 inline-block mr-1 text-purple-400"></i>
+                    Active Filters
+                </label>
+                <div class="bg-gray-800/30 rounded-lg p-3 space-y-1.5 max-h-48 overflow-y-auto">
+                    {% for filter_name, filter_value in current_filters.items() %}
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-gray-400">{{ filter_name }}:</span>
+                        <span class="text-purple-300 font-medium">{{ filter_value }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            {# Hidden input to store filters as JSON #}
+            <input type="hidden" name="filters_json" id="filters-json-input" value="">
+            
+            {# Search Button #}
+            <div class="flex justify-end pt-2">
+                <button 
+                    type="submit"
+                    id="search-button"
+                    class="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white font-semibold rounded-lg transition-all duration-200 inline-flex items-center gap-2 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40">
+                    <i data-lucide="search" id="search-icon" class="w-4 h-4"></i>
+                    <i data-lucide="loader-2" id="loading-icon" class="w-4 h-4 animate-spin hidden"></i>
+                    <span id="search-text">Search Stocks</span>
+                </button>
+            </div>
+        </form>
+    </section>
+    
+    {# Loading Overlay - Fixed position, persists during swaps #}
+    <div id="signal-hunter-loading-overlay" class="htmx-indicator fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div class="glass rounded-xl p-8 border-2 border-purple-500/50 bg-gray-900/95 shadow-2xl max-w-md mx-4">
+            <div class="flex flex-col items-center gap-4">
+                <div class="flex items-center gap-3 text-purple-400">
+                    <i data-lucide="loader-2" class="w-8 h-8 animate-spin"></i>
+                    <span class="text-lg font-bold" id="modal-loading-title">Searching Finviz...</span>
+                </div>
+                <div class="w-full">
+                    <div class="flex items-center justify-between text-sm text-gray-300 mb-2">
+                        <span>Fetching stocks</span>
+                        <span id="loading-status-text" class="font-medium">Initializing...</span>
+                    </div>
+                    <div class="w-full bg-gray-700/50 rounded-full h-3 overflow-hidden">
+                        <div class="h-full bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 animate-pulse rounded-full" style="width: 60%; background-size: 200% 100%; animation: pulse 2s ease-in-out infinite, shimmer 2s linear infinite;"></div>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-400 text-center mt-2" id="modal-loading-message">
+                    This may take 10-30 seconds. Please wait...
+                </p>
+                <p class="text-xs text-yellow-400 text-center mt-1 animate-pulse hidden" id="catch-momentum-warning">
+                    ⚠️ Catch Momentum searches take 30-60 seconds - this is normal!
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    {# Error Message #}
+    {% if error %}
+    <section class="glass rounded-lg p-4 border border-red-500/50 bg-red-500/10">
+        <div class="flex items-center gap-2 text-red-400">
+            <i data-lucide="alert-circle" class="w-5 h-5"></i>
+            <span>{{ error|e }}</span>
+        </div>
+    </section>
+    {% endif %}
+    
+    {# Results #}
+    {% if results is not none %}
+        {% if results|length > 0 %}
+        <section>
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                    <i data-lucide="list" class="w-4 h-4 text-purple-400"></i>
+                    <span>Results ({{ results|length }})</span>
+                </h3>
+                <div class="flex items-center gap-2 text-xs text-gray-400">
+                    {% set candidate_count = results|selectattr('is_candidate')|list|length %}
+                    <span class="px-2 py-1 rounded bg-green-500/20 text-green-400 border border-green-500/50">
+                        {{ candidate_count }} Candidate{{ 's' if candidate_count != 1 else '' }}
+                    </span>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {% for stock in results %}
+                    {% include "components/signal_hunter_card.html" %}
+                {% endfor %}
+            </div>
+        </section>
+        {% else %}
+        <section class="glass rounded-lg p-6 border border-gray-700/50 text-center">
+            <i data-lucide="inbox" class="w-12 h-12 text-gray-600 mx-auto mb-3"></i>
+            <p class="text-gray-400 mb-2">No stocks found</p>
+            <p class="text-xs text-gray-500">Try a different preset or adjust filters</p>
+        </section>
+        {% endif %}
+    {% else %}
+    <section class="glass rounded-lg p-6 border border-gray-700/50 text-center">
+        <i data-lucide="radar" class="w-12 h-12 text-purple-400 mx-auto mb-3"></i>
+        <p class="text-gray-400 mb-2">Select a preset and click Search</p>
+        <p class="text-xs text-gray-500">Results will be evaluated against your strategy: {{ strategy_name|default('Default') }}</p>
+    </section>
+    {% endif %}
+</div>
+
+<script>
+// Preset filters data (injected from backend)
+const PRESETS = {{ presets|tojson|safe }};
+
+function selectPreset(presetName) {
+    const filters = PRESETS[presetName];
+    if (!filters) return;
+    
+    // Update button styles
+    const buyLowBtn = document.getElementById('buy-low-btn');
+    const catchMomentumBtn = document.getElementById('catch-momentum-btn');
+    const presetInput = document.getElementById('preset-name-input');
+    
+    if (presetName === 'Buy Low') {
+        buyLowBtn.className = 'px-4 py-3 bg-gradient-to-r from-green-500/30 to-green-600/30 border-green-500/60 text-green-300 border rounded-lg text-sm font-semibold transition-all flex flex-col items-center gap-1';
+        catchMomentumBtn.className = 'px-4 py-3 bg-gradient-to-r from-gray-800/50 to-gray-700/50 border-gray-700/50 text-gray-300 hover:from-gray-700/60 hover:to-gray-600/60 border rounded-lg text-sm font-semibold transition-all flex flex-col items-center gap-1';
+    } else {
+        catchMomentumBtn.className = 'px-4 py-3 bg-gradient-to-r from-blue-500/30 to-blue-600/30 border-blue-500/60 text-blue-300 border rounded-lg text-sm font-semibold transition-all flex flex-col items-center gap-1';
+        buyLowBtn.className = 'px-4 py-3 bg-gradient-to-r from-gray-800/50 to-gray-700/50 border-gray-700/50 text-gray-300 hover:from-gray-700/60 hover:to-gray-600/60 border rounded-lg text-sm font-semibold transition-all flex flex-col items-center gap-1';
+    }
+    
+    if (presetInput) {
+        presetInput.value = presetName;
+    }
+    
+    // Show warning for Catch Momentum
+    const catchMomentumDesc = catchMomentumBtn ? catchMomentumBtn.querySelector('.text-\\[10px\\]') : null;
+    if (presetName === 'Catch Momentum' && catchMomentumDesc) {
+        catchMomentumDesc.textContent = 'Uptrend continuation (30-60s)';
+        catchMomentumDesc.className = 'text-[10px] opacity-75 text-yellow-300';
+    } else if (catchMomentumDesc) {
+        catchMomentumDesc.textContent = 'Uptrend continuation';
+        catchMomentumDesc.className = 'text-[10px] opacity-75';
+    }
+    
+    // Update the active filters display
+    const displayDiv = document.getElementById('active-filters-display');
+    const filtersContainer = displayDiv ? displayDiv.querySelector('.bg-gray-800\\/30') : null;
+    
+    if (filtersContainer) {
+        filtersContainer.innerHTML = Object.entries(filters).map(function(entry) {
+            var key = entry[0];
+            var value = entry[1];
+            return '<div class="flex items-center justify-between text-xs">' +
+                '<span class="text-gray-400">' + key + ':</span>' +
+                '<span class="purple-300 font-medium">' + value + '</span>' +
+                '</div>';
+        }).join('');
+    }
+    
+    // Update hidden input with filters as JSON
+    const jsonInput = document.getElementById('filters-json-input');
+    if (jsonInput) {
+        jsonInput.value = JSON.stringify(filters);
+    }
+}
+
+// Update loading status text
+function updateLoadingStatus() {
+    const statusEl = document.getElementById('loading-status-text');
+    if (!statusEl) return;
+    
+    const steps = [
+        'Connecting to Finviz...',
+        'Applying filters...',
+        'Fetching stock data...',
+        'Processing results...',
+        'Almost done...'
+    ];
+    
+    let stepIndex = 0;
+    const interval = setInterval(function() {
+        if (statusEl && statusEl.parentElement && statusEl.parentElement.offsetParent !== null) {
+            statusEl.textContent = steps[stepIndex % steps.length];
+            stepIndex++;
+        } else {
+            clearInterval(interval);
+        }
+    }, 3000);
+    
+    // Clean up when loading completes
+    setTimeout(function() {
+        clearInterval(interval);
+    }, 60000);
+}
+
+// Update button state
+function updateButtonState(loading) {
+    const searchIcon = document.getElementById('search-icon');
+    const loadingIcon = document.getElementById('loading-icon');
+    const searchText = document.getElementById('search-text');
+    const searchButton = document.getElementById('search-button');
+    
+    if (!searchButton) return;
+    
+    if (loading) {
+        searchButton.disabled = true;
+        searchButton.classList.add('opacity-50', 'cursor-not-allowed');
+        if (searchIcon) searchIcon.classList.add('hidden');
+        if (loadingIcon) loadingIcon.classList.remove('hidden');
+        if (searchText) searchText.textContent = 'Searching...';
+    } else {
+        searchButton.disabled = false;
+        searchButton.classList.remove('opacity-50', 'cursor-not-allowed');
+        if (searchIcon) searchIcon.classList.remove('hidden');
+        if (loadingIcon) loadingIcon.classList.add('hidden');
+        if (searchText) searchText.textContent = 'Search Stocks';
+    }
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', function() {
+    const presetInput = document.getElementById('preset-name-input');
+    const defaultPreset = presetInput ? presetInput.value : 'Buy Low';
+    selectPreset(defaultPreset);
+    
+    // Update filters when form is submitted
+    const form = document.getElementById('signal-hunter-form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const presetInput = document.getElementById('preset-name-input');
+            const presetName = presetInput ? presetInput.value : 'Buy Low';
+            const filters = PRESETS[presetName];
+            const jsonInput = document.getElementById('filters-json-input');
+            if (jsonInput && filters) {
+                jsonInput.value = JSON.stringify(filters);
+            }
+            
+            // Update loading messages based on preset
+            const loadingTitle = document.getElementById('modal-loading-title');
+            const loadingMessage = document.getElementById('modal-loading-message');
+            const catchMomentumWarning = document.getElementById('catch-momentum-warning');
+            
+            if (presetName === 'Catch Momentum') {
+                if (loadingTitle) loadingTitle.textContent = 'Searching Catch Momentum...';
+                if (loadingMessage) loadingMessage.textContent = 'This may take 30-60 seconds. Please wait...';
+                if (catchMomentumWarning) catchMomentumWarning.classList.remove('hidden');
+            } else {
+                if (loadingTitle) loadingTitle.textContent = 'Searching Finviz...';
+                if (loadingMessage) loadingMessage.textContent = 'This may take 10-30 seconds. Please wait...';
+                if (catchMomentumWarning) catchMomentumWarning.classList.add('hidden');
+            }
+            
+            // Update button state
+            updateButtonState(true);
+            
+            // Start progress updates
+            setTimeout(updateLoadingStatus, 500);
+        });
+    }
+    
+    // Watch for HTMX events
+    if (typeof htmx !== 'undefined') {
+        document.body.addEventListener('htmx:beforeRequest', function(event) {
+            if (event.detail.target && event.detail.target.id === 'modal-container') {
+                updateButtonState(true);
+                setTimeout(updateLoadingStatus, 500);
+            }
+        });
+        
+        document.body.addEventListener('htmx:afterRequest', function(event) {
+            if (event.detail.target && event.detail.target.id === 'modal-container') {
+                updateButtonState(false);
+                // Re-initialize lucide icons
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+                // Re-load preset filters for new content
+                setTimeout(loadPresetFilters, 100);
+            }
+        });
+        
+        // Refresh signal hunter modal when watchlist is updated (to update add/remove buttons)
+        document.body.addEventListener('watchlistUpdated', function(event) {
+            const modalContainer = document.getElementById('modal-container');
+            if (modalContainer) {
+                const modalContent = modalContainer.querySelector('.signal-hunter-modal-content');
+                if (modalContent) {
+                    // Get current preset from the form
+                    const presetInput = document.getElementById('preset-name-input');
+                    const currentPreset = presetInput ? presetInput.value : 'Buy Low';
+                    
+                    // Refresh the signal hunter section to get updated watchlist status
+                    htmx.ajax('GET', '/api/signal-hunter-section?preset_name=' + encodeURIComponent(currentPreset), {
+                        target: '#signal-hunter-section-wrapper',
+                        swap: 'innerHTML'
+                    }).catch(function(err) {
+                        console.debug('Could not refresh signal hunter section:', err);
+                    });
+                    
+                    // If modal is open and contains results, refresh just the results section
+                    const modal = document.getElementById('signal-hunter-modal');
+                    const resultsSection = modalContent.querySelector('section:has(.grid)');
+                    if (modal && modal.offsetParent !== null && resultsSection) {
+                        // Modal is visible and has results, refresh the results
+                        const filtersJsonInput = document.getElementById('filters-json-input');
+                        const filtersJson = filtersJsonInput ? filtersJsonInput.value : '{}';
+                        
+                        // Re-fetch results with updated watchlist status
+                        htmx.ajax('POST', '/api/signal-hunter', {
+                            target: '#modal-container',
+                            swap: 'innerHTML',
+                            values: {
+                                preset_name: currentPreset,
+                                filters_json: filtersJson
+                            }
+                        }).catch(function(err) {
+                            console.debug('Could not refresh signal hunter modal:', err);
+                        });
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+
+<style>
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+</style>
+
+{% include "scripts/lucide_init.html" %}

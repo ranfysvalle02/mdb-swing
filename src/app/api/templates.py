@@ -31,9 +31,28 @@ def pending_order_card(
     limit_price: Optional[float],
     order_id: str,
     stop_loss: Optional[float] = None,
-    take_profit: Optional[float] = None
+    take_profit: Optional[float] = None,
+    current_price: Optional[float] = None,
+    market_open: bool = True,
+    status_message: Optional[str] = None,
+    price_diff_pct: Optional[float] = None
 ) -> str:
-    """Generate HTML for a pending order card."""
+    """Generate HTML for a pending order card.
+    
+    Args:
+        symbol: Stock symbol
+        qty: Number of shares
+        side: 'buy' or 'sell'
+        order_type: Order type (e.g., 'limit')
+        limit_price: Limit price for the order
+        order_id: Alpaca order ID
+        stop_loss: Optional stop loss price
+        take_profit: Optional take profit price
+        current_price: Optional current market price
+        market_open: Whether market is currently open (default True)
+        status_message: Optional status message explaining why order is pending
+        price_diff_pct: Optional percentage difference between limit and current price
+    """
     return templates.get_template("components/pending_order_card.html").render(
         symbol=symbol,
         qty=qty,
@@ -42,7 +61,11 @@ def pending_order_card(
         limit_price=limit_price,
         order_id=order_id,
         stop_loss=stop_loss,
-        take_profit=take_profit
+        take_profit=take_profit,
+        current_price=current_price,
+        market_open=market_open,
+        status_message=status_message,
+        price_diff_pct=price_diff_pct
     )
 
 
@@ -583,7 +606,8 @@ def empty_transactions() -> str:
 def transactions_view(
     pending_orders: list,
     transaction_history: list,
-    trade_records_map: Optional[Dict[str, Dict]] = None
+    trade_records_map: Optional[Dict[str, Dict]] = None,
+    order_status_map: Optional[Dict[str, Dict]] = None
 ) -> str:
     """Generate complete transactions view HTML.
     
@@ -593,6 +617,7 @@ def transactions_view(
         pending_orders: List of pending order objects from Alpaca API
         transaction_history: List of transaction history records from database
         trade_records_map: Optional dict mapping (symbol, side) -> trade_record for pending orders
+        order_status_map: Optional dict mapping order_id -> status info (current_price, market_open, status_message, price_diff_pct)
     """
     html_parts = []
     
@@ -613,6 +638,9 @@ def transactions_view(
                     key = (order.symbol, order.side.lower())
                     trade_record = trade_records_map.get(key)
                 
+                # Get status info if available
+                status_info = order_status_map.get(str(order.id), {}) if order_status_map else {}
+                
                 html_parts.append(pending_order_card(
                     symbol=order.symbol,
                     qty=int(order.qty),
@@ -621,7 +649,11 @@ def transactions_view(
                     limit_price=float(order.limit_price) if order.limit_price else None,
                     order_id=str(order.id),
                     stop_loss=trade_record.get("stop_loss") if trade_record else None,
-                    take_profit=trade_record.get("take_profit") if trade_record else None
+                    take_profit=trade_record.get("take_profit") if trade_record else None,
+                    current_price=status_info.get("current_price"),
+                    market_open=status_info.get("market_open", True),
+                    status_message=status_info.get("status_message"),
+                    price_diff_pct=status_info.get("price_diff_pct")
                 ))
             except Exception as e:
                 from mdb_engine.observability import get_logger

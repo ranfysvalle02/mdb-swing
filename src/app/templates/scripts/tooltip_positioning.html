@@ -1,0 +1,97 @@
+{# Tooltip Positioning Script for Modals
+   Ensures tooltips with fixed positioning are correctly positioned relative to their triggers
+#}
+<script>
+(function() {
+    'use strict';
+    
+    function positionTooltip(tooltipElement, triggerElement) {
+        const tooltipText = tooltipElement.querySelector('.tooltip-text');
+        if (!tooltipText || !triggerElement) return;
+        
+        // Only apply fixed positioning logic if inside a modal
+        const isInModal = triggerElement.closest('.htmx-modal, dialog');
+        if (!isInModal) return;
+        
+        // Get trigger position relative to viewport
+        const triggerRect = triggerElement.getBoundingClientRect();
+        const tooltipRect = tooltipText.getBoundingClientRect();
+        
+        // Calculate position
+        let top = triggerRect.top - tooltipRect.height - 8; // 8px gap
+        let left = triggerRect.left + (triggerRect.width / 2) - (tooltipRect.width / 2);
+        
+        // Ensure tooltip stays within viewport
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const padding = 16;
+        
+        // Horizontal adjustments
+        if (left < padding) {
+            left = padding;
+        } else if (left + tooltipRect.width > viewportWidth - padding) {
+            left = viewportWidth - tooltipRect.width - padding;
+        }
+        
+        // Vertical adjustments - if tooltip would go above viewport, show below
+        if (top < padding) {
+            top = triggerRect.bottom + 8;
+        } else if (top + tooltipRect.height > viewportHeight - padding) {
+            top = viewportHeight - tooltipRect.height - padding;
+        }
+        
+        // Apply position
+        tooltipText.style.top = top + 'px';
+        tooltipText.style.left = left + 'px';
+        tooltipText.style.bottom = 'auto';
+        tooltipText.style.right = 'auto';
+        tooltipText.style.transform = 'none';
+    }
+    
+    function setupTooltipPositioning() {
+        const tooltips = document.querySelectorAll('.stats-content .tooltip, .htmx-modal .tooltip');
+        
+        tooltips.forEach(tooltip => {
+            const button = tooltip.querySelector('button');
+            if (!button) return;
+            
+            // Position on hover/focus
+            const positionHandler = () => {
+                // Small delay to ensure tooltip is visible
+                setTimeout(() => {
+                    positionTooltip(tooltip, button);
+                }, 10);
+            };
+            
+            button.addEventListener('mouseenter', positionHandler);
+            button.addEventListener('focus', positionHandler);
+            
+            // Reposition on scroll/resize
+            const repositionHandler = () => {
+                if (tooltip.querySelector('.tooltip-text').style.visibility === 'visible') {
+                    positionTooltip(tooltip, button);
+                }
+            };
+            
+            window.addEventListener('scroll', repositionHandler, true);
+            window.addEventListener('resize', repositionHandler);
+        });
+    }
+    
+    // Initialize on DOM ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupTooltipPositioning);
+    } else {
+        setupTooltipPositioning();
+    }
+    
+    // Re-initialize after HTMX swaps
+    if (typeof htmx !== 'undefined') {
+        document.body.addEventListener('htmx:afterSwap', function(event) {
+            if (event.target.querySelector && event.target.querySelector('.tooltip')) {
+                setupTooltipPositioning();
+            }
+        });
+    }
+})();
+</script>

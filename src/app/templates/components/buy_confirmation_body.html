@@ -1,0 +1,169 @@
+{# Buy Confirmation Modal Body Content
+   Shows order details, quantity selector, and confirm/cancel buttons
+   Uses Alpine.js for quantity adjustment and real-time cost calculation
+#}
+<div 
+     x-data="{
+         quantity: {{ quantity }},
+         price: {{ price }},
+         stopLoss: {{ stop_loss }},
+         takeProfit: {{ take_profit }},
+         buyingPower: {{ buying_power }},
+         maxQuantity: Math.min(99, Math.floor({{ buying_power }} / {{ price }})),
+         get totalCost() { return (this.quantity * this.price).toFixed(2); },
+         get riskAmount() { return (this.quantity * (this.price - this.stopLoss)).toFixed(2); },
+         get profitPotential() { return (this.quantity * (this.takeProfit - this.price)).toFixed(2); },
+         get sufficientPower() { return this.buyingPower >= (this.quantity * this.price); },
+         get stopDistance() { return (this.price - this.stopLoss).toFixed(2); },
+         get profitDistance() { return (this.takeProfit - this.price).toFixed(2); },
+         incrementQty() { if (this.quantity < this.maxQuantity) this.quantity++; },
+         decrementQty() { if (this.quantity > 1) this.quantity--; }
+     }">
+    
+    {# Order Summary #}
+    <div class="space-y-4">
+        {# Symbol and Price Header #}
+        <div class="glass rounded-lg p-4 border border-green-500/30 bg-green-500/10">
+            <div class="flex items-center justify-between mb-2">
+                <div>
+                    <div class="text-2xl font-bold text-white">{{ symbol|e }}</div>
+                    <div class="text-sm text-gray-400">Current Market Price</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-3xl font-bold text-green-400">$<span x-text="price.toFixed(2)"></span></div>
+                </div>
+            </div>
+        </div>
+        
+        {# Quantity Selector #}
+        <div class="glass rounded-lg p-4 border border-blue-500/30">
+            <label class="block text-sm font-semibold text-white mb-3">
+                <i data-lucide="hash" class="w-4 h-4 inline-block mr-1"></i>
+                Number of Shares
+            </label>
+            <div class="flex items-center gap-3">
+                <button 
+                    type="button"
+                    @click="decrementQty()"
+                    :disabled="quantity <= 1"
+                    class="w-10 h-10 rounded-lg bg-gray-700/50 hover:bg-gray-600/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center border border-gray-600/50 transition-all">
+                    <i data-lucide="minus" class="w-4 h-4 text-white"></i>
+                </button>
+                <input 
+                    type="number"
+                    id="buy-qty-{{ symbol|lower }}"
+                    name="qty"
+                    x-model.number="quantity"
+                    min="1"
+                    :max="maxQuantity"
+                    class="flex-1 px-4 py-2 rounded-lg bg-gray-800/60 border-2 border-gray-700/50 focus:border-green-500/50 text-white text-center text-xl font-bold focus:outline-none focus:ring-2 focus:ring-green-500/30"
+                    style="appearance: textfield;"
+                    required>
+                <button 
+                    type="button"
+                    @click="incrementQty()"
+                    :disabled="quantity >= maxQuantity"
+                    class="w-10 h-10 rounded-lg bg-gray-700/50 hover:bg-gray-600/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center border border-gray-600/50 transition-all">
+                    <i data-lucide="plus" class="w-4 h-4 text-white"></i>
+                </button>
+            </div>
+            <div class="mt-2 text-xs text-gray-400 text-center">
+                Max: <span x-text="maxQuantity"></span> shares (based on buying power)
+            </div>
+        </div>
+        
+        {# Order Details Grid #}
+        <div class="grid grid-cols-2 gap-3">
+            {# Stop Loss #}
+            <div class="glass rounded-lg p-3 border border-red-500/30 bg-red-500/10">
+                <div class="flex items-center gap-2 mb-1">
+                    <i data-lucide="shield-off" class="w-4 h-4 text-red-400"></i>
+                    <span class="text-xs font-semibold text-red-400 uppercase">Stop Loss</span>
+                </div>
+                <div class="text-lg font-bold text-red-300">$<span x-text="stopLoss.toFixed(2)"></span></div>
+                <div class="text-xs text-gray-400 mt-1">Distance: $<span x-text="stopDistance"></span></div>
+            </div>
+            
+            {# Take Profit #}
+            <div class="glass rounded-lg p-3 border border-green-500/30 bg-green-500/10">
+                <div class="flex items-center gap-2 mb-1">
+                    <i data-lucide="target" class="w-4 h-4 text-green-400"></i>
+                    <span class="text-xs font-semibold text-green-400 uppercase">Take Profit</span>
+                </div>
+                <div class="text-lg font-bold text-green-300">$<span x-text="takeProfit.toFixed(2)"></span></div>
+                <div class="text-xs text-gray-400 mt-1">Distance: $<span x-text="profitDistance"></span></div>
+            </div>
+        </div>
+        
+        {# Cost Summary #}
+        <div class="glass rounded-lg p-4 border border-blue-500/30 bg-blue-500/10">
+            <div class="space-y-2">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-300">Total Cost:</span>
+                    <span class="text-xl font-bold text-white">$<span x-text="totalCost"></span></span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-300">Risk Amount:</span>
+                    <span class="text-lg font-bold text-red-400">-$<span x-text="riskAmount"></span></span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-300">Profit Potential:</span>
+                    <span class="text-lg font-bold text-green-400">+$<span x-text="profitPotential"></span></span>
+                </div>
+                <div class="pt-2 border-t border-gray-700/50 mt-2">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-300">Available Buying Power:</span>
+                        <span class="text-sm font-semibold" :class="sufficientPower ? 'text-green-400' : 'text-red-400'">
+                            $<span x-text="buyingPower.toFixed(2)"></span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        {# Insufficient Buying Power Warning #}
+        <div x-show="!sufficientPower" 
+             x-cloak
+             class="glass rounded-lg p-3 border border-red-500/50 bg-red-500/20">
+            <div class="flex items-start gap-2">
+                <i data-lucide="alert-triangle" class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5"></i>
+                <div>
+                    <div class="text-sm font-semibold text-red-300 mb-1">Insufficient Buying Power</div>
+                    <div class="text-xs text-red-200">You need $<span x-text="(quantity * price - buyingPower).toFixed(2)"></span> more to place this order.</div>
+                </div>
+            </div>
+        </div>
+        
+        {# HTMX Best Practice: Use proper form element for submission #}
+        {# Form uses hx-swap="none" because response contains hx-swap-oob elements #}
+        <form 
+            id="buy-form-{{ symbol|lower }}"
+            hx-post="/api/buy-confirm"
+            hx-swap="none"
+            hx-target="body"
+            data-symbol="{{ symbol|lower }}">
+            {# Hidden input for symbol #}
+            <input type="hidden" name="symbol" value="{{ symbol|e }}">
+            
+            {# Action Buttons #}
+            <div class="flex gap-3 pt-2">
+                <button 
+                    type="button"
+                    class="htmx-modal-close flex-1 py-3 rounded-lg text-sm font-semibold text-white hover:bg-gray-700/50 transition-all bg-gray-800/50 border border-gray-700/50">
+                    Cancel
+                </button>
+                <button 
+                    type="submit"
+                    :disabled="!sufficientPower || quantity < 1"
+                    class="flex-1 py-3 rounded-lg text-sm font-bold text-white hover:bg-green-600/50 transition-all bg-green-500/50 border border-green-400/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                    <span class="htmx-indicator">
+                        <i data-lucide="loader-2" class="w-4 h-4 lucide-spin"></i>
+                    </span>
+                    <i data-lucide="check-circle" class="w-4 h-4 htmx-indicator-hidden"></i>
+                    <span class="htmx-indicator-hidden">Confirm Buy</span>
+                    <span class="htmx-indicator">Placing Order...</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

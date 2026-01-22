@@ -1,13 +1,25 @@
 <script>
-    new TradingView.widget({
-        "autosize": true, 
-        "symbol": {{ symbol|tojson }},
-        "interval": "D", 
-        "timezone": "Etc/UTC", 
-        "theme": "dark", 
-        "style": "1",
-        "container_id": {{ container_id|tojson }},
-        "locale": "en"
-    });
-    lucide.createIcons();
+    // Guard against TradingView not being loaded
+    if (typeof TradingView !== 'undefined' && TradingView.widget) {
+        new TradingView.widget({
+            "autosize": true, 
+            "symbol": {{ symbol|tojson }},
+            "interval": "D", 
+            "timezone": "Etc/UTC", 
+            "theme": "dark", 
+            "style": "1",
+            "container_id": {{ container_id|tojson }},
+            "locale": "en"
+        });
+    } else {
+        console.warn('TradingView widget not available - chart will not be displayed');
+        // Show a placeholder message
+        const container = document.getElementById({{ container_id|tojson }});
+        if (container) {
+            container.innerHTML = '<div class="flex items-center justify-center h-full text-gray-400 text-sm">Chart unavailable - TradingView script not loaded</div>';
+        }
+    }
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
 </script>
