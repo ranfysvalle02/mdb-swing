@@ -1,15 +1,11 @@
-"""Market data analysis services.
-
-MDB-Engine Integration:
-- Logging: Uses `get_logger(__name__)` from mdb_engine.observability for structured logging
-"""
+"""Market data analysis services."""
 import pandas as pd
 from typing import Tuple, Optional, Dict, Any
 import vectorbt as vbt
 from datetime import datetime, timedelta
 from alpaca_trade_api.rest import TimeFrame
 from mdb_engine.observability import get_logger
-from ..core.config import ALPACA_KEY, ALPACA_SECRET, ALPACA_URL
+from ..core.config import ALPACA_KEY, ALPACA_SECRET, ALPACA_URL, FIRECRAWL_API_KEY
 import alpaca_trade_api as tradeapi
 import asyncio
 
@@ -24,11 +20,8 @@ else:
 
 api = tradeapi.REST(ALPACA_KEY, ALPACA_SECRET, ALPACA_URL, api_version='v2') if ALPACA_KEY and ALPACA_SECRET else None
 
-# Firecrawl API configuration - using direct HTTP API calls (no SDK)
-from ..core.config import FIRECRAWL_API_KEY
 FIRECRAWL_API_URL = "https://api.firecrawl.dev/v2"
 
-# Import httpx for HTTP requests (FastAPI includes it)
 try:
     import httpx
     HTTPX_AVAILABLE = True

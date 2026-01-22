@@ -1,17 +1,4 @@
-"""Market Data Ingestion - High-Performance Cache (NOT MongoDB)
-
-Architecture Principle: OHLCV data is NOT stored in MongoDB.
-This module handles data loading from high-speed sources (Parquet/Arrow/Cache/API).
-
-MongoDB remembers what *happened*. Python decides what *should happen*.
-Market data is disposable computation fuel, not persistent state.
-
-Uses industry-standard caching (Parquet/pickle) for performance.
-
-MDB-Engine Integration:
-- Logging: Uses `get_logger(__name__)` from mdb_engine.observability for structured logging
-- Note: This module does NOT use MongoDB - data comes from cache/API only
-"""
+"""Market Data Ingestion - High-Performance Cache."""
 import pandas as pd
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta

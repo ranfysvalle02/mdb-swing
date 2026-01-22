@@ -1,15 +1,4 @@
-"""Alpaca Account Management Service.
-
-Manages multiple Alpaca paper trading accounts, allowing users to:
-- Store multiple account credentials
-- Select which account to use for trading
-- Switch between accounts dynamically
-- Create/manage account configurations
-
-MDB-Engine Integration:
-- Logging: Uses `get_logger(__name__)` from mdb_engine.observability
-- Database: Uses scoped database via mdb-engine
-"""
+"""Alpaca Account Management Service."""
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from mdb_engine.observability import get_logger
@@ -23,11 +12,7 @@ class AlpacaAccountManager:
     """Manages multiple Alpaca paper trading accounts."""
     
     def __init__(self, db):
-        """Initialize account manager with database connection.
-        
-        Args:
-            db: MongoDB database instance (scoped via mdb-engine)
-        """
+        """Initialize account manager with database connection."""
         self.db = db
     
     async def get_accounts(self) -> List[Dict[str, Any]]:

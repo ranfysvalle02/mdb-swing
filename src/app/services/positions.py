@@ -1,11 +1,4 @@
-"""Position management service.
-
-MDB-Engine Integration:
-- Logging: Uses `get_logger(__name__)` from mdb_engine.observability for structured logging
-
-Service layer abstracts business logic from routes.
-This service handles position calculations, progress tracking, and sell signal detection.
-"""
+"""Position management service."""
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from mdb_engine.observability import get_logger
@@ -127,8 +120,6 @@ async def calculate_position_metrics(
 ) -> PositionMetrics:
     """Calculate metrics for a position.
     
-    MDB-Engine Pattern: Service layer handles business logic.
-    
     Args:
         position: Alpaca position object
         trade_record: Trade record from database (optional)
@@ -193,8 +184,6 @@ async def detect_sell_signal(
     db = None
 ) -> Optional[SellSignal]:
     """Detect sell signals based on technical analysis.
-    
-    MDB-Engine Pattern: Service layer handles business logic.
     
     Args:
         symbol: Stock symbol

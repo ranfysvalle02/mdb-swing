@@ -1,11 +1,4 @@
-"""Logo service with SVG initials fallback.
-
-Provides simple SVG initials generation for stock symbols.
-No external API calls, no caching complexity - instant SVG rendering.
-
-MDB-Engine Integration:
-- Logging: Uses `get_logger(__name__)` from mdb_engine.observability for structured logging
-"""
+"""Logo service with SVG initials fallback."""
 import hashlib
 from typing import Dict
 from mdb_engine.observability import get_logger

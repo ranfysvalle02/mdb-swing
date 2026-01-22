@@ -1,14 +1,4 @@
-"""HTML template helpers for HTMX responses using Jinja2.
-
-MDB-Engine Pattern: Separate presentation logic from routes.
-These helpers generate clean, reusable HTML components for HTMX responses.
-
-Best Practice: Using Jinja2 templates instead of f-strings for:
-- Better separation of concerns
-- Cleaner template syntax
-- Easier maintenance
-- Better support for HTMX patterns
-"""
+"""HTML template helpers for HTMX responses using Jinja2."""
 import json
 import re
 import time
@@ -81,11 +71,7 @@ def progress_bar(
     warning_class: str = "",
     warning_msg: str = ""
 ) -> str:
-    """Generate a progress bar component.
-    
-    HTMX Security Best Practice: Sanitize warning_msg before using |safe filter.
-    """
-    # Sanitize warning_msg since it's rendered with |safe in template
+    """Generate a progress bar component."""
     sanitized_warning_msg = _sanitize_html_for_htmx(warning_msg) if warning_msg else ""
     
     return templates.get_template("components/progress_bar.html").render(
@@ -131,24 +117,7 @@ def toast_notification(
     undo_action: Optional[str] = None,
     undo_symbol: Optional[str] = None
 ) -> str:
-    """Generate toast notification HTML with hx-swap-oob support.
-    
-    HTMX Security Best Practice: This function returns HTML with data attributes only.
-    - NO inline scripts (prevents XSS attacks)
-    - Uses Alpine.js x-data for initialization (already in DOM, not injected)
-    - All user input is escaped via template filters (|e)
-    - Uses data attributes to pass data safely
-    
-    The toast is initialized by Alpine.js event handlers listening for htmx:afterSwap events.
-    
-    Args:
-        message: Toast message text
-        type: Toast type (success, info, warning, error)
-        duration: Auto-dismiss duration in milliseconds
-        target_id: Target container ID for hx-swap-oob
-        undo_action: Optional HTMX action URL for undo button
-        undo_symbol: Optional symbol to pass to undo action
-    """
+    """Generate toast notification HTML with hx-swap-oob support."""
     toast_id = f"toast-{int(time.time() * 1000000)}"
     
     return templates.get_template("components/toast_notification.html").render(
@@ -163,29 +132,10 @@ def toast_notification(
 
 
 def _sanitize_html_for_htmx(html_content: str) -> str:
-    """Sanitize HTML content to ensure it's valid for HTMX parsing.
-    
-    Fixes common issues that cause HTMX insertBefore errors:
-    - Escapes standalone & characters that aren't part of valid HTML entities
-    - Preserves existing HTML entities (like &amp;, &lt;, &quot;, etc.)
-    
-    Args:
-        html_content: HTML string that may contain unescaped entities
-        
-    Returns:
-        Sanitized HTML string safe for HTMX parsing
-    """
+    """Sanitize HTML content to ensure it's valid for HTMX parsing."""
     if not html_content:
         return html_content
     
-    # Pattern to escape & characters that are NOT part of valid HTML entities
-    # Valid entities: &name; or &#number; or &#xhex;
-    # This regex uses negative lookahead to avoid matching valid entities
-    # It matches & that's NOT followed by:
-    #   - A letter (start of named entity like &amp;)
-    #   - # followed by digits (numeric entity like &#123;)
-    #   - # followed by x/X and hex digits (hex entity like &#x1F;)
-    #   - And ending with ;
     result = re.sub(
         r'&(?!(?:[a-zA-Z][a-zA-Z0-9]{1,31}|#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6});)',
         '&amp;',
@@ -201,25 +151,12 @@ def error_response(
     target_id: Optional[str] = None,
     hx_trigger: Optional[str] = None
 ) -> HTMLResponse:
-    """Standardized error response for HTMX.
-    
-    HTMX Gold Standard: Consistent error handling across all routes.
-    
-    Args:
-        message: Error message to display
-        status_code: HTTP status code (default: 500)
-        target_id: Optional element ID to target with hx-swap-oob
-        hx_trigger: Optional HTMX event to trigger
-        
-    Returns:
-        HTMLResponse with error message
-    """
+    """Standardized error response for HTMX."""
     error_html = templates.get_template("partials/error_message.html").render(
         message=message
     )
     
     if target_id:
-        # Use htmx_response for multi-element updates
         content = htmx_response(updates={target_id: error_html})
         response = HTMLResponse(content=content, status_code=status_code)
     else:
@@ -237,19 +174,7 @@ def htmx_html_response(
     hx_trigger: Optional[str] = None,
     sanitize: bool = True
 ) -> HTMLResponse:
-    """Wrapper for HTMX HTML responses with automatic sanitization.
-    
-    HTMX Gold Standard: All HTML responses go through sanitization.
-    
-    Args:
-        content: HTML content to return
-        status_code: HTTP status code (default: 200)
-        hx_trigger: Optional HTMX event to trigger via header
-        sanitize: Whether to sanitize content (default: True)
-        
-    Returns:
-        HTMLResponse with sanitized content
-    """
+    """Wrapper for HTMX HTML responses with automatic sanitization."""
     if sanitize:
         content = _sanitize_html_for_htmx(content)
     
@@ -264,52 +189,19 @@ def htmx_html_response(
 def htmx_response(
     updates: Dict[str, str]
 ) -> str:
-    """Generate HTMX response with multiple hx-swap-oob updates.
-    
-    HTMX Security Best Practice: This function returns HTML only - no inline scripts.
-    Use HX-Trigger response headers to trigger events instead of inline scripts.
-    
-    MDB-Engine Pattern: Standardize multi-element HTMX responses.
-    This helper generates HTML with multiple hx-swap-oob elements,
-    allowing a single response to update multiple parts of the page.
-    
-    Args:
-        updates: Dict mapping element IDs to HTML content.
-                 Keys are element IDs, values are HTML strings.
-                 For toast-container, use "beforeend" strategy.
-        
-    Returns:
-        HTML string with multiple hx-swap-oob elements.
-        
-    Example:
-        response_content = htmx_response(updates={
-            "positions-list": positions_html,
-            "toast-container": toast_html
-        })
-        response = HTMLResponse(content=response_content)
-        response.headers["HX-Trigger"] = "refreshPositions"  # Set trigger via header
-        return response
-    """
-    # Prepare updates data for template
+    """Generate HTMX response with multiple hx-swap-oob updates."""
     updates_data = {}
     for element_id, content in updates.items():
-        # Sanitize content to ensure valid HTML for HTMX parsing
         content = _sanitize_html_for_htmx(content)
         
         if element_id == "toast-container":
-            # toast_notification already includes hx-swap-oob="beforeend"
             updates_data[element_id] = {
                 "content": content,
                 "swap_strategy": "beforeend"
             }
         else:
-            # Determine swap strategy based on content
-            # If content starts with a div with the same ID, use outerHTML
-            # Otherwise, use innerHTML for content replacement
             content_stripped = content.strip()
             if content_stripped.startswith(f'<div id="{element_id}"') or content_stripped.startswith(f"<div id='{element_id}'"):
-                # Content already has wrapper div with ID - add hx-swap-oob to it
-                # Find the opening div tag and add hx-swap-oob attribute
                 pattern = rf'(<div\s+id=["\']{re.escape(element_id)}["\'])([^>]*>)'
                 replacement = r'\1 hx-swap-oob="outerHTML"\2'
                 content = re.sub(pattern, replacement, content, count=1)
@@ -318,14 +210,12 @@ def htmx_response(
                     "swap_strategy": "outerHTML"
                 }
             else:
-                # Content doesn't have wrapper - wrap it
                 swap_strategy = "innerHTML"
                 updates_data[element_id] = {
                     "content": content,
                     "swap_strategy": swap_strategy
                 }
     
-    # Render template (no trigger - use HX-Trigger response headers instead)
     return templates.get_template("partials/htmx_swap_oob.html").render(
         updates=updates_data
     )
@@ -339,13 +229,7 @@ def htmx_modal_wrapper(
     icon: Optional[str] = None,
     icon_color: str = "text-purple-400"
 ) -> str:
-    """Generate HTMX modal wrapper HTML with native dialog element.
-    
-    Clean HTMX Pattern: Uses native <dialog> with CSS3 animations.
-    No Alpine.js, no Hyperscript - just pure CSS3 + HTMX magic.
-    
-    HTMX Security Best Practice: Sanitize content before using |safe filter.
-    """
+    """Generate HTMX modal wrapper HTML with native dialog element."""
     size_classes = {
         "small": "max-w-md",
         "medium": "max-w-2xl",
@@ -354,8 +238,6 @@ def htmx_modal_wrapper(
         "full": "max-w-95vw"
     }
     max_width = size_classes.get(size, size_classes["medium"])
-    
-    # Sanitize content since it's rendered with |safe in template
     sanitized_content = _sanitize_html_for_htmx(content)
     
     return templates.get_template("components/htmx_modal_wrapper.html").render(
@@ -369,13 +251,7 @@ def htmx_modal_wrapper(
 
 
 def stock_card(stock_data: Dict[str, Any]) -> str:
-    """Generate stock card HTML from stock data.
-    
-    MDB-Engine Pattern: Server-rendered components for better performance.
-    This replaces the client-side createStockCard() JavaScript function.
-    
-    Uses Jinja2 template for proper HTMX best practices.
-    """
+    """Generate stock card HTML from stock data."""
     symbol = stock_data.get('symbol', '')
     price = stock_data.get('price')
     rsi = stock_data.get('rsi')

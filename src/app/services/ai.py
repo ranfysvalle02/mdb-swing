@@ -1,23 +1,9 @@
-"""AI service for market analysis - reusable AI engine for FLUX.
-
-This module provides the EyeAI class, a strategy-agnostic AI analysis engine that works
-with any trading strategy by accepting strategy-specific prompts. FLUX analyzes markets,
-strategies define what it seeks, and EyeAI provides the intelligence.
-
-Key Features:
-- Strategy-agnostic: Works with any strategy via custom prompts
-- Azure OpenAI Integration: Uses GPT-4o for intelligent analysis
-- Structured Output: Returns TradeVerdict with score, action, reason, risk_level
-- Reusable: Single AI engine instance can be shared across strategies
-
-MDB-Engine Pattern: Uses mdb-engine's observability for structured logging.
-"""
+"""AI service for market analysis."""
 from langchain_openai import AzureChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from mdb_engine.observability import get_logger
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
-from typing import List
 from ..core.config import (
     AZURE_OPENAI_ENDPOINT,
     AZURE_OPENAI_API_KEY,

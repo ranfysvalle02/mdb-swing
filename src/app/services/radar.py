@@ -1,23 +1,4 @@
-"""Radar Service - MongoDB-backed caching and historical learning.
-
-This service provides intelligent caching and pattern learning capabilities:
-- TTL-based caching (1-hour expiration) to reduce API calls
-- Historical storage with vector embeddings for similarity search
-- Confidence scoring based on historical pattern performance
-- Vector search integration via mdb-engine's declarative index management
-
-MDB-Engine Patterns:
-- Dependency Injection: Accepts EmbeddingService as constructor parameter
-- Scoped Database: Uses scoped database from mdb-engine (automatic connection management)
-- Vector Search: Leverages mdb-engine's vector search index (declared in manifest.json)
-- Index Management: All indexes managed declaratively, no manual creation needed
-
-Key Features:
-- Cache Analysis: Store analysis results with TTL to avoid redundant API calls
-- Historical Learning: Store every analysis with embeddings for pattern matching
-- Similarity Search: Find similar historical signals using vector embeddings
-- Confidence Boost: Calculate confidence boost based on historical win rate
-"""
+"""Radar Service - MongoDB-backed caching and historical learning."""
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from mdb_engine.observability import get_logger
@@ -26,40 +7,15 @@ logger = get_logger(__name__)
 
 
 class RadarService:
-    """Radar Service for caching analysis results and historical learning.
-    
-    MDB-Engine Best Practices:
-    - Uses dependency injection for EmbeddingService (via FastAPI Depends())
-    - Uses scoped database from mdb-engine (automatic connection management)
-    - Leverages mdb-engine's vector search indexes (declarative in manifest.json)
-    
-    Provides:
-    - TTL-based caching to reduce API calls
-    - Historical storage with vector embeddings
-    - Vector search for similar signals
-    - Confidence scoring based on historical patterns
-    """
+    """Radar Service for caching analysis results and historical learning."""
     
     def __init__(self, db, embedding_service=None):
-        """Initialize RadarService with database and embedding service.
-        
-        MDB-Engine Pattern: Dependency Injection
-        - db: Scoped database from mdb-engine (via get_scoped_db())
-        - embedding_service: EmbeddingService from mdb-engine (via get_embedding_service())
-        
-        Args:
-            db: MongoDB database instance (scoped via mdb-engine)
-            embedding_service: Optional EmbeddingService instance (from mdb-engine)
-        """
+        """Initialize RadarService with database and embedding service."""
         self.db = db
         self.embedding_service = embedding_service
     
     def _get_embedding_service(self):
-        """Get embedding service, with fallback if not injected.
-        
-        Returns:
-            Embedding service instance or None if not available
-        """
+        """Get embedding service, with fallback if not injected."""
         if self.embedding_service:
             return self.embedding_service
         
@@ -442,9 +398,6 @@ class RadarService:
     ) -> bool:
         """Save daily scan results to MongoDB.
         
-        MDB-Engine Pattern: Uses scoped database from constructor.
-        Follows existing cache_analysis() pattern for consistency.
-        
         Args:
             stocks: List of stock analysis results
             strategy_id: Strategy identifier
@@ -492,8 +445,6 @@ class RadarService:
     
     async def get_latest_scan(self, date: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Get latest scan for a given date (or today if not specified).
-        
-        MDB-Engine Pattern: Uses scoped database from constructor.
         
         Logic:
         - If time < 6pm ET: return latest scan for date
@@ -554,8 +505,6 @@ class RadarService:
     
     async def get_scan_by_date(self, date: str) -> Optional[Dict[str, Any]]:
         """Get scan for a specific date.
-        
-        MDB-Engine Pattern: Uses scoped database from constructor.
         
         Args:
             date: Date string (YYYY-MM-DD)

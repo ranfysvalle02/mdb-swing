@@ -54,18 +54,7 @@ from time import time
 
 
 def error_response_html(message: str, status_code: int = 200) -> HTMLResponse:
-    """Create a standardized HTML error response for HTMX.
-    
-    HTMX Best Practice: Return HTML fragments for errors, not JSON.
-    This ensures errors can be swapped into the DOM seamlessly.
-    
-    Args:
-        message: Error message to display
-        status_code: HTTP status code (default 200 for HTMX compatibility)
-        
-    Returns:
-        HTMLResponse with error message template
-    """
+    """Create a standardized HTML error response for HTMX."""
     return HTMLResponse(
         content=templates.get_template("partials/error_message.html").render(message=message),
         status_code=status_code
@@ -73,16 +62,7 @@ def error_response_html(message: str, status_code: int = 200) -> HTMLResponse:
 
 
 def error_response_json(message: str, detail: Optional[str] = None, status_code: int = 400) -> JSONResponse:
-    """Create a standardized JSON error response for API endpoints.
-    
-    Args:
-        message: Error message
-        detail: Optional detailed error information
-        status_code: HTTP status code
-        
-    Returns:
-        JSONResponse with error structure
-    """
+    """Create a standardized JSON error response for API endpoints."""
     content = {"error": message}
     if detail:
         content["detail"] = detail
@@ -90,12 +70,7 @@ def error_response_json(message: str, detail: Optional[str] = None, status_code:
 
 
 async def get_timeout_error() -> HTMLResponse:
-    """Get timeout error template for HTMX timeout handling.
-    
-    HTMX Best Practice: Server-rendered HTML template for error messages.
-    This endpoint provides the timeout error template that can be swapped
-    into the target element when a request times out.
-    """
+    """Get timeout error template for HTMX timeout handling."""
     return HTMLResponse(content=templates.get_template("partials/timeout_error.html").render())
 
 async def _get_target_symbols(db: Any, force_discovery: bool = False) -> List[str]:
@@ -956,7 +931,7 @@ async def get_all_stats(request: Request, ticker: str = Form(...), db: Any = Dep
         return HTMLResponse(content=error_content)
 
 async def analyze_rejection(ticker: str = Form(...), db: Any = Depends(get_scoped_db)) -> HTMLResponse:
-    """Analyze why a symbol doesn't meet entry criteria - simple explanation."""
+    """Analyze why a symbol does not meet entry criteria - simple explanation."""
     symbol = ticker.upper().strip()
     if not symbol:
         error_content = templates.get_template("partials/error_message.html").render(
@@ -2901,7 +2876,7 @@ async def search_tickers(
     """Search for available tickers using Alpaca API.
     
     Returns a list of tickers that match the query (if provided) or popular tickers.
-    Uses Alpaca's list_assets API to get tradable stocks.
+    Uses Alpaca list_assets API to get tradable stocks.
     Optionally includes company names for better UX.
     Always checks candidate status for top 5 results.
     """
@@ -3447,9 +3422,7 @@ async def quick_buy(symbol: str = Form(...), qty: Optional[int] = Form(10), db: 
     HTMX Pattern: Returns HTML with hx-swap-oob="true" to update multiple elements:
     - Updates #positions-list with fresh positions
     - Adds toast notification to #toast-container
-    This demonstrates htmx's out-of-band swap capability.
-    
-    MDB-Engine Pattern: Uses Depends(get_scoped_db) for database access.
+    This demonstrates htmx out-of-band swap capability.
     
     Args:
         symbol: Stock symbol to buy
@@ -4026,17 +3999,7 @@ async def get_latest_scan(
     db: Any = Depends(get_scoped_db),
     embedding_service: EmbeddingService = Depends(get_embedding_service)
 ) -> JSONResponse:
-    """Get latest scan (or final scan if after 6pm ET).
-    
-    MDB-Engine Pattern: Uses Depends(get_scoped_db) and Depends(get_embedding_service)
-    for dependency injection. Follows existing route patterns.
-    
-    Args:
-        date: Optional date string (YYYY-MM-DD). If None, uses today.
-        
-    Returns:
-        JSONResponse with scan data or empty if not found
-    """
+    """Get latest scan (or final scan if after 6 PM ET)."""
     try:
         # MDB-Engine Pattern: Initialize RadarService with injected dependencies
         radar_service = RadarService(db, embedding_service=embedding_service)
@@ -6508,6 +6471,11 @@ async def test_alpaca_account(
         result = await account_manager.test_connection(account_id)
         
         if result.get('success'):
+            equity = result.get('equity', 0)
+            buying_power = result.get('buying_power', 0)
+            status = result.get('status', 'N/A')
+            equity_str = f"${equity:,.2f}"
+            buying_power_str = f"${buying_power:,.2f}"
             return HTMLResponse(content=f"""
                 <div class="glass rounded-lg p-3 border border-green-500/30 bg-green-500/10">
                     <div class="flex items-center gap-2 text-green-400 mb-2">
@@ -6515,9 +6483,9 @@ async def test_alpaca_account(
                         <span class="font-semibold">Connection Successful</span>
                     </div>
                     <div class="text-xs text-muted space-y-1">
-                        <div>Equity: <span class="text-white font-mono">${result.get('equity', 0):,.2f}</span></div>
-                        <div>Buying Power: <span class="text-white font-mono">${result.get('buying_power', 0):,.2f}</span></div>
-                        <div>Status: <span class="text-white">{{ result.get('status', 'N/A') }}</span></div>
+                        <div>Equity: <span class="text-white font-mono">{equity_str}</span></div>
+                        <div>Buying Power: <span class="text-white font-mono">{buying_power_str}</span></div>
+                        <div>Status: <span class="text-white">{status}</span></div>
                     </div>
                 </div>
             """)

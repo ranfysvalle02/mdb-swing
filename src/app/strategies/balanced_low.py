@@ -1,22 +1,4 @@
-"""Balanced Low Strategy - Swing Trading
-
-Entry Criteria (all must be true):
-1. RSI oversold: 20 < RSI < 35
-2. Price > SMA-200 (uptrend)
-3. Price within 3% of SMA-200 (near support)
-4. News filter: AI analysis excludes fraud, bankruptcy, major scandals
-
-Risk Management:
-- Stop Loss: 2x ATR below entry
-- Position Sizing: Based on ATR and risk per trade
-
-Architecture: Uses vectorbt for indicator calculations.
-MongoDB stores configuration and decisions, NOT computed indicators.
-
-MDB-Engine Integration:
-- Logging: Uses `get_logger(__name__)` from mdb_engine.observability for structured logging
-- Note: This module does NOT use MongoDB - it's pure computation logic
-"""
+"""Balanced Low Strategy - Swing Trading."""
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, Optional, Tuple

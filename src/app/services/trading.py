@@ -1,19 +1,13 @@
-"""Trading execution services.
-
-MDB-Engine Integration:
-- Logging: Uses `get_logger(__name__)` from mdb_engine.observability for structured logging
-- Database: Uses scoped database via mdb-engine for trade history (when needed)
-"""
+"""Trading execution services."""
 import math
 import asyncio
 from datetime import datetime
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, TYPE_CHECKING
 import pandas as pd
 from alpaca_trade_api.rest import TimeFrame
 from mdb_engine.observability import get_logger
 from ..core.config import ALPACA_KEY, ALPACA_SECRET, ALPACA_URL, STRATEGY_CONFIG
 from .analysis import api, get_market_data, analyze_technicals
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import alpaca_trade_api as tradeapi

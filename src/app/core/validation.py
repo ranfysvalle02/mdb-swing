@@ -1,8 +1,4 @@
-"""Input validation helpers for API routes.
-
-HTMX Gold Standard: Validate all inputs before processing.
-Provides reusable validation functions and Pydantic models.
-"""
+"""Input validation helpers for API routes."""
 import re
 from typing import Optional, List
 from pydantic import BaseModel, Field, validator
@@ -10,27 +6,15 @@ from fastapi import HTTPException, status
 
 
 def validate_symbol(symbol: str) -> str:
-    """Validate and normalize stock symbol.
-    
-    Args:
-        symbol: Stock symbol to validate
-        
-    Returns:
-        Normalized uppercase symbol
-        
-    Raises:
-        HTTPException: If symbol is invalid
-    """
+    """Validate and normalize stock symbol."""
     if not symbol:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Symbol cannot be empty"
         )
     
-    # Remove whitespace and convert to uppercase
     symbol = symbol.strip().upper()
     
-    # Validate format: 1-5 uppercase letters/numbers
     if not re.match(r'^[A-Z0-9]{1,5}$', symbol):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -41,25 +25,13 @@ def validate_symbol(symbol: str) -> str:
 
 
 def validate_symbols(symbols: str, max_count: int = 5) -> List[str]:
-    """Validate and normalize comma-separated stock symbols.
-    
-    Args:
-        symbols: Comma-separated list of symbols
-        max_count: Maximum number of symbols allowed
-        
-    Returns:
-        List of normalized uppercase symbols
-        
-    Raises:
-        HTTPException: If symbols are invalid
-    """
+    """Validate and normalize comma-separated stock symbols."""
     if not symbols:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Symbols cannot be empty"
         )
     
-    # Split and clean
     symbol_list = [s.strip().upper() for s in symbols.split(',') if s.strip()]
     
     if not symbol_list:
@@ -74,7 +46,6 @@ def validate_symbols(symbols: str, max_count: int = 5) -> List[str]:
             detail=f"Maximum {max_count} symbols allowed"
         )
     
-    # Validate each symbol
     validated_symbols = []
     for symbol in symbol_list:
         validated_symbols.append(validate_symbol(symbol))
@@ -83,19 +54,7 @@ def validate_symbols(symbols: str, max_count: int = 5) -> List[str]:
 
 
 def validate_price(price: float, min_price: float = 0.01, max_price: float = 1000000.0) -> float:
-    """Validate price value.
-    
-    Args:
-        price: Price to validate
-        min_price: Minimum allowed price
-        max_price: Maximum allowed price
-        
-    Returns:
-        Validated price
-        
-    Raises:
-        HTTPException: If price is invalid
-    """
+    """Validate price value."""
     if price is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -120,19 +79,7 @@ def validate_price(price: float, min_price: float = 0.01, max_price: float = 100
 
 
 def validate_quantity(qty: int, min_qty: int = 1, max_qty: int = 10000) -> int:
-    """Validate share quantity.
-    
-    Args:
-        qty: Quantity to validate
-        min_qty: Minimum allowed quantity
-        max_qty: Maximum allowed quantity
-        
-    Returns:
-        Validated quantity
-        
-    Raises:
-        HTTPException: If quantity is invalid
-    """
+    """Validate share quantity."""
     if qty is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -155,8 +102,6 @@ def validate_quantity(qty: int, min_qty: int = 1, max_qty: int = 10000) -> int:
     
     return qty_int
 
-
-# Pydantic models for request validation
 
 class TradeRequest(BaseModel):
     """Request model for trade execution."""

@@ -1,11 +1,4 @@
-"""Progress calculation utilities for watchlist cards.
-
-This module provides reusable functions for calculating progress percentages
-for RSI and SMA-200 proximity indicators used in watchlist cards.
-
-MDB-Engine Integration:
-- Logging: Uses `get_logger(__name__)` from mdb_engine.observability
-"""
+"""Progress calculation utilities for watchlist cards."""
 from typing import Optional
 from mdb_engine.observability import get_logger
 

@@ -1,23 +1,4 @@
-"""Intelligent Symbol Discovery Service - Scouting Tool.
-
-This is a scouting/discovery tool that:
-1. Generates intelligent queries based on strategy
-2. Searches web/news for relevant articles
-3. Extracts tickers directly from search results
-4. Reasons about each ticker with strategy context
-5. Ranks and selects top 5 based on strategy criteria
-6. Auto-populates target symbols
-
-Architecture:
-- Scouting-focused: Designed as a discovery tool, not manual input
-- Direct ticker extraction: Extracts tickers directly, not company names first
-- Intelligent ranking: Uses LLM to reason about each ticker
-- Strategy-aware: All steps consider current trading strategy
-- Fully automated: No manual comma-separated input needed
-
-MDB-Engine Integration:
-- Logging: Uses `get_logger(__name__)` from mdb_engine.observability for structured logging
-"""
+"""Intelligent Symbol Discovery Service."""
 from typing import List, Dict, Any, Optional
 from mdb_engine.observability import get_logger
 from langchain_openai import AzureChatOpenAI

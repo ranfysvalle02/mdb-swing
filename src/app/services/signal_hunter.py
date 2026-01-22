@@ -1,11 +1,4 @@
-"""Signal Hunter service for Finviz screener integration using finvizfinance.
-
-MDB-Engine Integration:
-- Logging: Uses `get_logger(__name__)` from mdb_engine.observability for structured logging
-
-Signal Hunter uses Finviz Overview screener with preset filter strategies.
-Results are then evaluated against the current strategy to mark candidates.
-"""
+"""Signal Hunter service for Finviz screener integration."""
 from typing import List, Dict, Any, Optional
 import pandas as pd
 from mdb_engine.observability import get_logger

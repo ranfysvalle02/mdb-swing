@@ -1,11 +1,4 @@
-"""Custom strategy evaluation service.
-
-MDB-Engine Integration:
-- Logging: Uses `get_logger(__name__)` from mdb_engine.observability for structured logging
-
-This service provides a generic strategy evaluator that can evaluate any combination
-of metric conditions against stock statistics.
-"""
+"""Custom strategy evaluation service."""
 from typing import Dict, Any, List, Optional, Tuple
 from mdb_engine.observability import get_logger
 
