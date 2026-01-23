@@ -41,7 +41,7 @@ from ..core.templates import templates
 from ..core.config import ALPACA_KEY, ALPACA_SECRET, STRATEGY_CONFIG, get_strategy_from_db, get_strategy_config as get_strategy_config_dict, FIRECRAWL_SEARCH_QUERY_TEMPLATE, get_active_custom_strategy, calculate_custom_strategy_hash
 from ..services.ai_prompts import get_balanced_low_prompt
 from ..services.custom_strategies import evaluate_strategy, get_available_metrics, format_strategy_description
-from ..services.signal_hunter import get_screener_results, FILTER_PRESETS, DEFAULT_PRESET
+from ..services.signal_hunter import get_screener_results, FILTER_PRESETS, DEFAULT_PRESET, get_finviz_filter_options
 
 logger = get_logger(__name__)
 
@@ -5981,7 +5981,45 @@ async def search_signal_hunter(
                 logger.warning(f"[SIGNAL_HUNTER] Failed to parse filters_json, using preset instead")
         
         if not filters_dict:
-            if preset_name in FILTER_PRESETS:
+            if preset_name == 'CUSTOM':
+                # CUSTOM preset MUST have filters in filters_json
+                logger.error(f"[SIGNAL_HUNTER] CUSTOM preset selected but no filters_json provided or empty")
+                # Return error modal
+                custom_strategy = await get_active_custom_strategy(db)
+                if custom_strategy:
+                    strategy_config = custom_strategy
+                else:
+                    strategy_config = await get_strategy_config_dict(db)
+                
+                watchlist_symbols = set()
+                try:
+                    watch_list_settings = await db.app_settings.find_one({"key": "watch_list"})
+                    if watch_list_settings and watch_list_settings.get("value"):
+                        symbols_str = watch_list_settings.get("value", "")
+                        watchlist_symbols = {s.strip().upper() for s in symbols_str.split(',') if s.strip()}
+                except:
+                    pass
+                
+                modal_content = templates.get_template("pages/signal_hunter_modal.html").render(
+                    results=None,
+                    loading=False,
+                    presets=FILTER_PRESETS,
+                    default_preset=DEFAULT_PRESET,
+                    current_filters={},
+                    strategy_name=strategy_config.get('name', 'Default') if strategy_config else 'Default',
+                    watchlist_symbols=watchlist_symbols,
+                    error="Please add at least one filter in the Custom Filter Builder before searching."
+                )
+                modal_html = htmx_modal_wrapper(
+                    modal_id="signal-hunter-modal",
+                    title="Signal Hunter",
+                    content=modal_content,
+                    size="xl",
+                    icon="radar",
+                    icon_color="text-purple-400"
+                )
+                return HTMLResponse(content=modal_html)
+            elif preset_name in FILTER_PRESETS:
                 filters_dict = FILTER_PRESETS[preset_name].copy()
                 logger.info(f"[SIGNAL_HUNTER] Using preset: {preset_name}")
             else:
@@ -6305,7 +6343,7 @@ async def search_signal_hunter(
 
 
 async def get_finviz_filters_api(
-    type: str = Query("technical", description="Screener type: technical or overview"),
+    type: str = Query("overview", description="Screener type: technical or overview"),
     db: Any = Depends(get_scoped_db)
 ) -> JSONResponse:
     """Get available Finviz filters and their options.
@@ -6318,7 +6356,7 @@ async def get_finviz_filters_api(
         JSONResponse with filters and their options
     """
     try:
-        filters = get_finviz_filters(type)
+        filters = get_finviz_filter_options()
         return JSONResponse(content={
             "success": True,
             "screener_type": type,

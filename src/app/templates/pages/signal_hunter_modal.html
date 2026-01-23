@@ -24,37 +24,78 @@
             class="space-y-4"
             id="signal-hunter-form">
             
-            {# Preset Selector - Two Buttons #}
+            {# Preset Selector - Grid Layout #}
             <div>
                 <label class="block text-sm font-semibold text-gray-300 mb-2">
                     <i data-lucide="zap" class="w-4 h-4 inline-block mr-1 text-purple-400"></i>
                     Filter Strategy
                 </label>
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-2.5">
+                    {% for preset_name, preset_filters in presets.items() %}
                     <button
                         type="button"
-                        id="buy-low-btn"
-                        onclick="selectPreset('Buy Low')"
-                        class="px-4 py-3 bg-gradient-to-r {% if default_preset == 'Buy Low' %}from-green-500/30 to-green-600/30 border-green-500/60 text-green-300{% else %}from-gray-800/50 to-gray-700/50 border-gray-700/50 text-gray-300 hover:from-gray-700/60 hover:to-gray-600/60{% endif %} border rounded-lg text-sm font-semibold transition-all flex flex-col items-center gap-1">
-                        <i data-lucide="trending-down" class="w-5 h-5"></i>
+                        id="preset-{{ preset_name|lower|replace(' ', '-') }}-btn"
+                        onclick="selectPreset('{{ preset_name }}')"
+                        class="px-3 py-2.5 bg-gradient-to-r {% if default_preset == preset_name %}from-purple-500/30 to-pink-500/30 border-purple-500/60 text-purple-300{% else %}from-gray-800/50 to-gray-700/50 border-gray-700/50 text-gray-300 hover:from-gray-700/60 hover:to-gray-600/60{% endif %} border rounded-lg text-xs font-semibold transition-all flex flex-col items-center gap-1 relative">
+                        {% if preset_name == 'Buy Low' %}
+                        <i data-lucide="trending-down" class="w-4 h-4"></i>
                         <span>Buy Low</span>
-                        <span class="text-[10px] opacity-75">Oversold bounce</span>
+                        <span class="text-[9px] opacity-75">Oversold bounce</span>
+                        {% elif preset_name == 'Catch Momentum' %}
+                        <i data-lucide="trending-up" class="w-4 h-4"></i>
+                        <span>Catch Momentum</span>
+                        <span class="text-[9px] opacity-75">Uptrend continuation</span>
+                        <span class="absolute -top-1 -right-1 px-1 py-0.5 bg-yellow-500/80 text-yellow-900 text-[8px] font-bold rounded-full animate-pulse">⚠️</span>
+                        {% elif preset_name == 'Deep Value' %}
+                        <i data-lucide="dollar-sign" class="w-4 h-4"></i>
+                        <span>Deep Value</span>
+                        <span class="text-[9px] opacity-75">Low P/E stocks</span>
+                        {% elif preset_name == 'Growth Stocks' %}
+                        <i data-lucide="trending-up" class="w-4 h-4"></i>
+                        <span>Growth</span>
+                        <span class="text-[9px] opacity-75">High EPS growth</span>
+                        {% elif preset_name == 'High Volume' %}
+                        <i data-lucide="activity" class="w-4 h-4"></i>
+                        <span>High Volume</span>
+                        <span class="text-[9px] opacity-75">Liquid stocks</span>
+                        {% elif preset_name == 'Breakout' %}
+                        <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+                        <span>Breakout</span>
+                        <span class="text-[9px] opacity-75">Momentum plays</span>
+                        {% elif preset_name == 'Oversold Bounce' %}
+                        <i data-lucide="arrow-down-left" class="w-4 h-4"></i>
+                        <span>Oversold</span>
+                        <span class="text-[9px] opacity-75">Bounce plays</span>
+                        {% elif preset_name == 'Strong Uptrend' %}
+                        <i data-lucide="arrow-up" class="w-4 h-4"></i>
+                        <span>Uptrend</span>
+                        <span class="text-[9px] opacity-75">Strong momentum</span>
+                        {% else %}
+                        <i data-lucide="target" class="w-4 h-4"></i>
+                        <span>{{ preset_name }}</span>
+                        {% endif %}
                     </button>
+                    {% endfor %}
+                    {# CUSTOM Filter Builder Button #}
                     <button
                         type="button"
-                        id="catch-momentum-btn"
-                        onclick="selectPreset('Catch Momentum')"
-                        class="px-4 py-3 bg-gradient-to-r {% if default_preset == 'Catch Momentum' %}from-blue-500/30 to-blue-600/30 border-blue-500/60 text-blue-300{% else %}from-gray-800/50 to-gray-700/50 border-gray-700/50 text-gray-300 hover:from-gray-700/60 hover:to-gray-600/60{% endif %} border rounded-lg text-sm font-semibold transition-all flex flex-col items-center gap-1 relative">
-                        <i data-lucide="trending-up" class="w-5 h-5"></i>
-                        <span>Catch Momentum</span>
-                        <span class="text-[10px] opacity-75 {% if default_preset == 'Catch Momentum' %}text-yellow-300{% endif %}">Uptrend continuation</span>
-                        <span class="absolute -top-1 -right-1 px-1.5 py-0.5 bg-yellow-500/80 text-yellow-900 text-[9px] font-bold rounded-full animate-pulse">⚠️ Slow</span>
+                        id="preset-custom-btn"
+                        onclick="toggleCustomBuilder()"
+                        class="px-3 py-2.5 bg-gradient-to-r from-orange-500/30 to-yellow-500/30 border-orange-500/60 text-orange-300 border rounded-lg text-xs font-semibold transition-all flex flex-col items-center gap-1 hover:from-orange-500/40 hover:to-yellow-500/40">
+                        <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+                        <span>Custom</span>
+                        <span class="text-[9px] opacity-75">Build your own</span>
                     </button>
                 </div>
                 <input type="hidden" name="preset_name" id="preset-name-input" value="{{ default_preset }}">
                 <p class="text-xs text-gray-500 mt-2">
-                    Choose your trading strategy
+                    Choose a preset or build your own custom filter
                 </p>
+            </div>
+            
+            {# Custom Filter Builder - Initially Hidden #}
+            <div id="custom-builder-container" class="hidden">
+                {% include "components/custom_filter_builder.html" %}
             </div>
             
             {# Active Filters Display #}
@@ -169,36 +210,44 @@
 <script>
 // Preset filters data (injected from backend)
 const PRESETS = {{ presets|tojson|safe }};
+const DEFAULT_PRESET = {{ default_preset|tojson|safe }} || 'Buy Low';
 
 function selectPreset(presetName) {
+    // Hide custom builder if showing
+    const customBuilder = document.getElementById('custom-builder-container');
+    if (customBuilder) {
+        customBuilder.classList.add('hidden');
+    }
+    
+    // Reset custom button style
+    const customBtn = document.getElementById('preset-custom-btn');
+    if (customBtn) {
+        customBtn.className = 'px-3 py-2.5 bg-gradient-to-r from-orange-500/30 to-yellow-500/30 border-orange-500/60 text-orange-300 border rounded-lg text-xs font-semibold transition-all flex flex-col items-center gap-1 hover:from-orange-500/40 hover:to-yellow-500/40';
+    }
+    
     const filters = PRESETS[presetName];
     if (!filters) return;
     
-    // Update button styles
-    const buyLowBtn = document.getElementById('buy-low-btn');
-    const catchMomentumBtn = document.getElementById('catch-momentum-btn');
+    // Update all preset button styles
+    Object.keys(PRESETS).forEach(function(name) {
+        const btnId = 'preset-' + name.toLowerCase().replace(/\s+/g, '-') + '-btn';
+        const btn = document.getElementById(btnId);
+        if (btn) {
+            if (name === presetName) {
+                // Active preset - purple/pink gradient
+                btn.className = btn.className.replace(/from-\w+-\d+\/30 to-\w+-\d+\/30 border-\w+-\d+\/60 text-\w+-\d+/g, 
+                    'from-purple-500/30 to-pink-500/30 border-purple-500/60 text-purple-300');
+            } else {
+                // Inactive preset - gray
+                btn.className = btn.className.replace(/from-\w+-\d+\/30 to-\w+-\d+\/30 border-\w+-\d+\/60 text-\w+-\d+/g,
+                    'from-gray-800/50 to-gray-700/50 border-gray-700/50 text-gray-300 hover:from-gray-700/60 hover:to-gray-600/60');
+            }
+        }
+    });
+    
     const presetInput = document.getElementById('preset-name-input');
-    
-    if (presetName === 'Buy Low') {
-        buyLowBtn.className = 'px-4 py-3 bg-gradient-to-r from-green-500/30 to-green-600/30 border-green-500/60 text-green-300 border rounded-lg text-sm font-semibold transition-all flex flex-col items-center gap-1';
-        catchMomentumBtn.className = 'px-4 py-3 bg-gradient-to-r from-gray-800/50 to-gray-700/50 border-gray-700/50 text-gray-300 hover:from-gray-700/60 hover:to-gray-600/60 border rounded-lg text-sm font-semibold transition-all flex flex-col items-center gap-1';
-    } else {
-        catchMomentumBtn.className = 'px-4 py-3 bg-gradient-to-r from-blue-500/30 to-blue-600/30 border-blue-500/60 text-blue-300 border rounded-lg text-sm font-semibold transition-all flex flex-col items-center gap-1';
-        buyLowBtn.className = 'px-4 py-3 bg-gradient-to-r from-gray-800/50 to-gray-700/50 border-gray-700/50 text-gray-300 hover:from-gray-700/60 hover:to-gray-600/60 border rounded-lg text-sm font-semibold transition-all flex flex-col items-center gap-1';
-    }
-    
     if (presetInput) {
         presetInput.value = presetName;
-    }
-    
-    // Show warning for Catch Momentum
-    const catchMomentumDesc = catchMomentumBtn ? catchMomentumBtn.querySelector('.text-\\[10px\\]') : null;
-    if (presetName === 'Catch Momentum' && catchMomentumDesc) {
-        catchMomentumDesc.textContent = 'Uptrend continuation (30-60s)';
-        catchMomentumDesc.className = 'text-[10px] opacity-75 text-yellow-300';
-    } else if (catchMomentumDesc) {
-        catchMomentumDesc.textContent = 'Uptrend continuation';
-        catchMomentumDesc.className = 'text-[10px] opacity-75';
     }
     
     // Update the active filters display
@@ -206,20 +255,96 @@ function selectPreset(presetName) {
     const filtersContainer = displayDiv ? displayDiv.querySelector('.bg-gray-800\\/30') : null;
     
     if (filtersContainer) {
-        filtersContainer.innerHTML = Object.entries(filters).map(function(entry) {
-            var key = entry[0];
-            var value = entry[1];
-            return '<div class="flex items-center justify-between text-xs">' +
-                '<span class="text-gray-400">' + key + ':</span>' +
-                '<span class="purple-300 font-medium">' + value + '</span>' +
-                '</div>';
-        }).join('');
+        if (Object.keys(filters).length === 0) {
+            filtersContainer.innerHTML = '<div class="text-xs text-gray-500 text-center py-2">No active filters</div>';
+        } else {
+            filtersContainer.innerHTML = Object.entries(filters).map(function(entry) {
+                var key = entry[0];
+                var value = entry[1];
+                return '<div class="flex items-center justify-between text-xs">' +
+                    '<span class="text-gray-400">' + key + ':</span>' +
+                    '<span class="text-purple-300 font-medium">' + value + '</span>' +
+                    '</div>';
+            }).join('');
+        }
     }
     
     // Update hidden input with filters as JSON
     const jsonInput = document.getElementById('filters-json-input');
     if (jsonInput) {
         jsonInput.value = JSON.stringify(filters);
+    }
+}
+
+function toggleCustomBuilder() {
+    const customBuilder = document.getElementById('custom-builder-container');
+    const customBtn = document.getElementById('preset-custom-btn');
+    const presetInput = document.getElementById('preset-name-input');
+    
+    if (!customBuilder || !customBtn) return;
+    
+    if (customBuilder.classList.contains('hidden')) {
+        // Show custom builder
+        customBuilder.classList.remove('hidden');
+        customBtn.className = 'px-3 py-2.5 bg-gradient-to-r from-orange-500/40 to-yellow-500/40 border-orange-500/80 text-orange-200 border rounded-lg text-xs font-semibold transition-all flex flex-col items-center gap-1';
+        
+        // Reset all other preset buttons
+        Object.keys(PRESETS).forEach(function(name) {
+            const btnId = 'preset-' + name.toLowerCase().replace(/\s+/g, '-') + '-btn';
+            const btn = document.getElementById(btnId);
+            if (btn) {
+                btn.className = btn.className.replace(/from-\w+-\d+\/30 to-\w+-\d+\/30 border-\w+-\d+\/60 text-\w+-\d+/g,
+                    'from-gray-800/50 to-gray-700/50 border-gray-700/50 text-gray-300 hover:from-gray-700/60 hover:to-gray-600/60');
+            }
+        });
+        
+        if (presetInput) {
+            presetInput.value = 'CUSTOM';
+        }
+        
+        // Clear any existing filters JSON
+        const jsonInput = document.getElementById('filters-json-input');
+        if (jsonInput) {
+            jsonInput.value = '';
+        }
+        
+        // Clear active filters display
+        const displayDiv = document.getElementById('active-filters-display');
+        const filtersContainer = displayDiv ? displayDiv.querySelector('.bg-gray-800\\/30') : null;
+        if (filtersContainer) {
+            filtersContainer.innerHTML = '<div class="text-xs text-gray-500 text-center py-2">Add filters in the Custom Builder below</div>';
+        }
+        
+        // Initialize Alpine.js if needed
+        if (typeof Alpine !== 'undefined') {
+            setTimeout(function() {
+                const builderElement = document.getElementById('custom-filter-builder');
+                if (builderElement && typeof Alpine.initTree === 'function') {
+                    try {
+                        Alpine.initTree(builderElement);
+                    } catch (e) {
+                        console.debug('Alpine init error (non-critical):', e);
+                    }
+                }
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+            }, 100);
+        }
+    } else {
+        // Hide custom builder
+        customBuilder.classList.add('hidden');
+        customBtn.className = 'px-3 py-2.5 bg-gradient-to-r from-orange-500/30 to-yellow-500/30 border-orange-500/60 text-orange-300 border rounded-lg text-xs font-semibold transition-all flex flex-col items-center gap-1 hover:from-orange-500/40 hover:to-yellow-500/40';
+        
+        // Clear filters JSON when hiding
+        const jsonInput = document.getElementById('filters-json-input');
+        if (jsonInput) {
+            jsonInput.value = '';
+        }
+        
+        if (presetInput) {
+            presetInput.value = DEFAULT_PRESET || 'Buy Low';
+        }
     }
 }
 
@@ -288,10 +413,58 @@ document.addEventListener('DOMContentLoaded', function() {
         form.addEventListener('submit', function(e) {
             const presetInput = document.getElementById('preset-name-input');
             const presetName = presetInput ? presetInput.value : 'Buy Low';
-            const filters = PRESETS[presetName];
             const jsonInput = document.getElementById('filters-json-input');
-            if (jsonInput && filters) {
-                jsonInput.value = JSON.stringify(filters);
+            
+            // Handle CUSTOM preset
+            if (presetName === 'CUSTOM') {
+                // Get filters from custom builder (Alpine.js component)
+                const customBuilder = document.getElementById('custom-filter-builder');
+                let customFilters = {};
+                
+                // Try to get from Alpine.js component
+                if (customBuilder && typeof Alpine !== 'undefined') {
+                    try {
+                        const builderData = Alpine.$data(customBuilder);
+                        if (builderData && typeof builderData.getFiltersDict === 'function') {
+                            customFilters = builderData.getFiltersDict();
+                            console.log('[SIGNAL_HUNTER] Got filters from Alpine component:', customFilters);
+                        }
+                    } catch (alpineError) {
+                        console.warn('Could not get filters from Alpine component:', alpineError);
+                    }
+                }
+                
+                // Fallback: try to get from JSON input if already set
+                if (Object.keys(customFilters).length === 0 && jsonInput && jsonInput.value) {
+                    try {
+                        const parsed = JSON.parse(jsonInput.value);
+                        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+                            customFilters = parsed;
+                            console.log('[SIGNAL_HUNTER] Got filters from JSON input:', customFilters);
+                        }
+                    } catch (parseError) {
+                        console.warn('Could not parse filters from JSON input:', parseError);
+                    }
+                }
+                
+                if (Object.keys(customFilters).length === 0) {
+                    e.preventDefault();
+                    alert('Please add at least one filter to your custom filter builder before searching.\n\nClick "Add Filter" and select filter types and values.');
+                    return false;
+                }
+                
+                // Ensure JSON input is set
+                if (jsonInput) {
+                    jsonInput.value = JSON.stringify(customFilters);
+                    console.log('[SIGNAL_HUNTER] Set filters_json to:', jsonInput.value);
+                }
+            } else {
+                // Use preset filters
+                const filters = PRESETS[presetName];
+                if (jsonInput && filters) {
+                    jsonInput.value = JSON.stringify(filters);
+                    console.log('[SIGNAL_HUNTER] Using preset filters:', presetName, filters);
+                }
             }
             
             // Update loading messages based on preset
@@ -334,7 +507,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     lucide.createIcons();
                 }
                 // Re-load preset filters for new content
-                setTimeout(loadPresetFilters, 100);
+                setTimeout(function() {
+                    const presetInput = document.getElementById('preset-name-input');
+                    const defaultPreset = presetInput ? presetInput.value : 'Buy Low';
+                    selectPreset(defaultPreset);
+                    
+                    // Initialize Alpine.js for custom filter builder if present
+                    if (typeof Alpine !== 'undefined' && typeof Alpine.initTree === 'function') {
+                        const customBuilder = document.getElementById('custom-filter-builder');
+                        if (customBuilder) {
+                            try {
+                                Alpine.initTree(customBuilder);
+                            } catch (e) {
+                                console.debug('Alpine init error on custom builder (non-critical):', e);
+                            }
+                        }
+                    }
+                }, 100);
             }
         });
         
